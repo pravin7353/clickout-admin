@@ -29,11 +29,19 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
   late String _gst;
   DateTime? _selectedExpiry;
 
+  // 🎨 STRICT DARK THEME CONSTANTS
+  static const Color bgDark = Color(0xFF080B08);
+  static const Color cardDark = Color(0xFF111811);
+  static const Color accentGreen = Color(0xFF00C853);
+  static const Color accentRed = Color(0xFFFE8181);
+  static const Color textPrimary = Color(0xFFF0F0F0);
+  static const Color textSecondary = Color(0xFF888888);
+  static const Color inputBg = Color(0xFF1A221A);
+
   @override
   void initState() {
     super.initState();
 
-    // 🧠 SMART PARSING TO PREVENT CRASHES
     _barcodeCtrl = TextEditingController(
       text: widget.productData['barcode'] ?? widget.docId,
     );
@@ -59,14 +67,14 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
           widget.productData['stock']?.toString() ??
           '0',
     );
+
     _gst =
         (widget.productData['gst'] ??
                 widget.productData['gst_slab'] ??
                 '0% GST')
             .toString();
-    if (!_gst.contains('%')) _gst = '$_gst% GST'; // Normalize legacy data
+    if (!_gst.contains('%')) _gst = '$_gst% GST';
 
-    // 🛡️ THE CRASH SAVIOR: Handle both String and Timestamp gracefully
     var rawExpiry =
         widget.productData['expiryDate'] ?? widget.productData['expiry_date'];
     if (rawExpiry != null) {
@@ -76,7 +84,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
         try {
           _selectedExpiry = DateFormat('dd MMM yyyy').parse(rawExpiry);
         } catch (e) {
-          _selectedExpiry = DateTime.tryParse(rawExpiry); // Fallback
+          _selectedExpiry = DateTime.tryParse(rawExpiry);
         }
       }
     }
@@ -91,8 +99,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
       'weight': _weightCtrl.text.trim(),
       'physicalStock': _stockCtrl.text.trim(),
       'gst': _gst,
-      'expiryDate':
-          _selectedExpiry, // The provider will convert this to Timestamp
+      'expiryDate': _selectedExpiry,
     };
 
     try {
@@ -103,15 +110,18 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("✅ Master SKU Updated Successfully!"),
-            backgroundColor: Colors.green,
+            content: Text("✅ Master SKU Updated!"),
+            backgroundColor: accentGreen,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     }
@@ -124,18 +134,20 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
 
     int currentStock = int.tryParse(_stockCtrl.text) ?? 0;
     bool isLowStock = currentStock <= 10;
-
     bool isExpired =
         _selectedExpiry != null && _selectedExpiry!.isBefore(DateTime.now());
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      backgroundColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+      ),
+      backgroundColor: bgDark,
       insetPadding: const EdgeInsets.all(16),
       child: Container(
         width: isMobile ? double.infinity : 750,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: bgDark,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -145,19 +157,17 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: bgDark,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                border: Border(
+                  bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.edit_square,
-                    color: Color(0xFF2B3674),
-                    size: 28,
-                  ),
+                  const Icon(Icons.edit_square, color: accentGreen, size: 28),
                   const SizedBox(width: 15),
                   Expanded(
                     child: Column(
@@ -168,13 +178,13 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w900,
-                            color: Color(0xFF1E1E2D),
+                            color: textPrimary,
                           ),
                         ),
                         Text(
                           "Modifying: ${_barcodeCtrl.text}",
                           style: const TextStyle(
-                            color: Colors.grey,
+                            color: textSecondary,
                             fontSize: 13,
                             fontFamily: 'monospace',
                             fontWeight: FontWeight.bold,
@@ -183,7 +193,6 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ],
                     ),
                   ),
-                  // Health Badges
                   if (isLowStock)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -191,13 +200,14 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: accentRed.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: accentRed.withOpacity(0.3)),
                       ),
                       child: const Text(
                         "Low Stock",
                         style: TextStyle(
-                          color: Colors.deepOrange,
+                          color: accentRed,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -212,14 +222,19 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ),
                       decoration: BoxDecoration(
                         color: isExpired
-                            ? Colors.red.shade100
-                            : Colors.green.shade100,
+                            ? accentRed.withOpacity(0.1)
+                            : accentGreen.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isExpired
+                              ? accentRed.withOpacity(0.3)
+                              : accentGreen.withOpacity(0.3),
+                        ),
                       ),
                       child: Text(
                         isExpired ? "EXPIRED" : "Fresh",
                         style: TextStyle(
-                          color: isExpired ? Colors.red : Colors.green,
+                          color: isExpired ? accentRed : accentGreen,
                           fontWeight: FontWeight.bold,
                           fontSize: 12,
                         ),
@@ -258,9 +273,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                           ),
                         ],
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Divider(color: textSecondary.withOpacity(0.1)),
                       ),
 
                       _buildSectionLabel("PRICING & TAX"),
@@ -286,6 +301,11 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                                 "Included GST",
                                 Icons.receipt_long,
                               ),
+                              dropdownColor: cardDark,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: accentGreen,
+                              ),
                               items: _gstSlabs
                                   .map(
                                     (val) => DropdownMenuItem(
@@ -294,6 +314,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                                         val,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
+                                          color: textPrimary,
                                         ),
                                       ),
                                     ),
@@ -304,9 +325,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                           ),
                         ],
                       ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Divider(color: textSecondary.withOpacity(0.1)),
                       ),
 
                       _buildSectionLabel("INVENTORY & LIFECYCLE"),
@@ -335,6 +356,22 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                                       ),
                                   firstDate: DateTime.now(),
                                   lastDate: DateTime(2030),
+                                  builder: (context, child) {
+                                    return Theme(
+                                      data: Theme.of(context).copyWith(
+                                        colorScheme: const ColorScheme.dark(
+                                          primary: accentGreen,
+                                          onPrimary: bgDark,
+                                          surface: cardDark,
+                                          onSurface: textPrimary,
+                                        ),
+                                        dialogTheme: DialogThemeData(
+                                          backgroundColor: bgDark,
+                                        ),
+                                      ),
+                                      child: child!,
+                                    );
+                                  },
                                 );
                                 if (date != null) {
                                   setState(() => _selectedExpiry = date);
@@ -358,8 +395,8 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: _selectedExpiry == null
-                                        ? Colors.grey
-                                        : Colors.black,
+                                        ? textSecondary
+                                        : textPrimary,
                                   ),
                                 ),
                               ),
@@ -377,11 +414,13 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: bgDark,
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(16),
                 ),
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                border: Border(
+                  top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -393,41 +432,42 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                     child: const Text(
                       "Cancel",
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: textSecondary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2B3674),
+                      backgroundColor: accentGreen,
+                      foregroundColor: bgDark,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
-                        vertical: 18,
+                        vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     onPressed: isProcessing ? null : _submitEdit,
-                    child: isProcessing
+                    icon: isProcessing
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 18,
+                            height: 18,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: bgDark,
                               strokeWidth: 2,
                             ),
                           )
-                        : const Text(
-                            "SAVE CHANGES",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
-                            ),
-                          ),
+                        : const Icon(Icons.update, size: 18),
+                    label: const Text(
+                      "UPDATE CHANGES",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -451,10 +491,10 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w900,
-          color: Colors.grey.shade500,
+          color: textSecondary,
           letterSpacing: 1.5,
         ),
       ),
@@ -476,7 +516,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
         keyboardType: isNumber
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
-        style: const TextStyle(fontWeight: FontWeight.w600),
+        style: const TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
         decoration: _inputDecoration(label, icon),
         validator: isRequired
             ? (value) => value == null || value.isEmpty ? "Required" : null
@@ -488,25 +528,25 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(
-        color: Colors.grey,
+      labelStyle: TextStyle(
+        color: textSecondary.withOpacity(0.8),
         fontWeight: FontWeight.bold,
       ),
-      prefixIcon: Icon(icon, color: Colors.grey.shade600, size: 20),
+      prefixIcon: Icon(icon, color: textSecondary, size: 20),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: inputBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide.none,
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF2B3674), width: 2),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        borderSide: BorderSide(color: accentGreen, width: 1.5),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.red.shade300),
+      errorBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
       ),
     );
   }

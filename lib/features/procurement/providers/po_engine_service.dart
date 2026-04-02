@@ -27,9 +27,17 @@ class POEngineNotifier extends Notifier<bool> {
           .collection('products')
           .where('physicalStock', isLessThanOrEqualTo: 20);
 
+      // 🚀 THE WALL: Fetch Branch Code
+      final branchCode = ref.read(adminRoleProvider).value?['branchCode'];
+
       // 🚀 SAAS ISOLATION
       if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
         query = query.where('tenantId', isEqualTo: tenantId);
+      }
+
+      // 🛡️ THE WALL: Branch Isolation for Managers
+      if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+        query = query.where('branchCode', isEqualTo: branchCode);
       }
 
       final lowStockSnaps = await query.get();
@@ -38,15 +46,54 @@ class POEngineNotifier extends Notifier<bool> {
         return 0;
       }
 
+      // 🚀 CACHE: Store fallback supplier to avoid querying DB inside the loop
+      String? fallbackSupplierId;
+
       Map<String, List<Map<String, dynamic>>> supplierGroups = {};
       for (var doc in lowStockSnaps.docs) {
-        // 🚀 THE FIX: Dart ko batao ki ye Map hai!
         final data = doc.data() as Map<String, dynamic>;
 
         if (data['isBlocked'] == true || data['isDeleted'] == true) continue;
 
-        String supplier = data['supplierId'] ?? 'DEFAULT_SUPPLIER';
+        String supplier = data['supplierId'] ?? '';
+
+        // 🚀 STEP 1 & 2: RESOLVE SUPPLIER SAFELY
+        if (supplier.isEmpty || supplier == 'DEFAULT_SUPPLIER') {
+          if (fallbackSupplierId == null) {
+            Query supQ = _db.collection('suppliers').limit(1);
+            if (role != 'super_admin' &&
+                tenantId != null &&
+                tenantId.isNotEmpty) {
+              supQ = supQ.where('tenantId', isEqualTo: tenantId);
+            }
+            final defaultSupSnap = await supQ.get();
+            if (defaultSupSnap.docs.isNotEmpty) {
+              fallbackSupplierId = defaultSupSnap.docs.first.id;
+            }
+          }
+
+          if (fallbackSupplierId != null) {
+            supplier = fallbackSupplierId;
+            debugPrint(
+              "⚠️ WARNING: Product ${doc.id} missing supplier. Auto-assigned fallback: $supplier",
+            );
+          } else {
+            debugPrint(
+              "🚨 ERROR: No valid supplier found in DB. Skipping PO for product ${doc.id}",
+            );
+            continue; // Skip PO creation for this product to prevent "Unknown" bug
+          }
+        }
+
         int reorderQty = 50;
+        // 💰 FINANCIAL CALCULATION (FIXED: Real unitCost with 30% fallback)
+        double price = double.tryParse(data['price']?.toString() ?? '0') ?? 0.0;
+        double unitCost =
+            double.tryParse(data['unitCost']?.toString() ?? '0') ?? 0.0;
+        if (unitCost <= 0) {
+          unitCost = price * 0.70; // 🚀 Fallback to 70% of MRP if missing
+        }
+        double totalItemCost = unitCost * reorderQty;
 
         if (!supplierGroups.containsKey(supplier)) {
           supplierGroups[supplier] = [];
@@ -55,20 +102,42 @@ class POEngineNotifier extends Notifier<bool> {
           'productId': doc.id,
           'name': data['name'],
           'orderQty': reorderQty,
+          'unitCost': unitCost, // 💰 FINANCIALS
+          'totalItemCost': totalItemCost, // 💰 FINANCIALS
         });
       }
 
       for (var supplierId in supplierGroups.keys) {
         final items = supplierGroups[supplierId]!;
-        await _db.collection('purchase_orders').add({
+
+        // Calculate Total PO Value
+        double totalOrderValue = 0.0;
+        for (var item in items) {
+          totalOrderValue += (item['totalItemCost'] as double);
+        }
+
+        // 🚀 STEP 3: FETCH AND STORE REAL SUPPLIER NAME FOR FAST UI
+        String supplierName = 'Unknown Supplier';
+        try {
+          final sDoc = await _db.collection('suppliers').doc(supplierId).get();
+          if (sDoc.exists) {
+            supplierName = sDoc.data()?['name'] ?? 'Unknown Supplier';
+          }
+        } catch (_) {}
+
+        final docRef = await _db.collection('purchase_orders').add({
+          'poId': 'TEMP',
           'supplierId': supplierId,
-          'items': items,
+          'supplierName': supplierName, // 🚀 FAST UI RENDER SUPPORT
           'totalItems': items.length,
+          'totalOrderValue': totalOrderValue, // 💰 FINANCIALS
           'status': 'DRAFT',
           'createdAt': FieldValue.serverTimestamp(),
           'tenantId': tenantId, // 🚀 SAAS INJECTION
           'generatedBy': 'AI_ENGINE',
+          'items': items,
         });
+        await docRef.update({'poId': docRef.id});
         posCreated++;
       }
     } catch (e) {
@@ -99,7 +168,7 @@ class POEngineNotifier extends Notifier<bool> {
     }
   }
 
-  // 🚀 3. MANUAL PO ENGINE
+  // 🚀 3. MANUAL PO ENGINE (ENTERPRISE FINANCIAL SCHEMA)
   Future<void> createManualPO({
     required String productId,
     required String productName,
@@ -117,30 +186,60 @@ class POEngineNotifier extends Notifier<bool> {
       // 🚀 SAAS CONTEXT
       final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
 
+      // 💰 FINANCIAL TRACKING: Fetch Unit Cost dynamically (FIXED)
+      final prodSnap = await _db.collection('products').doc(productId).get();
+      final prodData = prodSnap.data() ?? {};
+      final double price =
+          double.tryParse(prodData['price']?.toString() ?? '0') ?? 0.0;
+      double unitCost =
+          double.tryParse(prodData['unitCost']?.toString() ?? '0') ?? 0.0;
+      if (unitCost <= 0) {
+        unitCost = price * 0.70; // 🚀 Fallback to 70% of MRP if missing
+      }
+      final double totalItemCost = unitCost * orderQty;
+
       await poRef.set({
         'poId': poRef.id,
-        'supplierId': supplierId.toUpperCase(),
+        'supplierId': supplierId, // 🚀 Real ID Used
         'status': 'PENDING_APPROVAL',
         'branchCode': branchCode.toUpperCase(),
         'expectedDelivery': Timestamp.fromDate(deliveryDate),
         'notes': notes ?? '',
-        'items': [
-          {'productId': productId, 'name': productName, 'orderQty': orderQty},
-        ],
         'totalItems': 1,
+        'totalOrderValue': totalItemCost, // 💰 FINANCIAL TRACKING
         'createdAt': FieldValue.serverTimestamp(),
         'generatedBy': adminEmail,
-        'tenantId':
-            tenantId, // 🚀 SAAS INJECTION (Added here as well for safety)
+        'tenantId': tenantId, // 🚀 SAAS SECURED
+        'items': [
+          {
+            'productId': productId,
+            'name': productName,
+            'orderQty': orderQty,
+            'unitCost': unitCost, // 💰 FINANCIAL TRACKING
+            'totalItemCost': totalItemCost, // 💰 FINANCIAL TRACKING
+          },
+        ],
       });
 
+      // 🚀 SAAS LOGIC: Fetch REAL Supplier Email
+      final supplierSnap = await _db
+          .collection('suppliers')
+          .doc(supplierId)
+          .get();
+      final supplierEmail = supplierSnap.data()?['email'];
+
+      // Agar distributor ka email nahi hai, toh testing ke liye aapke email par jayega
+      final targetEmail =
+          (supplierEmail != null && supplierEmail.toString().isNotEmpty)
+          ? supplierEmail
+          : 'pravinjaiswal@gmail.com'; // ⚠️ Apna email yahan dal lijiye testing ke liye
+
       await _db.collection('mail').add({
-        'to': 'orders@${supplierId.toString().toLowerCase()}.com',
+        'to': targetEmail,
         'message': {
-          'subject':
-              'URGENT: Purchase Order #${poRef.id} from ClickOut', // 🛠️ Bracket formatting fixed
+          'subject': 'URGENT: Purchase Order #${poRef.id} from ClickOut',
           'html':
-              '<h3>Purchase Order: #${poRef.id}</h3><p>Please deliver <b>$orderQty Units</b> of <b>$productName</b> to $branchCode by ${deliveryDate.toLocal().toString().split(' ')[0]}.</p>',
+              '<h3>Purchase Order: #${poRef.id}</h3><p>Please deliver <b>$orderQty Units</b> of <b>$productName</b> to <b>$branchCode</b> by ${deliveryDate.toLocal().toString().split(' ')[0]}.</p><br><p>Total Value: ₹$totalItemCost</p>',
         },
       });
     } catch (e) {
@@ -165,26 +264,47 @@ class POEngineNotifier extends Notifier<bool> {
       // 🚀 SAAS CONTEXT
       final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
 
+      // 💰 FINANCIAL TRACKING (FIXED)
+      final prodSnap = await _db
+          .collection('products')
+          .doc(suggestionData['productId'])
+          .get();
+      final prodData = prodSnap.data() ?? {};
+      final double price =
+          double.tryParse(prodData['price']?.toString() ?? '0') ?? 0.0;
+      double unitCost =
+          double.tryParse(prodData['unitCost']?.toString() ?? '0') ?? 0.0;
+      if (unitCost <= 0) {
+        unitCost = price * 0.70; // 🚀 Fallback to 70% of MRP if missing
+      }
+      final double totalItemCost = unitCost * orderQty;
+
       final poRef = await _db.collection('purchase_orders').add({
+        'poId': 'TEMP', // Will update instantly below
         'supplierId': supplierId,
         'status': 'APPROVED',
         'branchCode': branchCode,
         'expectedDelivery': Timestamp.fromDate(
           DateTime.now().add(const Duration(days: 3)),
         ),
+        'totalItems': 1,
+        'totalOrderValue': totalItemCost, // 💰 FINANCIAL TRACKING
+        'createdAt': FieldValue.serverTimestamp(),
+        'approvedBy': 'AI_engine_CONFIRMED_BY_$adminEmail',
+        'approvedAt': FieldValue.serverTimestamp(),
+        'tenantId': tenantId, // 🚀 SAAS INJECTION
         'items': [
           {
             'productId': suggestionData['productId'],
             'name': productName,
             'orderQty': orderQty,
+            'unitCost': unitCost, // 💰 FINANCIAL TRACKING
+            'totalItemCost': totalItemCost, // 💰 FINANCIAL TRACKING
           },
         ],
-        'totalItems': 1,
-        'createdAt': FieldValue.serverTimestamp(),
-        'approvedBy': 'AI_engine_CONFIRMED_BY_$adminEmail',
-        'approvedAt': FieldValue.serverTimestamp(),
-        'tenantId': tenantId, // 🚀 SAAS INJECTION
       });
+
+      await poRef.update({'poId': poRef.id}); // Auto-assign exact ID
 
       await _db.collection('mail').add({
         'to': 'orders@${supplierId.toString().toLowerCase()}.com',

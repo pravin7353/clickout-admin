@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION
+import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
 
-class AddDistributorDialog extends StatefulWidget {
+class AddDistributorDialog extends ConsumerStatefulWidget {
   const AddDistributorDialog({super.key});
 
   @override
-  State<AddDistributorDialog> createState() => _AddDistributorDialogState();
+  ConsumerState<AddDistributorDialog> createState() =>
+      _AddDistributorDialogState();
 }
 
-class _AddDistributorDialogState extends State<AddDistributorDialog> {
+class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
+  // 🚀 FIX: Aapke Missing Controllers wapas aa gaye!
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
@@ -17,6 +21,13 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _categoryCtrl = TextEditingController();
+
+  // 🎨 STRICT DARK THEME CONSTANTS
+  static const Color bgDark = Color(0xFF080B08);
+  static const Color accentGreen = Color(0xFF00C853);
+  static const Color textPrimary = Color(0xFFF0F0F0);
+  static const Color textSecondary = Color(0xFF888888);
+  static const Color inputBg = Color(0xFF1A221A);
 
   @override
   void dispose() {
@@ -33,6 +44,15 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
     setState(() => _isLoading = true);
 
     try {
+      // 🚀 SAAS INJECTION: Fetch Tenant Identity safely
+      final adminData = ref.read(adminRoleProvider).value;
+      final tenantId = adminData?['tenantId'];
+      final adminEmail = adminData?['email'] ?? 'Unknown Admin';
+
+      if (tenantId == null) {
+        throw "Tenant Identity Missing! Cannot save distributor.";
+      }
+
       final supplierData = {
         'supplierID': _idCtrl.text.trim().isEmpty
             ? 'AUTO_GEN'
@@ -41,10 +61,12 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
         'email': _emailCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'categories': _categoryCtrl.text.trim(),
+        'tenantId': tenantId, // 🚀 FIX: SaaS Isolation Locked!
+        'addedBy': adminEmail, // 🚀 FIX: Audit Trail Locked!
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // 🚀 Save to Firestore (Auto-ID generate hoga)
+      // Save to Firestore (Auto-ID generate hoga)
       await FirebaseFirestore.instance
           .collection('suppliers')
           .add(supplierData);
@@ -55,7 +77,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("✅ New Distributor Added Successfully!"),
-            backgroundColor: Colors.green,
+            backgroundColor: accentGreen,
           ),
         );
       }
@@ -75,22 +97,18 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      backgroundColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+      ),
+      backgroundColor: bgDark,
       elevation: 24,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 700),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: bgDark,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -102,12 +120,12 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: bgDark,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade200),
+                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
                   ),
                 ),
                 child: Row(
@@ -115,12 +133,12 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2B3674).withOpacity(0.1),
+                        color: accentGreen.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
                         Icons.domain_add,
-                        color: Color(0xFF2B3674),
+                        color: accentGreen,
                         size: 26,
                       ),
                     ),
@@ -132,7 +150,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                           const Text(
                             "Add New Distributor",
                             style: TextStyle(
-                              color: Color(0xFF1E1E2D),
+                              color: textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.5,
@@ -142,7 +160,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                           Text(
                             "Register a new supplier for automated POs and tracking.",
                             style: TextStyle(
-                              color: Colors.grey.shade600,
+                              color: textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -151,7 +169,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.grey),
+                      icon: const Icon(Icons.close, color: textSecondary),
                       onPressed: () => Navigator.pop(context),
                       splashRadius: 24,
                     ),
@@ -191,7 +209,6 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                             ),
                           ],
                         ),
-
                         _buildDivider(),
 
                         _buildSectionTitle("CONTACT & COMMUNICATION"),
@@ -223,7 +240,6 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                             ),
                           ],
                         ),
-
                         _buildDivider(),
 
                         _buildSectionTitle("SUPPLY CATEGORIES"),
@@ -247,11 +263,13 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                   vertical: 20,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: bgDark,
                   borderRadius: const BorderRadius.vertical(
                     bottom: Radius.circular(16),
                   ),
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  border: Border(
+                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -263,7 +281,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                       child: const Text(
                         "Cancel",
                         style: TextStyle(
-                          color: Colors.grey,
+                          color: textSecondary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -273,8 +291,8 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                     ElevatedButton.icon(
                       onPressed: _isLoading ? null : _saveDistributor,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2B3674),
-                        foregroundColor: Colors.white,
+                        backgroundColor: accentGreen,
+                        foregroundColor: bgDark,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 30,
                           vertical: 18,
@@ -288,7 +306,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
+                                color: bgDark,
                                 strokeWidth: 2,
                               ),
                             )
@@ -296,7 +314,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
                       label: Text(
                         _isLoading ? "Saving..." : "Save Distributor",
                         style: const TextStyle(
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w900,
                           fontSize: 14,
                         ),
                       ),
@@ -316,10 +334,10 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w900,
-          color: Colors.grey.shade500,
+          color: textSecondary,
           letterSpacing: 1.5,
         ),
       ),
@@ -329,7 +347,11 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
   Widget _buildDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: textSecondary.withOpacity(0.1),
+      ),
     );
   }
 
@@ -352,7 +374,7 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF1E1E2D),
+              color: textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -361,35 +383,32 @@ class _AddDistributorDialogState extends State<AddDistributorDialog> {
             keyboardType: keyboardType,
             style: const TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: textPrimary,
             ),
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(
-                color: Colors.grey.shade400,
+                color: textSecondary.withOpacity(0.5),
                 fontWeight: FontWeight.normal,
               ),
-              prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 20),
+              prefixIcon: Icon(icon, color: textSecondary, size: 20),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: inputBg,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 16,
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderSide: BorderSide.none,
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(
-                  color: Color(0xFF2B3674),
-                  width: 2,
-                ),
+              focusedBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+                borderSide: BorderSide(color: accentGreen, width: 2),
               ),
-              errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: Colors.red.shade300),
+              errorBorder: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+                borderSide: BorderSide(color: Colors.redAccent),
               ),
             ),
             validator: validator,

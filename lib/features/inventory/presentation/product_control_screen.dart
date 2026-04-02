@@ -4,11 +4,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
+
 import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
+import 'package:clickout_admin/core/utils/hierarchy_filter.dart'; // 🚀 THE WALL
 
 import 'add_product_dialog.dart';
 import 'edit_product_dialog.dart';
-import '../providers/product_master/product_master_provider.dart';
+import '../providers/product_master/product_master_provider.dart'; // Verify this path matches your folder structure
+// 🚀 NEW: Required for Unblocking items
+import 'package:clickout_admin/features/procurement/services/stock_service.dart'; // 🚀 FIX: Correct Absolute Path
 
 class ProductControlScreen extends ConsumerStatefulWidget {
   const ProductControlScreen({super.key});
@@ -41,15 +45,12 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
   // 🧠 SMART FIRESTORE QUERY BUILDER (🚀 SAAS INJECTED)
   Query _buildQuery() {
     final adminData = ref.read(adminRoleProvider).value;
-    final String? tenantId = adminData?['tenantId'];
-    final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
-    Query q = FirebaseFirestore.instance.collection('products');
-
-    // 🚀 SAAS ISOLATION
-    if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
-      q = q.where('tenantId', isEqualTo: tenantId);
-    }
+    // 🚀 SAAS ISOLATION: The Wall is Active Here!
+    Query q = HierarchyFilter.apply(
+      FirebaseFirestore.instance.collection('products'),
+      adminData,
+    );
 
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.trim().toLowerCase();
@@ -86,6 +87,18 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
       _currentPage = 0;
     } catch (e) {
       debugPrint("Fetch Error: $e");
+      // 🚀 FIREBASE INDEX ERROR HANDLER
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "🚨 FIREBASE INDEX REQUIRED! Please check Chrome Console (F12) for the direct creation link.",
+            ),
+            backgroundColor: const Color(0xFFFE8181),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
     }
     setState(() => _isLoading = false);
   }
@@ -110,7 +123,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     }
   }
 
-  // 🚀 CSV UPLOAD LOGIC (🚀 SAAS INJECTED)
+  // 🚀 CSV UPLOAD LOGIC (Calling Cloud Function with SaaS Context)
   Future<void> _processCsvImport() async {
     setState(() => _isUploadingCsv = true);
     try {
@@ -133,8 +146,12 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
         throw "🚨 CSV is empty or missing data rows!";
       }
 
-      // 🚀 SAAS INJECTION
-      final String? tenantId = ref.read(adminRoleProvider).value?['tenantId'];
+      // 🚀 SAAS INJECTION & FRAUD TRACKING
+      final adminData = ref.read(adminRoleProvider).value;
+      final String? tenantId = adminData?['tenantId'];
+      final String branchCode = adminData?['branchCode'] ?? 'HQ';
+      final String adminName = adminData?['name'] ?? 'Unknown Manager';
+      final String adminEmail = adminData?['email'] ?? 'Unknown Email';
 
       List<Map<String, dynamic>> productList = [];
       for (int i = 1; i < lines.length; i++) {
@@ -144,22 +161,30 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
         List<String> row = line.split(',');
         if (row.isEmpty || row[0].trim().isEmpty) continue;
 
+        // 🚀 SENDING THE RICH PAYLOAD TO BACKEND
         productList.add({
           'barcode': row[0].trim(),
           'name': row.length > 1 ? row[1].trim() : 'Unknown Item',
           'price': row.length > 2 ? double.tryParse(row[2].trim()) ?? 0 : 0,
           'weight': row.length > 3 ? row[3].trim() : '0',
-          'stock': row.length > 4 ? int.tryParse(row[4].trim()) ?? 0 : 0,
+          'physicalStock': row.length > 4
+              ? int.tryParse(row[4].trim()) ?? 0
+              : 0,
+          'openingStock': row.length > 4 ? int.tryParse(row[4].trim()) ?? 0 : 0,
           'gst': row.length > 5 ? row[5].trim() : '0',
           'expiryDate': row.length > 6 && row[6].trim().isNotEmpty
               ? row[6].trim()
               : null,
           'tenantId': tenantId, // 🚀 SAAS INJECTION
+          'branchCode': branchCode, // 🚀 ISOLATION
+          'addedBy': adminName, // 🚀 FRAUD TRACKING
+          'addedByEmail': adminEmail, // 🚀 FRAUD TRACKING
         });
       }
 
       if (productList.isEmpty) throw "🚨 No valid data found in CSV!";
 
+      // 🚀 CALLING CLOUD FUNCTION TO PREVENT FRONTEND HANG
       final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
         'bulkImportProducts',
       );
@@ -168,16 +193,21 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("✅ ${response.data['message']}"),
-            backgroundColor: Colors.green,
+            content: Text(
+              "✅ ${response.data['message'] ?? 'Imported Successfully!'}",
+            ),
+            backgroundColor: const Color(0xFF00C853),
           ),
         );
-        _fetchInitialData();
+        _fetchInitialData(); // Refresh UI
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("🚨 Error: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("🚨 Error: $e"),
+            backgroundColor: const Color(0xFFFE8181),
+          ),
         );
       }
     } finally {
@@ -187,8 +217,23 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const Color themeNavy = Color(0xFF2B3674);
+    // 🚀 FIX: Prevent "Empty Shelf" on hard refresh by listening to role changes
+    ref.listen(adminRoleProvider, (previous, next) {
+      if (previous?.value == null && next.value != null) {
+        _fetchInitialData();
+      }
+    });
+
     final isMobile = MediaQuery.of(context).size.width < 768;
+
+    // 🎨 STRICT DARK THEME CONSTANTS
+    const Color bgDark = Color(0xFF080B08);
+    const Color cardDark = Color(0xFF111811);
+    const Color accentGreen = Color(0xFF00C853);
+    const Color accentRed = Color(0xFFFE8181);
+    const Color textPrimary = Color(0xFFF0F0F0);
+    const Color textSecondary = Color(0xFF888888);
+    const Color inputBg = Color(0xFF1A221A);
 
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)
@@ -199,7 +244,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
         : _docs.sublist(startIndex, endIndex);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
+      backgroundColor: bgDark,
       body: SingleChildScrollView(
         padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
         child: Column(
@@ -218,14 +263,15 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       "Product Master Roster 📦",
                       style: TextStyle(
                         fontSize: isMobile ? 24 : 28,
-                        fontWeight: FontWeight.bold,
-                        color: themeNavy,
+                        fontWeight: FontWeight.w900,
+                        color: textPrimary,
+                        letterSpacing: 0.5,
                       ),
                     ),
                     const SizedBox(height: 5),
                     const Text(
                       "Enterprise SKU & Inventory Management",
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                      style: TextStyle(color: textSecondary, fontSize: 14),
                     ),
                   ],
                 ),
@@ -235,15 +281,17 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   children: [
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: themeNavy,
+                        backgroundColor: inputBg,
+                        foregroundColor: textPrimary,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
-                          vertical: 12,
+                          vertical: 16,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
-                          side: BorderSide(color: Colors.grey.shade300),
+                          side: BorderSide(
+                            color: textSecondary.withOpacity(0.2),
+                          ),
                         ),
                       ),
                       onPressed: _isUploadingCsv ? null : _processCsvImport,
@@ -251,9 +299,16 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                           ? const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: accentGreen,
+                              ),
                             )
-                          : const Icon(Icons.file_upload_outlined, size: 18),
+                          : const Icon(
+                              Icons.file_upload_outlined,
+                              size: 18,
+                              color: accentGreen,
+                            ),
                       label: Text(
                         _isUploadingCsv ? "Uploading..." : "Import CSV",
                         style: const TextStyle(fontWeight: FontWeight.bold),
@@ -261,10 +316,11 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     ),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: themeNavy,
+                        backgroundColor: accentGreen,
+                        foregroundColor: bgDark,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                          horizontal: 20,
+                          vertical: 16,
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -274,24 +330,17 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         context: context,
                         builder: (ctx) => const AddProductDialog(),
                       ).then((_) => _fetchInitialData()),
-                      icon: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 18,
-                      ),
+                      icon: const Icon(Icons.add, size: 18),
                       label: const Text(
                         "Add Product",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
 
             Wrap(
               spacing: 16,
@@ -301,22 +350,33 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                 Container(
                   width: isMobile ? double.infinity : 350,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: inputBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: textSecondary.withOpacity(0.15)),
                   ),
                   child: TextField(
                     controller: _searchController,
+                    style: const TextStyle(color: textPrimary),
                     onSubmitted: (val) {
                       _searchQuery = val;
                       _fetchInitialData();
                     },
                     decoration: InputDecoration(
                       hintText: "Scan Barcode or Search Name...",
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      hintStyle: TextStyle(
+                        color: textSecondary.withOpacity(0.5),
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: textSecondary,
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
+                              icon: const Icon(
+                                Icons.clear,
+                                size: 18,
+                                color: accentRed,
+                              ),
                               onPressed: () {
                                 _searchController.clear();
                                 _searchQuery = '';
@@ -333,17 +393,18 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: inputBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: textSecondary.withOpacity(0.15)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
+                      dropdownColor: cardDark,
                       value: _sortOption,
-                      icon: const Icon(Icons.sort, color: themeNavy),
+                      icon: const Icon(Icons.sort, color: accentGreen),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: themeNavy,
+                        color: textPrimary,
                         fontSize: 13,
                       ),
                       items: const [
@@ -369,32 +430,16 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     ),
                   ),
                 ),
-
-                if (_searchQuery.isEmpty)
-                  const Text(
-                    "💡 Hint: Searching disables custom sorting.",
-                    style: TextStyle(
-                      color: Colors.grey,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 25),
 
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardDark,
                 borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 10,
-                  ),
-                ],
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: textSecondary.withOpacity(0.15)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -402,170 +447,253 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   if (_isLoading && _docs.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(60),
-                      child: Center(child: CircularProgressIndicator()),
+                      child: Center(
+                        child: CircularProgressIndicator(color: accentGreen),
+                      ),
                     )
                   else if (currentPageDocs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(60),
+                    Padding(
+                      padding: const EdgeInsets.all(60),
                       child: Center(
-                        child: Text(
-                          "No products found matching criteria.",
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 40,
+                              color: accentRed.withOpacity(0.3),
+                            ),
+                            const SizedBox(height: 15),
+                            const Text(
+                              "Empty Shelf",
+                              style: TextStyle(
+                                color: accentRed,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              "No products found matching criteria.",
+                              style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     )
                   else
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        headingRowColor: WidgetStateProperty.all(
-                          Colors.grey.shade50,
+                      child: Theme(
+                        data: Theme.of(context).copyWith(
+                          dividerColor: textSecondary.withOpacity(0.15),
                         ),
-                        headingTextStyle: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2B3674),
-                          fontSize: 12,
-                          letterSpacing: 0.5,
-                        ),
-                        columnSpacing: 40,
-                        dataRowMinHeight: 60,
-                        dataRowMaxHeight: 60,
-                        columns: const [
-                          DataColumn(label: Text("BARCODE")),
-                          DataColumn(label: Text("PRODUCT NAME")),
-                          DataColumn(label: Text("MRP / PRICE")),
-                          DataColumn(label: Text("PHYSICAL STOCK")),
-                          DataColumn(label: Text("ACTIONS")),
-                        ],
-                        rows: currentPageDocs.map((doc) {
-                          final data = doc.data() as Map<String, dynamic>;
-                          final int stock = data['physicalStock'] ?? 0;
-                          bool isLowStock = stock <= 10;
+                        child: DataTable(
+                          headingRowColor: WidgetStateProperty.all(inputBg),
+                          headingTextStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: textSecondary,
+                            fontSize: 12,
+                            letterSpacing: 0.5,
+                          ),
+                          columnSpacing: 40,
+                          dataRowMinHeight: 65,
+                          dataRowMaxHeight: 65,
+                          columns: const [
+                            DataColumn(label: Text("BARCODE")),
+                            DataColumn(label: Text("PRODUCT NAME")),
+                            DataColumn(label: Text("MRP / PRICE")),
+                            DataColumn(label: Text("PHYSICAL STOCK")),
+                            DataColumn(label: Text("STATUS")), // 🚀 NEW COLUMN
+                            DataColumn(label: Text("ACTIONS")),
+                          ],
+                          rows: currentPageDocs.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            final int stock = data['physicalStock'] ?? 0;
+                            bool isLowStock = stock <= 10;
+                            final bool isBlocked =
+                                data['isBlocked'] ?? false; // 🚀 CHECK STATUS
 
-                          // SaaS Extracted Barcode (Visual clean up)
-                          final String displayBarcode =
-                              (data['barcode'] ?? doc.id)
-                                  .toString()
-                                  .split('_')
-                                  .last;
+                            final String displayBarcode =
+                                (data['barcode'] ?? doc.id)
+                                    .toString()
+                                    .split('_')
+                                    .last;
 
-                          return DataRow(
-                            color: WidgetStateProperty.resolveWith<Color?>((
-                              states,
-                            ) {
-                              if (states.contains(WidgetState.hovered)) {
-                                return Colors.blue.withOpacity(0.04);
-                              }
-                              return Colors.white;
-                            }),
-                            cells: [
-                              DataCell(
-                                Text(
-                                  displayBarcode,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontFamily: 'monospace',
-                                    color: themeNavy,
+                            return DataRow(
+                              color: WidgetStateProperty.resolveWith<Color?>((
+                                states,
+                              ) {
+                                if (states.contains(WidgetState.hovered)) {
+                                  return inputBg;
+                                }
+                                return Colors.transparent;
+                              }),
+                              cells: [
+                                DataCell(
+                                  Text(
+                                    displayBarcode,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
+                                      color: textPrimary,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              DataCell(
-                                Text(
-                                  data['name'] ?? 'N/A',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
+                                DataCell(
+                                  Text(
+                                    data['name'] ?? 'N/A',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              DataCell(
-                                Text(
-                                  "₹${data['price'] ?? 0}",
-                                  style: const TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.bold,
+                                DataCell(
+                                  Text(
+                                    "₹${data['price'] ?? 0}",
+                                    style: const TextStyle(
+                                      color: accentGreen,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isLowStock
-                                        ? Colors.red.withOpacity(0.1)
-                                        : Colors.green.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isLowStock)
-                                        const Icon(
-                                          Icons.warning_amber_rounded,
-                                          color: Colors.red,
-                                          size: 14,
+                                DataCell(
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isLowStock
+                                          ? accentRed.withOpacity(0.1)
+                                          : accentGreen.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: isLowStock
+                                            ? accentRed.withOpacity(0.3)
+                                            : accentGreen.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (isLowStock)
+                                          const Icon(
+                                            Icons.warning_amber_rounded,
+                                            color: accentRed,
+                                            size: 14,
+                                          ),
+                                        if (isLowStock)
+                                          const SizedBox(width: 4),
+                                        Text(
+                                          "$stock Units",
+                                          style: TextStyle(
+                                            color: isLowStock
+                                                ? accentRed
+                                                : accentGreen,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
                                         ),
-                                      if (isLowStock) const SizedBox(width: 4),
-                                      Text(
-                                        "$stock Units",
-                                        style: TextStyle(
-                                          color: isLowStock
-                                              ? Colors.red
-                                              : Colors.green,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  // 🚀 NEW STATUS CHIP
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isBlocked
+                                          ? accentRed.withValues(alpha: 0.1)
+                                          : accentGreen.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: isBlocked
+                                            ? accentRed.withValues(alpha: 0.3)
+                                            : accentGreen.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      isBlocked ? "BLOCKED 💀" : "ACTIVE",
+                                      style: TextStyle(
+                                        color: isBlocked
+                                            ? accentRed
+                                            : accentGreen,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  Row(
+                                    children: [
+                                      if (isBlocked) // 🚀 SAAS RULE: Blocked item gets Restore Button
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.settings_backup_restore,
+                                            color: Color(
+                                              0xFFD4580A,
+                                            ), // 🚀 THEME: Primary Orange
+                                          ),
+                                          tooltip: "Unblock & Restore Stock",
+                                          onPressed: () => _showRestoreDialog(
+                                            context,
+                                            doc.id, // 🔥 Full Firestore Doc ID chahiye
+                                            data['name'] ?? 'Unknown Item',
+                                          ),
+                                        )
+                                      else // 🚀 SAAS RULE: Active item gets Edit Button
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.edit_note,
+                                            color: accentGreen,
+                                          ),
+                                          tooltip: "Edit Product",
+                                          onPressed: () => showDialog(
+                                            context: context,
+                                            builder: (ctx) => EditProductDialog(
+                                              productData: data,
+                                              docId: displayBarcode,
+                                            ),
+                                          ).then((_) => _fetchInitialData()),
+                                        ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: accentRed,
+                                        ),
+                                        tooltip: "Delete Product",
+                                        onPressed: () => _confirmDelete(
+                                          context,
+                                          ref,
+                                          displayBarcode,
+                                          data['name'] ?? 'Unknown Item',
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              DataCell(
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.edit_note,
-                                        color: Colors.blueAccent,
-                                      ),
-                                      tooltip: "Edit Product Details",
-                                      onPressed: () => showDialog(
-                                        context: context,
-                                        builder: (ctx) => EditProductDialog(
-                                          productData: data,
-                                          docId:
-                                              displayBarcode, // Clean barcode pass
-                                        ),
-                                      ).then((_) => _fetchInitialData()),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.delete_outline,
-                                        color: Colors.redAccent,
-                                      ),
-                                      tooltip: "Delete Product",
-                                      onPressed: () => _confirmDelete(
-                                        context,
-                                        ref,
-                                        displayBarcode,
-                                        data['name'] ?? 'Unknown Item',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
 
                   Container(
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
+                      color: inputBg,
                       borderRadius: const BorderRadius.vertical(
                         bottom: Radius.circular(15),
                       ),
@@ -579,30 +707,39 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                             child: SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: accentGreen,
+                              ),
                             ),
                           ),
                         IconButton(
-                          icon: const Icon(Icons.chevron_left),
-                          tooltip: "Previous Page",
+                          icon: const Icon(
+                            Icons.chevron_left,
+                            color: textPrimary,
+                          ),
                           onPressed: _currentPage > 0 ? _prevPage : null,
+                          disabledColor: textSecondary.withOpacity(0.3),
                         ),
                         Text(
                           "Page ${_currentPage + 1}",
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: themeNavy,
+                            color: textPrimary,
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right),
-                          tooltip: "Next Page",
+                          icon: const Icon(
+                            Icons.chevron_right,
+                            color: textPrimary,
+                          ),
                           onPressed:
                               _hasMore ||
                                   ((_currentPage + 1) * _rowsPerPage <
                                       _docs.length)
                               ? _fetchNextPage
                               : null,
+                          disabledColor: textSecondary.withOpacity(0.3),
                         ),
                       ],
                     ),
@@ -616,6 +753,235 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     );
   }
 
+  // 🚀 NEW: UNBLOCK & RESTORE FLOW (THEMED)
+  void _showRestoreDialog(BuildContext context, String fullDocId, String name) {
+    final TextEditingController qtyCtrl = TextEditingController();
+    bool isRestoring = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(
+                color: Color(0xFFD4580A),
+                width: 1.5,
+              ), // 🚀 ORANGE THEME
+            ),
+            backgroundColor: const Color(0xFF080B08), // Dark BG
+            elevation: 24,
+            child: ConstrainedBox(
+              // 📱 RESPONSIVE: Tablet/Web pe 450px se bada nahi hoga, Mobile pe fit ho jayega
+              constraints: const BoxConstraints(maxWidth: 450),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111811), // Card Dark
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // --- HEADER ---
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFFD4580A,
+                            ).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.settings_backup_restore,
+                            color: Color(0xFFD4580A),
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Text(
+                            "Restore Blocked Item",
+                            style: TextStyle(
+                              color: Color(0xFFF0F0F0),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      "Unblock '$name' by adding new physical stock.",
+                      style: const TextStyle(
+                        color: Color(0xFF888888),
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // --- INPUT ---
+                    const Text(
+                      "New Physical Stock",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF888888),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: qtyCtrl,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(
+                        color: Color(0xFFF0F0F0),
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: "Enter units",
+                        hintStyle: TextStyle(color: Colors.grey.shade700),
+                        prefixIcon: const Icon(
+                          Icons.add_box,
+                          color: Color(0xFFD4580A),
+                          size: 20,
+                        ),
+                        filled: true,
+                        fillColor: const Color(0xFF1A221A), // Input bg
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(8)),
+                          borderSide: BorderSide(
+                            color: Color(0xFFD4580A),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // --- ACTIONS ---
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: isRestoring
+                              ? null
+                              : () => Navigator.pop(ctx),
+                          child: const Text(
+                            "Cancel",
+                            style: TextStyle(
+                              color: Color(0xFF888888),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(
+                              0xFFD4580A,
+                            ), // 🚀 ORANGE THEME
+                            foregroundColor: const Color(0xFF080B08),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          onPressed: isRestoring
+                              ? null
+                              : () async {
+                                  final int qty =
+                                      int.tryParse(qtyCtrl.text.trim()) ?? 0;
+                                  if (qty <= 0) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          "Enter a valid quantity!",
+                                        ),
+                                        backgroundColor: Color(0xFFFE8181),
+                                      ),
+                                    );
+                                    return;
+                                  }
+
+                                  setState(() => isRestoring = true);
+                                  try {
+                                    await StockService.undoBlockBatch(
+                                      fullDocId,
+                                      qty,
+                                    );
+                                    if (context.mounted) {
+                                      Navigator.pop(ctx);
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text("✅ $name Unblocked!"),
+                                          backgroundColor: const Color(
+                                            0xFF00C853,
+                                          ),
+                                        ),
+                                      );
+                                      _fetchInitialData(); // Refresh table
+                                    }
+                                  } catch (e) {
+                                    if (context.mounted) {
+                                      setState(() => isRestoring = false);
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text("Error: $e"),
+                                          backgroundColor: const Color(
+                                            0xFFFE8181,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  }
+                                },
+                          icon: isRestoring
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFF080B08),
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 18,
+                                ),
+                          label: const Text(
+                            "Restore Access",
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _confirmDelete(
     BuildContext context,
     WidgetRef ref,
@@ -625,17 +991,35 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Delete Product? 🗑️"),
+        backgroundColor: const Color(0xFF111811),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFFE8181), width: 1),
+        ),
+        title: const Text(
+          "Delete Product? 🗑️",
+          style: TextStyle(
+            color: Color(0xFFF0F0F0),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Text(
-          "Are you sure you want to permanently delete '$name' (Barcode: $barcode)?",
+          "Delete '$name' (Barcode: $barcode)?",
+          style: const TextStyle(color: Color(0xFF888888)),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel"),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Color(0xFF888888)),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFE8181),
+              foregroundColor: const Color(0xFF080B08),
+            ),
             onPressed: () async {
               Navigator.pop(ctx);
               try {
@@ -646,7 +1030,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text("🗑️ $name deleted!"),
-                      backgroundColor: Colors.red,
+                      backgroundColor: const Color(0xFFFE8181),
                     ),
                   );
                   _fetchInitialData();
@@ -656,7 +1040,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text("Error: $e"),
-                      backgroundColor: Colors.red,
+                      backgroundColor: const Color(0xFFFE8181),
                     ),
                   );
                 }
@@ -664,7 +1048,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
             },
             child: const Text(
               "Yes, Delete",
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],

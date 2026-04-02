@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_fonts/google_fonts.dart'; // 🚀 IMPORT GOOGLE FONTS
 import 'package:shared_preferences/shared_preferences.dart';
+// 🚀 ADDED
+import 'package:go_router/go_router.dart'; // 🚀 ADDED
 import '../../core/auth/unified_auth_service.dart';
 import 'auth_provider.dart';
 
@@ -134,6 +136,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     try {
       await UnifiedAuthService.verifyMagicLink(url, fallbackEmail: email);
       await ref.read(authControllerProvider.notifier).setupAdminSession();
+
+      // 🚀 SECURE ROUTING: Seedha Command Center bhejo. Koi purana screen nahi khulega.
+      if (mounted) {
+        context.go('/dashboard');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

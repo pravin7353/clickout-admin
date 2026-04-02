@@ -147,10 +147,8 @@ class SuperAdminScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tenantsState = ref.watch(saasTenantsProvider);
-    final isMobile =
-        MediaQuery.of(context).size.width < 1100; // Increased breakpoint
+    final isMobile = MediaQuery.of(context).size.width < 1100;
 
-    // 🎨 THEME DYNAMIC COLORS (Fixes Light Mode Bug)
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bgDark = theme.scaffoldBackgroundColor;
@@ -170,7 +168,6 @@ class SuperAdminScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🚀 WRAP LAGAYA HEADER MEIN BHI TAAKI CHOTE SCREEN PE NAHI PHATE
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -230,9 +227,15 @@ class SuperAdminScreen extends ConsumerWidget {
 
               tenantsState.maybeWhen(
                 data: (tenants) {
+                  // 🔴 EXISTING CODE: variables
                   int totalBranches = 0;
+                  // 🟢 NEW CODE: added activeBranches variable
+                  int activeBranches = 0;
+
                   for (var t in tenants) {
                     totalBranches += (t['totalBranches'] as num?)?.toInt() ?? 0;
+                    // 🟢 NEW CODE: Calculation logic
+                    activeBranches += (t['activeStores'] as num?)?.toInt() ?? 0;
                   }
 
                   if (isMobile) {
@@ -250,9 +253,11 @@ class SuperAdminScreen extends ConsumerWidget {
                           inputBg,
                         ),
                         const SizedBox(height: 15),
-                        _buildKPICard(
-                          "Total Active Branches",
-                          totalBranches.toString(),
+                        // 🟢 NEW CODE: Dual Card implementation for Mobile
+                        _buildDualKPICard(
+                          "Branch Network Status",
+                          totalBranches,
+                          activeBranches,
                           Icons.storefront,
                           cardDark,
                           textPrimary,
@@ -291,10 +296,12 @@ class SuperAdminScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 20),
+                      // 🟢 NEW CODE: Dual Card implementation for Desktop
                       Expanded(
-                        child: _buildKPICard(
-                          "Total Active Branches",
-                          totalBranches.toString(),
+                        child: _buildDualKPICard(
+                          "Branch Network Status",
+                          totalBranches,
+                          activeBranches,
                           Icons.storefront,
                           cardDark,
                           textPrimary,
@@ -719,8 +726,6 @@ class SuperAdminScreen extends ConsumerWidget {
                                           ),
                                         ),
                                       ),
-
-                                      // 🚀 FIX: WRAP LAGAYA HAI ROW KI JAGAH, KABHI NAHI PHATEGA
                                       Expanded(
                                         flex: 4,
                                         child: Wrap(
@@ -835,6 +840,7 @@ class SuperAdminScreen extends ConsumerWidget {
     );
   }
 
+  // 🔴 EXISTING CODE: Helper method (retained)
   Widget _buildKPICard(
     String title,
     String value,
@@ -895,6 +901,101 @@ class SuperAdminScreen extends ConsumerWidget {
     );
   }
 
+  // 🟢 NEW CODE: Added Dual Card widget perfectly integrated into the class
+  Widget _buildDualKPICard(
+    String title,
+    int allocatedCount,
+    int activeCount,
+    IconData icon,
+    Color cardDark,
+    Color textPrimary,
+    Color textSecondary,
+    Color dividerColor,
+    Color inputBg,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: cardDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: dividerColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: inputBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: textSecondary, size: 28),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "ALLOCATED",
+                          style: TextStyle(color: textSecondary, fontSize: 10),
+                        ),
+                        Text(
+                          allocatedCount.toString(),
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(width: 1, height: 24, color: dividerColor),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "ACTIVE",
+                          style: TextStyle(
+                            color: SuperAdminScreen.accentGreen,
+                            fontSize: 10,
+                          ),
+                        ),
+                        Text(
+                          activeCount.toString(),
+                          style: const TextStyle(
+                            color: SuperAdminScreen.accentGreen,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔴 EXISTING CODE: Restored _headerCell method
   Widget _headerCell(
     String title,
     Color textSecondary, {
@@ -918,6 +1019,7 @@ class SuperAdminScreen extends ConsumerWidget {
     );
   }
 
+  // 🔴 EXISTING CODE: Restored _buildEmptyState method
   Widget _buildEmptyState(
     BuildContext context,
     Color textPrimary,

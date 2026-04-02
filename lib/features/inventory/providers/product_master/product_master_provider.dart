@@ -19,9 +19,15 @@ class ProductMasterNotifier extends Notifier<bool> {
       // 🚀 SAAS INJECTION: Fetch Context
       final adminData = ref.read(adminRoleProvider).value;
       final String? tenantId = adminData?['tenantId'];
+      final String branchCode = adminData?['branchCode'] ?? 'HQ';
+      final String adminName =
+          adminData?['name'] ?? 'Unknown Manager'; // 🚀 NEW: Fraud Tracking
+      final String adminEmail =
+          adminData?['email'] ?? 'Unknown Email'; // 🚀 NEW: Fraud Tracking
 
-      // Note: SaaS Best Practice -> Isolate Barcode ID by Tenant
-      final String docId = '${tenantId}_$barcode';
+      // Note: SaaS Best Practice -> Isolate Barcode ID by Tenant & Store
+      final String docId =
+          '${tenantId}_${branchCode}_$barcode'; // 🚀 FIXED: Store isolation
       final docRef = _db.collection('products').doc(docId);
 
       await _db.runTransaction((transaction) async {
@@ -34,6 +40,9 @@ class ProductMasterNotifier extends Notifier<bool> {
           'barcode': barcode,
           'name': productData['name'],
           'price': double.tryParse(productData['price'].toString()) ?? 0.0,
+          'unitCost':
+              double.tryParse(productData['unitCost']?.toString() ?? '0') ??
+              0.0, // 🚀 NAYA: Kharidi Bhav sidha DB mein feed hoga!
           'gst': productData['gst'] ?? '0',
           'physicalStock':
               int.tryParse(productData['physicalStock'].toString()) ?? 0,
@@ -52,11 +61,15 @@ class ProductMasterNotifier extends Notifier<bool> {
           'updatedAt': FieldValue.serverTimestamp(),
           'searchKey': productData['name'].toString().toLowerCase(),
           'tenantId': tenantId, // 🚀 SAAS INJECTION
+          'branchCode': branchCode, // 🚀 NEW: Saved to DB for Hierarchy Filter
+          'addedBy': adminName, // 🚀 FIX: Fraud Accountability Name
+          'addedByEmail': adminEmail, // 🚀 FIX: Fraud Accountability Email
         };
 
         transaction.set(docRef, cleanData);
 
-        final adminEmail = FirebaseAuth.instance.currentUser?.email ?? 'Admin';
+        // 🚀 FIX: Removed the duplicate 'adminEmail' declaration.
+        // It will now safely use the one we defined at the top of the function.
         transaction.set(_db.collection('admin_audit_logs').doc(), {
           'action': 'NEW_MASTER_PRODUCT_ADDED',
           'barcode': barcode,
@@ -79,16 +92,28 @@ class ProductMasterNotifier extends Notifier<bool> {
   ) async {
     state = true;
     try {
-      final String? tenantId = ref.read(adminRoleProvider).value?['tenantId'];
-      final String docId = '${tenantId}_$barcode';
+      final adminData = ref.read(adminRoleProvider).value;
+      final String? tenantId = adminData?['tenantId'];
+      final String branchCode = adminData?['branchCode'] ?? 'HQ';
+      final String docId = '${tenantId}_${branchCode}_$barcode'; // 🚀 FIXED
       final docRef = _db.collection('products').doc(docId);
+
+      // 🚀 FETCH CURRENT ADMIN DETAILS FOR FRAUD TRACKING
+      final adminName = adminData?['name'] ?? 'Unknown Admin';
+      final adminEmail = adminData?['email'] ?? 'Unknown Email';
 
       final cleanData = {
         'name': updatedData['name'],
         'price': double.tryParse(updatedData['price'].toString()) ?? 0.0,
+        if (updatedData.containsKey('unitCost'))
+          'unitCost':
+              double.tryParse(updatedData['unitCost']?.toString() ?? '0') ??
+              0.0,
         'gst': updatedData['gst'] ?? '0',
         'weight': updatedData['weight'],
         'searchKey': updatedData['name'].toString().toLowerCase(),
+        'lastEditedBy': adminName, // 🚀 NEW: Logs directly in product doc
+        'lastEditedByEmail': adminEmail, // 🚀 NEW: Logs directly in product doc
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -105,7 +130,7 @@ class ProductMasterNotifier extends Notifier<bool> {
 
       await docRef.update(cleanData);
 
-      final adminEmail = FirebaseAuth.instance.currentUser?.email ?? 'Admin';
+      // 🚀 FIX: Purana duplicate adminEmail line hata diya. Ab ye upar wale (accurate) email ko use karega.
       await _db.collection('admin_audit_logs').doc().set({
         'action': 'MASTER_PRODUCT_UPDATED',
         'barcode': barcode,
@@ -124,8 +149,10 @@ class ProductMasterNotifier extends Notifier<bool> {
   Future<void> deleteProduct(String barcode, String productName) async {
     state = true;
     try {
-      final String? tenantId = ref.read(adminRoleProvider).value?['tenantId'];
-      final String docId = '${tenantId}_$barcode';
+      final adminData = ref.read(adminRoleProvider).value;
+      final String? tenantId = adminData?['tenantId'];
+      final String branchCode = adminData?['branchCode'] ?? 'HQ';
+      final String docId = '${tenantId}_${branchCode}_$barcode'; // 🚀 FIXED
 
       await _db.collection('products').doc(docId).delete();
 

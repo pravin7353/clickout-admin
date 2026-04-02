@@ -94,31 +94,34 @@ class UnifiedAuthService {
 
   static Future<void> sendAdminMagicLink(String email, String bundleId) async {
     try {
+      // 🚀 SAAS UPDATE: Allow link delivery for both new (Signup) and existing (Login) users
       final query = await _db
           .collection('staff')
           .where('email', isEqualTo: email)
-          .where('isActive', isEqualTo: true)
+          .limit(1)
           .get();
 
-      if (query.docs.isEmpty) {
-        throw "Access Denied: Unregistered or Inactive Admin Email.";
+      if (query.docs.isNotEmpty) {
+        final userData = query.docs.first.data();
+        if (userData['isActive'] == false || userData['isDeleted'] == true) {
+          throw "Account Suspended: Please contact support.";
+        }
+
+        final role = (userData['role'] ?? '').toString().toLowerCase();
+        final allowedWebRoles = [
+          'super_admin',
+          'tenant_admin',
+          'delegated_admin',
+          'admin',
+          'owner',
+          'manager',
+        ];
+
+        if (!allowedWebRoles.contains(role)) {
+          throw "Access Denied: You do not have Command Center privileges.";
+        }
       }
-
-      final userData = query.docs.first.data();
-      final role = (userData['role'] ?? '').toString().toLowerCase();
-
-      final allowedWebRoles = [
-        'super_admin',
-        'tenant_admin',
-        'delegated_admin',
-        'admin',
-        'owner',
-        'manager', // 🍖 YOSH! Manager is now in the crew!
-      ];
-
-      if (!allowedWebRoles.contains(role)) {
-        throw "Access Denied: You do not have Command Center privileges.";
-      }
+      // If query is empty, it's a new signup! They bypass the role check to receive the magic link.
 
       // final String redirectUrl = kDebugMode
       //     ? 'http://localhost:50000/'

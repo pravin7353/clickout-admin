@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:clickout_admin/features/auth/auth_provider.dart';
+import 'package:clickout_admin/core/utils/hierarchy_filter.dart';
+
 import '../../services/stock_service.dart';
 import 'offer_creation_dialog.dart';
 import 'create_po_dialog.dart';
 
-class ExpiryAlertDashboard extends StatefulWidget {
+// 🚀 CHANGED: StatefulWidget to ConsumerStatefulWidget
+class ExpiryAlertDashboard extends ConsumerStatefulWidget {
   const ExpiryAlertDashboard({super.key});
 
   @override
-  State<ExpiryAlertDashboard> createState() => _ExpiryAlertDashboardState();
+  ConsumerState<ExpiryAlertDashboard> createState() =>
+      _ExpiryAlertDashboardState();
 }
 
-class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
+class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = "";
 
@@ -23,6 +29,15 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
   Map<String, int> _salesDataCache = {};
   DateTime? _lastCacheTime;
 
+  // 🎨 STRICT DARK THEME CONSTANTS
+  static const Color bgDark = Color(0xFF080B08);
+  static const Color cardDark = Color(0xFF111811);
+  static const Color accentGreen = Color(0xFF00C853);
+  static const Color accentOrange = Color(0xFFD4580A); // 🚀 3rd Primary
+  static const Color textPrimary = Color(0xFFF0F0F0);
+  static const Color textSecondary = Color(0xFF888888);
+  static const Color accentRed = Color(0xFFFE8181);
+
   final List<Map<String, dynamic>> _sortOptions = [
     {
       'name': 'Trending',
@@ -32,6 +47,11 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
     {'name': 'Expiry', 'icon': Icons.hourglass_bottom, 'filter': 'Expiry'},
     {'name': 'Stock', 'icon': Icons.inventory, 'filter': 'Stock'},
     {'name': 'ATL', 'icon': Icons.trending_down, 'filter': 'ATL'},
+    {
+      'name': 'Offers',
+      'icon': Icons.local_offer,
+      'filter': 'Offers',
+    }, // 🚀 ADDED: Offers sorting option
   ];
 
   @override
@@ -42,19 +62,28 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
 
   Stream<QuerySnapshot> get _engineStream {
     final query = _searchQuery.trim().toLowerCase();
-    var baseQuery = FirebaseFirestore.instance.collection('products');
 
+    // 🚀 SAAS INJECTION: The Wall is Active Here!
+    final adminData = ref.watch(adminRoleProvider).value;
+    Query baseQuery = HierarchyFilter.apply(
+      FirebaseFirestore.instance.collection('products'),
+      adminData,
+    );
+
+    // 🚀 FIX 1: Forced Cache Engine (includeMetadataChanges) so it loads instantly from local device memory
     if (query.isNotEmpty) {
       if (double.tryParse(query) != null) {
-        return baseQuery.where('barcode', isEqualTo: query).snapshots();
+        return baseQuery
+            .where('barcode', isEqualTo: query)
+            .snapshots(includeMetadataChanges: true);
       }
       return baseQuery
           .where('searchKey', isGreaterThanOrEqualTo: query)
           .where('searchKey', isLessThanOrEqualTo: '$query\uf8ff')
           .limit(20)
-          .snapshots();
+          .snapshots(includeMetadataChanges: true);
     }
-    return baseQuery.snapshots();
+    return baseQuery.snapshots(includeMetadataChanges: true);
   }
 
   @override
@@ -72,8 +101,15 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
     setState(() => _isSorting = true);
     try {
       final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-      final ordersSnap = await FirebaseFirestore.instance
-          .collection('orders')
+
+      // 🚀 SAAS INJECTION: Secure Trending Sales Query
+      final adminData = ref.read(adminRoleProvider).value;
+      Query ordersQuery = HierarchyFilter.apply(
+        FirebaseFirestore.instance.collection('orders'),
+        adminData,
+      );
+
+      final ordersSnap = await ordersQuery
           .where(
             'timestamp',
             isGreaterThanOrEqualTo: Timestamp.fromDate(sevenDaysAgo),
@@ -82,7 +118,8 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
 
       Map<String, int> salesCount = {};
       for (var doc in ordersSnap.docs) {
-        final data = doc.data();
+        // 🚀 BUG FIX: Added 'as Map<String, dynamic>' to fix the bracket [] error
+        final data = doc.data() as Map<String, dynamic>;
         if (data['paymentStatus'] == 'PAID' ||
             data['paymentStatus'] == 'SUCCESS') {
           final items = data['items'] as List<dynamic>? ?? [];
@@ -153,6 +190,16 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
         return expA.compareTo(expB);
       }
 
+      // 🚀 ADDED: Active offers ko priority dekar top par laao
+      if (_selectedSort == 'Offers') {
+        bool offerA = dataA['clearanceActive'] == true;
+        bool offerB = dataB['clearanceActive'] == true;
+
+        if (offerA && !offerB) return -1; // A upar aayega
+        if (!offerA && offerB) return 1; // B upar aayega
+        return 0; // Agar dono mein offer hai ya dono mein nahi hai, toh wahi position rakho
+      }
+
       return 0;
     });
 
@@ -161,18 +208,15 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    bool isMobile =
+        MediaQuery.of(context).size.width < 768; // 🚀 RESPONSIVE CHECK
+
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardDark, // 🚀 DARK THEME
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 15,
-          ),
-        ],
+        border: Border.all(color: textSecondary.withOpacity(0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,16 +224,20 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.memory, color: Color(0xFF2B3674), size: 28),
-                  SizedBox(width: 12),
+                  const Icon(
+                    Icons.memory,
+                    color: accentOrange,
+                    size: 28,
+                  ), // 🚀 ORANGE
+                  const SizedBox(width: 12),
                   Text(
                     "Quantum Promotion Engine 🌌",
                     style: TextStyle(
-                      fontSize: 22,
+                      fontSize: isMobile ? 18 : 22, // 📱 Responsive Font
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF2B3674),
+                      color: textPrimary,
                     ),
                   ),
                 ],
@@ -225,21 +273,31 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                 child: Container(
                   height: 50,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: bgDark, // 🚀 Dark Input
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: textSecondary.withOpacity(0.2)),
                   ),
                   child: TextField(
                     controller: _searchCtrl,
+                    style: const TextStyle(
+                      color: textPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
                     onChanged: (val) => setState(() {
                       _searchQuery = val;
                       _currentPage = 0;
                     }),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       hintText: "Search Product by Name or Barcode...",
-                      prefixIcon: Icon(Icons.search, color: Colors.grey),
+                      hintStyle: TextStyle(
+                        color: textSecondary.withOpacity(0.5),
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: textSecondary,
+                      ),
                       border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
                 ),
@@ -251,15 +309,18 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                   height: 50,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: bgDark,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(
+                      color: accentOrange.withOpacity(0.5),
+                    ), // 🚀 ORANGE THEME
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       isExpanded: true,
+                      dropdownColor: cardDark, // 🚀 Dark Dropdown
                       value: _selectedSort,
-                      icon: const Icon(Icons.sort, color: Colors.blue),
+                      icon: const Icon(Icons.sort, color: accentOrange),
                       items: _sortOptions
                           .map(
                             (opt) => DropdownMenuItem<String>(
@@ -269,7 +330,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                   Icon(
                                     opt['icon'],
                                     size: 16,
-                                    color: const Color(0xFF2B3674),
+                                    color: accentOrange,
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
@@ -277,7 +338,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
-                                      color: Color(0xFF2B3674),
+                                      color: textPrimary,
                                     ),
                                   ),
                                 ],
@@ -307,16 +368,21 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
           _isSorting
               ? const Padding(
                   padding: EdgeInsets.all(50),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(
+                    child: CircularProgressIndicator(color: accentOrange),
+                  ),
                 )
               : StreamBuilder<QuerySnapshot>(
                   stream: _engineStream,
                   builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                    // 🚀 FIX 2: Spinner tabhi dikhega jab DATA bilkul na ho (First time install).
+                    // Baad me offline cache use hoga aur UI flicker nahi karega!
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
                       return const Center(
                         child: Padding(
                           padding: EdgeInsets.all(50.0),
-                          child: CircularProgressIndicator(),
+                          child: CircularProgressIndicator(color: accentOrange),
                         ),
                       );
                     }
@@ -381,12 +447,14 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                     vertical: 14,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
+                                    color: const Color(
+                                      0xFF131A13,
+                                    ), // 🚀 Table Header Dark
                                     borderRadius: const BorderRadius.vertical(
                                       top: Radius.circular(12),
                                     ),
                                     border: Border.all(
-                                      color: Colors.grey.shade200,
+                                      color: textSecondary.withOpacity(0.1),
                                     ),
                                   ),
                                   child: Row(
@@ -397,7 +465,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                           "Product Info",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF2B3674),
+                                            color: textPrimary,
                                           ),
                                         ),
                                       ),
@@ -407,7 +475,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                           "Expiry Status",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF2B3674),
+                                            color: textPrimary,
                                           ),
                                         ),
                                       ),
@@ -417,7 +485,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                           "Offer Status",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF2B3674),
+                                            color: textPrimary,
                                           ),
                                         ),
                                       ),
@@ -427,7 +495,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                           "Stock",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF2B3674),
+                                            color: textPrimary,
                                           ),
                                         ),
                                       ),
@@ -437,7 +505,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                           "Action",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF2B3674),
+                                            color: textPrimary,
                                           ),
                                         ),
                                       ),
@@ -483,14 +551,26 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                             name,
                                           ),
                                       onDismissed: (direction) async {
+                                        // 🚀 SAAS INJECTION: Fetch details for Audit Ledger
+                                        final adminData = ref
+                                            .read(adminRoleProvider)
+                                            .value;
+
                                         await StockService.blockBatchSafely(
                                           productId,
+                                          adminData?['tenantId'] ??
+                                              'SYSTEM', // 👈 2nd Parameter
+                                          adminData?['email'] ??
+                                              'Unknown', // 👈 3rd Parameter
                                         );
+
                                         ScaffoldMessenger.of(
                                           context,
                                         ).showSnackBar(
                                           SnackBar(
-                                            content: Text("✅ $name Blocked!"),
+                                            content: Text(
+                                              "✅ $name Blocked & Logged!",
+                                            ),
                                             backgroundColor: Colors.red,
                                           ),
                                         );
@@ -526,15 +606,24 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                           vertical: 16,
                                         ),
                                         decoration: BoxDecoration(
+                                          color: index % 2 == 0
+                                              ? bgDark
+                                              : cardDark, // 🚀 Dark Zebra Striping
                                           border: Border(
                                             bottom: BorderSide(
-                                              color: Colors.grey.shade200,
+                                              color: textSecondary.withOpacity(
+                                                0.1,
+                                              ),
                                             ),
                                             left: BorderSide(
-                                              color: Colors.grey.shade200,
+                                              color: textSecondary.withOpacity(
+                                                0.1,
+                                              ),
                                             ),
                                             right: BorderSide(
-                                              color: Colors.grey.shade200,
+                                              color: textSecondary.withOpacity(
+                                                0.1,
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -553,13 +642,15 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       fontSize: 14,
+                                                      color: textPrimary,
                                                     ),
                                                   ),
                                                   Text(
                                                     "7-Day Sales: ${_salesDataCache[productId] ?? 0}",
                                                     style: const TextStyle(
                                                       fontSize: 11,
-                                                      color: Colors.blueAccent,
+                                                      color:
+                                                          accentOrange, // 🚀 ORANGE THEME
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
@@ -568,7 +659,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                                     "Price: ₹$price",
                                                     style: const TextStyle(
                                                       fontSize: 11,
-                                                      color: Colors.green,
+                                                      color: accentGreen,
                                                       fontWeight:
                                                           FontWeight.bold,
                                                     ),
@@ -578,7 +669,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                                     "👉 Swipe right to Block",
                                                     style: TextStyle(
                                                       fontSize: 10,
-                                                      color: Colors.grey,
+                                                      color: textSecondary,
                                                       fontStyle:
                                                           FontStyle.italic,
                                                     ),
@@ -655,145 +746,411 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                                         ],
                                                       )
                                                     : (isClearanceActive
-                                                          ? Column(
-                                                              crossAxisAlignment:
-                                                                  CrossAxisAlignment
-                                                                      .start,
-                                                              children: [
-                                                                _buildSolidBadge(
-                                                                  (data['clearanceTag'] ??
-                                                                          'OFFER ACTIVE')
-                                                                      .toString()
-                                                                      .toUpperCase(),
-                                                                  Icons
-                                                                      .local_offer,
-                                                                  [
+                                                          ? Builder(
+                                                              builder: (context) {
+                                                                final clearanceType =
+                                                                    data['clearanceType']
+                                                                        ?.toString() ??
+                                                                    '';
+                                                                final double
+                                                                pPrice =
+                                                                    double.tryParse(
+                                                                      price
+                                                                          .toString(),
+                                                                    ) ??
+                                                                    0;
+                                                                final double
+                                                                oPrice =
+                                                                    double.tryParse(
+                                                                      data['offerPrice']
+                                                                              ?.toString() ??
+                                                                          '',
+                                                                    ) ??
+                                                                    0;
+
+                                                                String
+                                                                offerDisplayName =
+                                                                    'OFFER ACTIVE';
+                                                                List<Color>
+                                                                offerGradient = [
+                                                                  Colors
+                                                                      .purple
+                                                                      .shade400,
+                                                                  Colors
+                                                                      .purple
+                                                                      .shade600,
+                                                                ];
+                                                                IconData
+                                                                offerIcon = Icons
+                                                                    .local_offer;
+
+                                                                // 🧠 Smart Math & Universal Short Tags!
+                                                                if (clearanceType ==
+                                                                        'PERCENTAGE' ||
+                                                                    clearanceType ==
+                                                                        'TIERED_QTY') {
+                                                                  int percent =
+                                                                      (pPrice >
+                                                                              0 &&
+                                                                          oPrice >
+                                                                              0)
+                                                                      ? (((pPrice -
+                                                                                        oPrice) /
+                                                                                    pPrice) *
+                                                                                100)
+                                                                            .round()
+                                                                      : 0;
+                                                                  offerDisplayName =
+                                                                      percent >
+                                                                          0
+                                                                      ? '$percent% OFF'
+                                                                      : 'PERCENT OFF';
+                                                                  offerGradient = [
+                                                                    const Color(
+                                                                      0xFF2962FF,
+                                                                    ),
                                                                     Colors
-                                                                        .purple
+                                                                        .blue
+                                                                        .shade700,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .percent_rounded;
+                                                                } else if (clearanceType ==
+                                                                    'FLAT_AMOUNT') {
+                                                                  int flat =
+                                                                      (pPrice >
+                                                                              0 &&
+                                                                          oPrice >
+                                                                              0)
+                                                                      ? (pPrice -
+                                                                                oPrice)
+                                                                            .round()
+                                                                      : 0;
+                                                                  offerDisplayName =
+                                                                      flat > 0
+                                                                      ? '₹$flat OFF'
+                                                                      : 'FLAT OFF';
+                                                                  offerGradient = [
+                                                                    const Color(
+                                                                      0xFF00C853,
+                                                                    ),
+                                                                    Colors
+                                                                        .green
+                                                                        .shade700,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .currency_rupee_rounded;
+                                                                } else if (clearanceType ==
+                                                                    'BOGO') {
+                                                                  offerDisplayName =
+                                                                      'B1G1';
+                                                                  offerGradient = [
+                                                                    const Color(
+                                                                      0xFFFF6D00,
+                                                                    ),
+                                                                    Colors
+                                                                        .orange
+                                                                        .shade700,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .shopping_bag_outlined;
+                                                                } else if (clearanceType ==
+                                                                    'BUY_X_GET_Y') {
+                                                                  offerDisplayName =
+                                                                      'BXGY';
+                                                                  offerGradient = [
+                                                                    const Color(
+                                                                      0xFFFF6D00,
+                                                                    ),
+                                                                    Colors
+                                                                        .orange
+                                                                        .shade700,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .shopping_bag_outlined;
+                                                                } else if (clearanceType ==
+                                                                    'BUNDLE_PRICE') {
+                                                                  final v1 =
+                                                                      data['value1']
+                                                                          ?.toInt() ??
+                                                                      'X';
+                                                                  final v2 =
+                                                                      data['value2']
+                                                                          ?.toInt() ??
+                                                                      'Y';
+                                                                  offerDisplayName =
+                                                                      '$v1 for ₹$v2'; // 🚀 Ex: "3 for ₹99"
+                                                                  offerGradient = [
+                                                                    Colors
+                                                                        .teal
                                                                         .shade400,
                                                                     Colors
-                                                                        .purple
+                                                                        .teal
                                                                         .shade600,
-                                                                  ],
-                                                                ),
-                                                                const SizedBox(
-                                                                  height: 6,
-                                                                ),
-                                                                InkWell(
-                                                                  onTap: () =>
-                                                                      StockService.undoClearance(
-                                                                        productId,
-                                                                      ),
-                                                                  child: const Padding(
-                                                                    padding:
-                                                                        EdgeInsets.only(
-                                                                          left:
-                                                                              4.0,
-                                                                        ),
-                                                                    child: Text(
-                                                                      "Remove Offer",
-                                                                      style: TextStyle(
-                                                                        color: Colors
-                                                                            .red,
-                                                                        fontSize:
-                                                                            11,
-                                                                        fontWeight:
-                                                                            FontWeight.bold,
-                                                                        decoration:
-                                                                            TextDecoration.underline,
-                                                                      ),
-                                                                    ),
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                            )
-                                                          : Container(
-                                                              height: 38,
-                                                              width:
-                                                                  140, // 🚀 Fixed width like badges
-                                                              decoration: BoxDecoration(
-                                                                gradient: const LinearGradient(
-                                                                  colors: [
-                                                                    Color(
-                                                                      0xFF10B981,
-                                                                    ),
-                                                                    Color(
-                                                                      0xFF059669,
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      8,
-                                                                    ),
-                                                                boxShadow: [
-                                                                  BoxShadow(
-                                                                    color:
-                                                                        const Color(
-                                                                          0xFF059669,
-                                                                        ).withValues(
-                                                                          alpha:
-                                                                              0.3,
-                                                                        ),
-                                                                    blurRadius:
-                                                                        8,
-                                                                    offset:
-                                                                        const Offset(
-                                                                          0,
-                                                                          4,
-                                                                        ),
-                                                                  ),
-                                                                ],
-                                                              ),
-                                                              child: ElevatedButton.icon(
-                                                                style: ElevatedButton.styleFrom(
-                                                                  backgroundColor:
-                                                                      Colors
-                                                                          .transparent,
-                                                                  shadowColor:
-                                                                      Colors
-                                                                          .transparent,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .inventory_2;
+                                                                } else if (clearanceType ==
+                                                                    'FLASH_SALE') {
+                                                                  offerDisplayName =
+                                                                      'FLASH';
+                                                                  offerGradient = [
+                                                                    Colors
+                                                                        .redAccent,
+                                                                    Colors
+                                                                        .red
+                                                                        .shade700,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .flash_on;
+                                                                } else if (clearanceType ==
+                                                                        'CROSS_PRODUCT' ||
+                                                                    clearanceType ==
+                                                                        'BUY_X_GET_Y_CROSS') {
+                                                                  offerDisplayName =
+                                                                      'CROSS';
+                                                                  offerGradient = [
+                                                                    Colors
+                                                                        .deepPurple
+                                                                        .shade400,
+                                                                    Colors
+                                                                        .deepPurple
+                                                                        .shade600,
+                                                                  ];
+                                                                  offerIcon = Icons
+                                                                      .compare_arrows;
+                                                                }
+
+                                                                return Container(
+                                                                  height: 34,
+                                                                  width:
+                                                                      130, // Matched lightweight size
                                                                   padding:
-                                                                      const EdgeInsets.symmetric(
-                                                                        horizontal:
-                                                                            5,
+                                                                      const EdgeInsets.only(
+                                                                        left: 8,
+                                                                        right:
+                                                                            4,
                                                                       ),
-                                                                  shape: RoundedRectangleBorder(
+                                                                  decoration: BoxDecoration(
+                                                                    color: offerGradient
+                                                                        .first
+                                                                        .withOpacity(
+                                                                          0.1,
+                                                                        ), // 🚀 Tinted bg
+                                                                    border: Border.all(
+                                                                      color: offerGradient
+                                                                          .first
+                                                                          .withOpacity(
+                                                                            0.5,
+                                                                          ),
+                                                                      width: 1,
+                                                                    ), // 🚀 Outline
                                                                     borderRadius:
                                                                         BorderRadius.circular(
-                                                                          8,
+                                                                          6,
                                                                         ),
                                                                   ),
-                                                                ),
-                                                                onPressed: () =>
-                                                                    _handleApplyOffer(
-                                                                      context,
-                                                                      productId,
-                                                                      name,
-                                                                    ),
-                                                                icon: const Icon(
-                                                                  Icons.sell,
-                                                                  size: 14,
-                                                                  color: Colors
-                                                                      .white,
-                                                                ),
-                                                                label: const FittedBox(
-                                                                  fit: BoxFit
-                                                                      .scaleDown,
-                                                                  child: Text(
-                                                                    "APPLY OFFER",
-                                                                    style: TextStyle(
-                                                                      color: Colors
-                                                                          .white,
-                                                                      fontSize:
-                                                                          11,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w900,
-                                                                      letterSpacing:
-                                                                          0.5,
-                                                                    ),
+                                                                  child: Row(
+                                                                    children: [
+                                                                      Icon(
+                                                                        offerIcon,
+                                                                        size:
+                                                                            14,
+                                                                        color: offerGradient
+                                                                            .first,
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            4,
+                                                                      ),
+                                                                      Expanded(
+                                                                        child: FittedBox(
+                                                                          fit: BoxFit
+                                                                              .scaleDown,
+                                                                          alignment:
+                                                                              Alignment.centerLeft,
+                                                                          child: Text(
+                                                                            offerDisplayName,
+                                                                            style: TextStyle(
+                                                                              color: offerGradient.first, // 🚀 Text Color matching border
+                                                                              fontWeight: FontWeight.w900,
+                                                                              fontSize: 11,
+                                                                              letterSpacing: 0.5,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                      Tooltip(
+                                                                        message:
+                                                                            "REMOVE OFFER",
+                                                                        child: InkWell(
+                                                                          onTap: () async {
+                                                                            // 🚀 FIX: Are you sure dialog added before removing offer!
+                                                                            bool?
+                                                                            confirm =
+                                                                                await showDialog<
+                                                                                  bool
+                                                                                >(
+                                                                                  context: context,
+                                                                                  builder:
+                                                                                      (
+                                                                                        ctx,
+                                                                                      ) => AlertDialog(
+                                                                                        backgroundColor: cardDark,
+                                                                                        title: const Text(
+                                                                                          "Remove Offer?",
+                                                                                          style: TextStyle(
+                                                                                            color: Colors.white,
+                                                                                            fontWeight: FontWeight.bold,
+                                                                                          ),
+                                                                                        ),
+                                                                                        content: const Text(
+                                                                                          "Are you sure you want to deactivate this offer? Customer will no longer see this discount.",
+                                                                                          style: TextStyle(
+                                                                                            color: Colors.white70,
+                                                                                          ),
+                                                                                        ),
+                                                                                        actions: [
+                                                                                          TextButton(
+                                                                                            onPressed: () => Navigator.pop(
+                                                                                              ctx,
+                                                                                              false,
+                                                                                            ),
+                                                                                            child: const Text(
+                                                                                              "Cancel",
+                                                                                              style: TextStyle(
+                                                                                                color: Colors.grey,
+                                                                                              ),
+                                                                                            ),
+                                                                                          ),
+                                                                                          ElevatedButton(
+                                                                                            style: ElevatedButton.styleFrom(
+                                                                                              backgroundColor: Colors.redAccent,
+                                                                                            ),
+                                                                                            onPressed: () => Navigator.pop(
+                                                                                              ctx,
+                                                                                              true,
+                                                                                            ),
+                                                                                            child: const Text(
+                                                                                              "Remove",
+                                                                                              style: TextStyle(
+                                                                                                color: Colors.white,
+                                                                                              ),
+                                                                                            ),
+                                                                                          ),
+                                                                                        ],
+                                                                                      ),
+                                                                                );
+                                                                            if (confirm ==
+                                                                                true) {
+                                                                              await StockService.undoClearance(
+                                                                                productId,
+                                                                              );
+                                                                              if (context.mounted) {
+                                                                                ScaffoldMessenger.of(
+                                                                                  context,
+                                                                                ).showSnackBar(
+                                                                                  const SnackBar(
+                                                                                    content: Text(
+                                                                                      "✅ Offer Removed Successfully!",
+                                                                                    ),
+                                                                                    backgroundColor: accentOrange,
+                                                                                  ),
+                                                                                );
+                                                                              }
+                                                                            }
+                                                                          },
+                                                                          child: Container(
+                                                                            padding: const EdgeInsets.all(
+                                                                              4,
+                                                                            ),
+                                                                            decoration: BoxDecoration(
+                                                                              color: offerGradient.first.withOpacity(
+                                                                                0.2,
+                                                                              ),
+                                                                              borderRadius: BorderRadius.circular(
+                                                                                4,
+                                                                              ),
+                                                                            ),
+                                                                            child: Icon(
+                                                                              Icons.close_rounded,
+                                                                              color: offerGradient.first,
+                                                                              size: 14,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
                                                                   ),
+                                                                );
+                                                              },
+                                                            )
+                                                          : InkWell(
+                                                              onTap: () =>
+                                                                  _handleApplyOffer(
+                                                                    context,
+                                                                    productId,
+                                                                    name,
+                                                                    price,
+                                                                  ),
+                                                              borderRadius:
+                                                                  BorderRadius.circular(
+                                                                    6,
+                                                                  ),
+                                                              child: Container(
+                                                                height: 34,
+                                                                width:
+                                                                    130, // Matches lightweight size
+                                                                decoration: BoxDecoration(
+                                                                  color: accentOrange
+                                                                      .withOpacity(
+                                                                        0.1,
+                                                                      ), // 🚀 Light Orange Tint
+                                                                  border: Border.all(
+                                                                    color: accentOrange
+                                                                        .withOpacity(
+                                                                          0.5,
+                                                                        ),
+                                                                    width: 1,
+                                                                  ), // 🚀 Orange Outline
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        6,
+                                                                      ),
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisAlignment:
+                                                                      MainAxisAlignment
+                                                                          .center,
+                                                                  children: const [
+                                                                    Icon(
+                                                                      Icons
+                                                                          .sell,
+                                                                      size: 14,
+                                                                      color:
+                                                                          accentOrange,
+                                                                    ),
+                                                                    SizedBox(
+                                                                      width: 4,
+                                                                    ),
+                                                                    FittedBox(
+                                                                      fit: BoxFit
+                                                                          .scaleDown,
+                                                                      child: Text(
+                                                                        "APPLY OFFER",
+                                                                        style: TextStyle(
+                                                                          color:
+                                                                              accentOrange,
+                                                                          fontSize:
+                                                                              11,
+                                                                          fontWeight:
+                                                                              FontWeight.w900,
+                                                                          letterSpacing:
+                                                                              0.5,
+                                                                        ),
+                                                                      ),
+                                                                    ),
+                                                                  ],
                                                                 ),
                                                               ),
                                                             )),
@@ -809,91 +1166,77 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                                   fontWeight: FontWeight.w900,
                                                   fontSize: 16,
                                                   color: stock <= 20
-                                                      ? Colors.red
-                                                      : Colors.black,
+                                                      ? accentRed
+                                                      : textPrimary, // 🚀 Dark Theme Text
                                                 ),
                                               ),
                                             ),
 
-                                            // 5. ACTION (RAISE PO - Matched Width)
+                                            // 5. ACTION (RAISE PO - Matched Width Lightweight)
                                             Expanded(
                                               flex: 2,
                                               child: Align(
                                                 alignment: Alignment.centerLeft,
-                                                child: Container(
-                                                  height: 38,
-                                                  width:
-                                                      140, // 🚀 Fixed width like badges
-                                                  decoration: BoxDecoration(
-                                                    gradient:
-                                                        const LinearGradient(
-                                                          colors: [
-                                                            Color(0xFF3B82F6),
-                                                            Color(0xFF2563EB),
-                                                          ],
+                                                child: InkWell(
+                                                  onTap: () => showDialog(
+                                                    context: context,
+                                                    builder: (ctx) =>
+                                                        CreatePODialog(
+                                                          productId: productId,
+                                                          productName: name,
+                                                          currentStock: stock,
                                                         ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8,
-                                                        ),
-                                                    boxShadow: [
-                                                      BoxShadow(
-                                                        color: Colors.blue
-                                                            .withValues(
-                                                              alpha: 0.3,
-                                                            ),
-                                                        blurRadius: 8,
-                                                        offset: const Offset(
-                                                          0,
-                                                          4,
-                                                        ),
-                                                      ),
-                                                    ],
                                                   ),
-                                                  child: ElevatedButton.icon(
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor:
-                                                          Colors.transparent,
-                                                      shadowColor:
-                                                          Colors.transparent,
-                                                      padding:
-                                                          const EdgeInsets.symmetric(
-                                                            horizontal: 5,
-                                                          ),
-                                                      shape: RoundedRectangleBorder(
-                                                        borderRadius:
-                                                            BorderRadius.circular(
-                                                              8,
-                                                            ),
-                                                      ),
-                                                    ),
-                                                    onPressed: () => showDialog(
-                                                      context: context,
-                                                      builder: (ctx) =>
-                                                          CreatePODialog(
-                                                            productId:
-                                                                productId,
-                                                            productName: name,
-                                                            currentStock: stock,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  child: Container(
+                                                    height: 34,
+                                                    width:
+                                                        130, // 🚀 Lightweight Match
+                                                    decoration: BoxDecoration(
+                                                      color: accentGreen
+                                                          .withOpacity(
+                                                            0.1,
+                                                          ), // 🚀 Light Green Tint
+                                                      border: Border.all(
+                                                        color: accentGreen
+                                                            .withOpacity(0.5),
+                                                        width: 1,
+                                                      ), // 🚀 Green Outline
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
                                                           ),
                                                     ),
-                                                    icon: const Icon(
-                                                      Icons.add_shopping_cart,
-                                                      size: 14,
-                                                      color: Colors.white,
-                                                    ),
-                                                    label: const FittedBox(
-                                                      fit: BoxFit.scaleDown,
-                                                      child: Text(
-                                                        "RAISE PO",
-                                                        style: TextStyle(
-                                                          color: Colors.white,
-                                                          fontSize: 11,
-                                                          fontWeight:
-                                                              FontWeight.w900,
-                                                          letterSpacing: 0.5,
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      children: const [
+                                                        Icon(
+                                                          Icons
+                                                              .add_shopping_cart,
+                                                          size: 14,
+                                                          color: accentGreen,
                                                         ),
-                                                      ),
+                                                        SizedBox(width: 4),
+                                                        FittedBox(
+                                                          fit: BoxFit.scaleDown,
+                                                          child: Text(
+                                                            "RAISE PO",
+                                                            style: TextStyle(
+                                                              color:
+                                                                  accentGreen,
+                                                              fontSize: 11,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w900,
+                                                              letterSpacing:
+                                                                  0.5,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
                                                 ),
@@ -915,8 +1258,11 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                       vertical: 12,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.grey.shade50,
+                                      color: bgDark, // 🚀 Dark Pagination
                                       borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: textSecondary.withOpacity(0.1),
+                                      ),
                                     ),
                                     child: Row(
                                       mainAxisAlignment:
@@ -925,7 +1271,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                         Text(
                                           "Showing ${startIndex + 1} - $endIndex of ${processedProducts.length} Entries",
                                           style: const TextStyle(
-                                            color: Colors.grey,
+                                            color: textSecondary,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -934,7 +1280,8 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                             IconButton(
                                               icon: const Icon(
                                                 Icons.chevron_left,
-                                                color: Color(0xFF2B3674),
+                                                color:
+                                                    accentOrange, // 🚀 ORANGE
                                               ),
                                               onPressed: _currentPage > 0
                                                   ? () => setState(
@@ -949,14 +1296,15 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                                     vertical: 6,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: const Color(0xFF2B3674),
+                                                color:
+                                                    accentOrange, // 🚀 ORANGE
                                                 borderRadius:
                                                     BorderRadius.circular(6),
                                               ),
                                               child: Text(
                                                 "${_currentPage + 1} / $totalPages",
                                                 style: const TextStyle(
-                                                  color: Colors.white,
+                                                  color: bgDark,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -964,7 +1312,8 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
                                             IconButton(
                                               icon: const Icon(
                                                 Icons.chevron_right,
-                                                color: Color(0xFF2B3674),
+                                                color:
+                                                    accentOrange, // 🚀 ORANGE
                                               ),
                                               onPressed:
                                                   _currentPage < totalPages - 1
@@ -992,39 +1341,37 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
     );
   }
 
-  // 🚀 THE NEW UNIFIED SOLID BADGE (MATCHES BUTTONS PERFECTLY)
+  // 🚀 THE NEW LIGHTWEIGHT TINTED BADGE (Matches Product Control UI)
   Widget _buildSolidBadge(
     String text,
     IconData icon,
     List<Color> gradientColors,
   ) {
+    Color primaryColor = gradientColors.first; // Extract main color
     return Container(
-      height: 38,
-      width: 140, // Perfect identical alignment down the table
+      height: 34,
+      width: 130, // Lightweight compact size
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: gradientColors),
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: gradientColors.last.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: primaryColor.withOpacity(0.1), // 🚀 Light Tint
+        border: Border.all(
+          color: primaryColor.withOpacity(0.5),
+          width: 1,
+        ), // 🚀 Thin Outline
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 14, color: Colors.white),
+          Icon(icon, size: 14, color: primaryColor), // 🚀 Colored Icon
           const SizedBox(width: 6),
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 text,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: primaryColor, // 🚀 Colored Text
                   fontWeight: FontWeight.w900,
                   fontSize: 11,
                   letterSpacing: 0.5,
@@ -1074,6 +1421,7 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
     BuildContext context,
     String productId,
     String name,
+    num originalPrice, // 🚀 4th argument (Ye error 1 fix karega)
   ) async {
     OfferPayload? createdOffer = await showDialog<OfferPayload>(
       context: context,
@@ -1086,14 +1434,70 @@ class _ExpiryAlertDashboardState extends State<ExpiryAlertDashboard> {
         createdOffer.type,
         createdOffer.data,
       );
+
+      // 🚀 UNIVERSAL DISCOUNT ENGINE: Har offer ka 'Effective Unit Price' nikalega Node.js ke liye
+      double calculatedOfferPrice = originalPrice.toDouble();
+
+      // Extract universal values safely
+      double v1 =
+          double.tryParse(createdOffer.data['value1']?.toString() ?? '0') ?? 0;
+      double v2 =
+          double.tryParse(createdOffer.data['value2']?.toString() ?? '0') ?? 0;
+
+      switch (createdOffer.type) {
+        case 'PERCENTAGE':
+        case 'FLASH_SALE':
+        case 'TIERED_QTY':
+          // Tiered mein v2 discount percentage hai, baakiyo mein v1
+          double discountPercent = (createdOffer.type == 'TIERED_QTY')
+              ? v2
+              : v1;
+          calculatedOfferPrice =
+              originalPrice - (originalPrice * (discountPercent / 100));
+          break;
+        case 'FLAT_AMOUNT':
+          calculatedOfferPrice = originalPrice - v1;
+          break;
+        case 'BOGO':
+          // Buy 1 Get 1 = 50% effective off per unit
+          calculatedOfferPrice = originalPrice / 2;
+          break;
+        case 'BUY_X_GET_Y':
+          // Pay for X items, get (X + Y) items
+          if (v1 > 0 && v2 > 0) {
+            calculatedOfferPrice = (originalPrice * v1) / (v1 + v2);
+          }
+          break;
+        case 'BUNDLE_PRICE':
+          // Total Bundle Price (v2) divided by Total Qty (v1)
+          if (v1 > 0) {
+            calculatedOfferPrice = v2 / v1;
+          }
+          break;
+        case 'CROSS_PRODUCT':
+        case 'BUY_X_GET_Y_CROSS':
+          // Cross product target item par apply hota hai, current item full price par hi bikega
+          calculatedOfferPrice = originalPrice.toDouble();
+          break;
+      }
+
+      // 🛡️ Safety check: Price zero se neeche na jaye
+      if (calculatedOfferPrice < 0) calculatedOfferPrice = 0;
+
+      // Database me 'offerPrice' push karo taaki Node.js exact discountBurn nikal sake
+      await FirebaseFirestore.instance
+          .collection('products')
+          .doc(productId)
+          .update({'offerPrice': calculatedOfferPrice});
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("✅ Offer Applied!"),
+            content: Text("✅ Offer Applied & Synced with Quantum Engine!"),
             backgroundColor: Colors.green,
           ),
         );
       }
     }
   }
-}
+} // 🚀 FIX: YE AAKHRI BRACKET MISSING THA (Ye error 2 fix karega)

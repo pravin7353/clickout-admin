@@ -42,21 +42,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final revenueState = ref.watch(revenueEngineProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryTextColor = isDark ? Colors.white : const Color(0xFF2B3674);
+    final sectionTextColor = isDark ? Colors.white70 : Colors.black87;
+    final bgColor = isDark ? const Color(0xFF080B08) : const Color(0xFFF4F7FE);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FE),
+      backgroundColor: bgColor,
       floatingActionButton: ScaleTransition(
         scale: _pulseAnimation,
         child: FloatingActionButton(
           onPressed: () => ref.read(revenueEngineProvider.notifier).refresh(),
-          backgroundColor: const Color(0xFF2B3674),
+          backgroundColor: isDark
+              ? const Color(0xFF00C853)
+              : const Color(0xFF2B3674),
           tooltip: "Refresh Analytics",
           child: const Icon(Icons.refresh, color: Colors.white),
         ),
       ),
       body: revenueState.when(
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: Color(0xFF2B3674)),
+        loading: () => Center(
+          child: CircularProgressIndicator(
+            color: isDark ? const Color(0xFF00C853) : const Color(0xFF2B3674),
+          ),
         ),
         error: (err, stack) => Center(
           child: Text(
@@ -66,16 +74,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ),
         data: (metrics) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(
+              MediaQuery.of(context).size.width < 600 ? 16.0 : 24.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Command Center Intel 📡",
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: MediaQuery.of(context).size.width < 600 ? 24 : 28,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2B3674),
+                    color: primaryTextColor,
                   ),
                 ),
                 const Text(
@@ -84,36 +94,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 ),
                 const SizedBox(height: 30),
 
-                const Text(
+                Text(
                   "SECTION A: Revenue Intelligence",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: sectionTextColor,
                   ),
                 ),
                 const SizedBox(height: 15),
                 _buildRevenueGrid(metrics),
                 const SizedBox(height: 30),
 
-                const Text(
+                Text(
                   "SECTION B: Order Logistics",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: sectionTextColor,
                   ),
                 ),
                 const SizedBox(height: 15),
                 _buildOrderGrid(metrics),
                 const SizedBox(height: 30),
 
-                const Text(
+                Text(
                   "SECTION C: Financial Events",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    color: sectionTextColor,
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -125,36 +135,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 ),
                 const SizedBox(height: 40),
 
-                const Text(
+                Text(
                   "Command Intel 📡",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2B3674),
+                    color: primaryTextColor,
                   ),
                 ),
                 const SizedBox(height: 15),
                 const ManpowerRadarWidget(),
                 const SizedBox(height: 40),
 
-                const Text(
+                /* 🚀 DISABLED: Revenue Trend Matrix - Kept for future use
+                Text(
                   "Revenue Trend Matrix",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2B3674),
+                    color: primaryTextColor,
                   ),
                 ),
                 const SizedBox(height: 15),
                 const EnterpriseRevenueMatrixChart(),
                 const SizedBox(height: 40),
-
-                const Text(
+                */
+                Text(
                   "Reconciliation Table",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2B3674),
+                    color: primaryTextColor,
                   ),
                 ),
                 const SizedBox(height: 15),
@@ -291,15 +302,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     IconData icon,
     bool isAmt,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.05),
+            color: color.withOpacity(isDark ? 0.1 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -314,20 +329,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               Text(
                 title,
                 style: TextStyle(
-                  color: Colors.grey.shade600,
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                isAmt
-                    ? "₹${value.toStringAsFixed(0)}"
-                    : value.toInt().toString(),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF2B3674),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  isAmt
+                      ? "₹${value.toStringAsFixed(0)}"
+                      : value.toInt().toString(),
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: textColor, // 🚀 Dynamic Text Color
+                  ),
                 ),
               ),
               if (pct > 0) ...[
@@ -373,10 +391,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     Color color,
     IconData icon,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color.withOpacity(0.5), width: 1.5),
         boxShadow: [
@@ -865,6 +887,14 @@ class _ReconciliationTableWidgetState
       }
     });
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isMobile =
+        MediaQuery.of(context).size.width <
+        768; // 🚀 Adjusted for Tablets/Mobiles
+    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
+    final inputBg = isDark ? const Color(0xFF1A221A) : Colors.grey.shade50;
+    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)
         ? _docs.length
@@ -888,10 +918,13 @@ class _ReconciliationTableWidgetState
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: Column(
@@ -905,13 +938,24 @@ class _ReconciliationTableWidgetState
               alignment: WrapAlignment.spaceBetween,
               children: [
                 SizedBox(
-                  width: 300,
+                  width: isMobile
+                      ? double.infinity
+                      : 300, // 🚀 Fully Responsive Search Bar
                   child: TextField(
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black,
+                    ),
                     decoration: InputDecoration(
                       hintText: "Search Exact Order ID...",
-                      prefixIcon: const Icon(Icons.search),
+                      hintStyle: TextStyle(
+                        color: isDark ? Colors.grey : Colors.black54,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: isDark ? Colors.grey : Colors.black54,
+                      ),
                       filled: true,
-                      fillColor: Colors.grey.shade50,
+                      fillColor: inputBg,
                       contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
@@ -926,17 +970,22 @@ class _ReconciliationTableWidgetState
                 ),
                 Wrap(
                   spacing: 10,
+                  runSpacing: 10,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
+                        color: inputBg,
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
+                          dropdownColor: cardBg,
                           value: _statusFilter,
-                          icon: const Icon(Icons.filter_list),
+                          icon: Icon(
+                            Icons.filter_list,
+                            color: isDark ? Colors.white70 : Colors.black87,
+                          ),
                           items:
                               [
                                 'ALL',
@@ -951,7 +1000,10 @@ class _ReconciliationTableWidgetState
                                   value: s,
                                   child: Text(
                                     s,
-                                    style: const TextStyle(
+                                    style: TextStyle(
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black87,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
@@ -977,7 +1029,7 @@ class _ReconciliationTableWidgetState
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: inputBg,
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: Row(
@@ -988,15 +1040,15 @@ class _ReconciliationTableWidgetState
                                   ? Icons.arrow_downward
                                   : Icons.arrow_upward,
                               size: 16,
-                              color: const Color(0xFF2B3674),
+                              color: textColor,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               _isLatestFirst ? "Latest" : "Oldest",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 13,
-                                color: Color(0xFF2B3674),
+                                color: textColor,
                               ),
                             ),
                           ],
@@ -1068,118 +1120,229 @@ class _ReconciliationTableWidgetState
                     horizontal: 20,
                     vertical: 5,
                   ),
-                  iconColor: const Color(0xFF2B3674),
-                  title: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          displayId,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontFamily: 'monospace',
-                          ),
+                  iconColor: textColor,
+                  collapsedIconColor: isDark ? Colors.white54 : Colors.grey,
+                  title: isMobile
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  displayId,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontFamily: 'monospace',
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
+                                  ),
+                                ),
+                                _buildStatusChip(stat),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  DateFormat('hh:mm a').format(dt),
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  "₹$amount",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    color: textColor,
+                                  ),
+                                ),
+                                Text(
+                                  o['paymentMode']?.toString() ?? 'UPI',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                displayId,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                DateFormat('hh:mm a').format(dt),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? Colors.grey.shade400
+                                      : Colors.grey.shade600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                "₹$amount",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: textColor,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Text(
+                                o['paymentMode']?.toString() ?? 'UPI',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 3,
+                              child: Align(
+                                alignment: Alignment.centerRight,
+                                child: _buildStatusChip(stat),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          DateFormat('hh:mm a').format(dt),
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          "₹$amount",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF2B3674),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          o['paymentMode']?.toString() ?? 'UPI',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: _buildStatusChip(stat),
-                        ),
-                      ),
-                    ],
-                  ),
                   children: [
                     Container(
-                      color: Colors.grey.shade50,
+                      color: isDark
+                          ? const Color(0xFF080B08)
+                          : Colors.grey.shade50,
                       padding: const EdgeInsets.all(20),
-                      child: Row(
-                        children: [
-                          _timelineStep(
-                            Icons.shopping_cart,
-                            "Created",
-                            DateFormat('hh:mm a').format(dt),
-                            Colors.blue,
-                          ),
-                          _timelineLine(Colors.green),
-                          _timelineStep(
-                            Icons.payment,
-                            "Paid (${o['paymentMode'] ?? 'UPI'})",
-                            DateFormat(
-                              'hh:mm a',
-                            ).format(dt.add(const Duration(minutes: 2))),
-                            Colors.green,
-                          ),
-                          _timelineLine(
-                            (stat == 'Clear Exit' || stat == 'Fix & Exit')
-                                ? Colors.green
-                                : (stat == 'Reject'
-                                      ? Colors.red
-                                      : (stat == 'QR Expire'
-                                            ? Colors.grey
-                                            : Colors.orange)),
-                          ),
-                          _timelineStep(
-                            (stat == 'Clear Exit' || stat == 'Fix & Exit')
-                                ? Icons.directions_walk
-                                : (stat == 'Reject'
-                                      ? Icons.block
-                                      : (stat == 'QR Expire'
-                                            ? Icons.timer_off
-                                            : Icons.hourglass_empty)),
-                            (stat == 'Clear Exit' || stat == 'Fix & Exit')
-                                ? "Guard Exit"
-                                : (stat == 'Reject'
-                                      ? "Rejected"
-                                      : (stat == 'QR Expire'
-                                            ? "QR Expired"
-                                            : "Pending Verifier")),
-                            (stat == 'Clear Exit' || stat == 'Fix & Exit')
-                                ? DateFormat(
+                      child: isMobile
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _timelineStep(
+                                  Icons.shopping_cart,
+                                  "Created",
+                                  DateFormat('hh:mm a').format(dt),
+                                  Colors.blue,
+                                ),
+                                const SizedBox(height: 10),
+                                _timelineStep(
+                                  Icons.payment,
+                                  "Paid (${o['paymentMode'] ?? 'UPI'})",
+                                  DateFormat(
                                     'hh:mm a',
-                                  ).format(dt.add(const Duration(minutes: 5)))
-                                : "--",
-                            (stat == 'Clear Exit' || stat == 'Fix & Exit')
-                                ? Colors.green
-                                : (stat == 'Reject'
-                                      ? Colors.red
-                                      : (stat == 'QR Expire'
-                                            ? Colors.grey
-                                            : Colors.orange)),
-                          ),
-                        ],
-                      ),
+                                  ).format(dt.add(const Duration(minutes: 2))),
+                                  Colors.green,
+                                ),
+                                const SizedBox(height: 10),
+                                _timelineStep(
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? Icons.directions_walk
+                                      : (stat == 'Reject'
+                                            ? Icons.block
+                                            : (stat == 'QR Expire'
+                                                  ? Icons.timer_off
+                                                  : Icons.hourglass_empty)),
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? "Guard Exit"
+                                      : (stat == 'Reject'
+                                            ? "Rejected"
+                                            : (stat == 'QR Expire'
+                                                  ? "QR Expired"
+                                                  : "Pending Verifier")),
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? DateFormat('hh:mm a').format(
+                                          dt.add(const Duration(minutes: 5)),
+                                        )
+                                      : "--",
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? Colors.green
+                                      : (stat == 'Reject'
+                                            ? Colors.red
+                                            : (stat == 'QR Expire'
+                                                  ? Colors.grey
+                                                  : Colors.orange)),
+                                ),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                _timelineStep(
+                                  Icons.shopping_cart,
+                                  "Created",
+                                  DateFormat('hh:mm a').format(dt),
+                                  Colors.blue,
+                                ),
+                                _timelineLine(Colors.green),
+                                _timelineStep(
+                                  Icons.payment,
+                                  "Paid (${o['paymentMode'] ?? 'UPI'})",
+                                  DateFormat(
+                                    'hh:mm a',
+                                  ).format(dt.add(const Duration(minutes: 2))),
+                                  Colors.green,
+                                ),
+                                _timelineLine(
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? Colors.green
+                                      : (stat == 'Reject'
+                                            ? Colors.red
+                                            : (stat == 'QR Expire'
+                                                  ? Colors.grey
+                                                  : Colors.orange)),
+                                ),
+                                _timelineStep(
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? Icons.directions_walk
+                                      : (stat == 'Reject'
+                                            ? Icons.block
+                                            : (stat == 'QR Expire'
+                                                  ? Icons.timer_off
+                                                  : Icons.hourglass_empty)),
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? "Guard Exit"
+                                      : (stat == 'Reject'
+                                            ? "Rejected"
+                                            : (stat == 'QR Expire'
+                                                  ? "QR Expired"
+                                                  : "Pending Verifier")),
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? DateFormat('hh:mm a').format(
+                                          dt.add(const Duration(minutes: 5)),
+                                        )
+                                      : "--",
+                                  (stat == 'Clear Exit' || stat == 'Fix & Exit')
+                                      ? Colors.green
+                                      : (stat == 'Reject'
+                                            ? Colors.red
+                                            : (stat == 'QR Expire'
+                                                  ? Colors.grey
+                                                  : Colors.orange)),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
                 );
@@ -1190,7 +1353,7 @@ class _ReconciliationTableWidgetState
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: inputBg,
               borderRadius: const BorderRadius.vertical(
                 bottom: Radius.circular(16),
               ),
@@ -1208,15 +1371,24 @@ class _ReconciliationTableWidgetState
                     ),
                   ),
                 IconButton(
-                  icon: const Icon(Icons.chevron_left),
+                  icon: Icon(
+                    Icons.chevron_left,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                   onPressed: _currentPage > 0 ? _prevPage : null,
                 ),
                 Text(
                   "Page ${_currentPage + 1} of $totalPages",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.chevron_right),
+                  icon: Icon(
+                    Icons.chevron_right,
+                    color: isDark ? Colors.white : Colors.black,
+                  ),
                   onPressed: (_currentPage < totalPages - 1 || _hasMore)
                       ? _nextPage
                       : null,
@@ -1230,35 +1402,36 @@ class _ReconciliationTableWidgetState
   }
 
   Widget _buildStatusChip(String status) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color bg;
     Color text;
     switch (status) {
       case 'Clear Exit':
-        bg = Colors.green.shade50;
-        text = Colors.green;
+        bg = isDark ? Colors.green.withOpacity(0.1) : Colors.green.shade50;
+        text = isDark ? Colors.greenAccent : Colors.green;
         break;
       case 'Gate Pass Pending':
-        bg = Colors.orange.shade50;
-        text = Colors.orange.shade800;
+        bg = isDark ? Colors.orange.withOpacity(0.1) : Colors.orange.shade50;
+        text = isDark ? Colors.orangeAccent : Colors.orange.shade800;
         break;
       case 'Reject':
-        bg = Colors.red.shade50;
-        text = Colors.red;
+        bg = isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50;
+        text = isDark ? Colors.redAccent : Colors.red;
         break;
       case 'Fix & Exit':
-        bg = Colors.purple.shade50;
-        text = Colors.purple;
+        bg = isDark ? Colors.purple.withOpacity(0.1) : Colors.purple.shade50;
+        text = isDark ? Colors.purpleAccent : Colors.purple;
         break;
       case 'Refund':
-        bg = Colors.blue.shade50;
-        text = Colors.blue;
+        bg = isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50;
+        text = isDark ? Colors.blueAccent : Colors.blue;
         break;
       case 'QR Expire':
-        bg = Colors.grey.shade200;
-        text = Colors.grey.shade800;
+        bg = isDark ? Colors.grey.withOpacity(0.1) : Colors.grey.shade200;
+        text = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
         break;
       default:
-        bg = Colors.grey.shade100;
+        bg = isDark ? Colors.grey.withOpacity(0.1) : Colors.grey.shade100;
         text = Colors.grey;
     }
     return Container(
@@ -1280,6 +1453,7 @@ class _ReconciliationTableWidgetState
   }
 
   Widget _timelineStep(IconData icon, String title, String time, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       children: [
         CircleAvatar(
@@ -1290,9 +1464,19 @@ class _ReconciliationTableWidgetState
         const SizedBox(height: 5),
         Text(
           title,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
         ),
-        Text(time, style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+        Text(
+          time,
+          style: TextStyle(
+            fontSize: 10,
+            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+          ),
+        ),
       ],
     );
   }

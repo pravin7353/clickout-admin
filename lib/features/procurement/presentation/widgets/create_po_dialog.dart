@@ -24,7 +24,8 @@ class CreatePODialog extends ConsumerStatefulWidget {
 class _CreatePODialogState extends ConsumerState<CreatePODialog> {
   final _formKey = GlobalKey<FormState>();
   final _qtyCtrl = TextEditingController(text: "100");
-  final _branchCtrl = TextEditingController(text: "MUM01");
+  final _branchCtrl =
+      TextEditingController(); // 🚀 FIX: Removed hardcoded MUM01
 
   String _selectedSupplier = "";
   DateTime _deliveryDate = DateTime.now().add(const Duration(days: 3));
@@ -36,6 +37,13 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
   @override
   void initState() {
     super.initState();
+
+    // 🚀 FIX: Automatically set the exact branch code of the logged-in user!
+    final adminData = ref.read(adminRoleProvider).value;
+    final branchCode =
+        adminData?['branchCode'] ?? adminData?['storeId'] ?? "HQ";
+    _branchCtrl.text = branchCode;
+
     _fetchSuppliers();
   }
 
@@ -80,18 +88,29 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
     final isProcessing = ref.watch(poEngineProvider);
     final isMobile = MediaQuery.of(context).size.width < 600;
 
+    // 🎨 THEME CONSTANTS
+    const Color bgDark = Color(0xFF080B08);
+    const Color cardDark = Color(0xFF111811);
+    const Color accentOrange = Color(0xFFD4580A);
+
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(
+          color: accentOrange,
+          width: 1.5,
+        ), // 🚀 ORANGE BORDER
+      ),
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.all(16),
       child: Container(
         width: isMobile ? double.infinity : 600,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: bgDark,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withOpacity(0.5),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),
@@ -104,11 +123,15 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: const Color(0xFF111811), // cardDark
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(20),
                 ),
-                border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+                border: Border(
+                  bottom: BorderSide(
+                    color: const Color(0xFFD4580A).withOpacity(0.2),
+                  ), // 🚀 ORANGE BORDER
+                ),
               ),
               child: Row(
                 children: [
@@ -201,7 +224,8 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                     });
                                   },
                               onSelected: (selection) {
-                                _selectedSupplier = selection['name'];
+                                // 🚀 FIX: Actual ID jayega DB mein, Name nahi!
+                                _selectedSupplier = selection['id'];
                               },
                               fieldViewBuilder:
                                   (
@@ -314,11 +338,15 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: const Color(0xFF080B08), // bgDark
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(20),
                 ),
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                border: Border(
+                  top: BorderSide(
+                    color: const Color(0xFF888888).withOpacity(0.1),
+                  ),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -339,8 +367,8 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                   const SizedBox(width: 15),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2B3674),
-                      foregroundColor: Colors.white,
+                      backgroundColor: const Color(0xFFD4580A), // 🚀 ORANGE
+                      foregroundColor: const Color(0xFF080B08),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 16,
@@ -378,7 +406,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
-                                      "✅ PO Raised & Sent to Supplier!",
+                                      "✅ PO Raised! Kindly check 'PENDING APPROVALS' to approve and send to supplier.",
                                     ),
                                     backgroundColor: Colors.green,
                                   ),
@@ -440,24 +468,33 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
     String? hintText,
     String? helperText,
   }) {
+    const Color inputBg = Color(0xFF1A221A);
+    const Color accentOrange = Color(0xFFD4580A);
+    const Color textSecondary = Color(0xFF888888);
+
     return InputDecoration(
       hintText: hintText,
+      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
       helperText: helperText,
-      prefixIcon: Icon(icon, color: Colors.grey.shade600),
+      helperStyle: TextStyle(color: textSecondary.withOpacity(0.7)),
+      prefixIcon: Icon(icon, color: textSecondary),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: inputBg, // 🚀 Dark Input
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF2B3674), width: 2),
+        borderSide: const BorderSide(
+          color: accentOrange,
+          width: 2,
+        ), // 🚀 ORANGE FOCUS
       ),
     );
   }

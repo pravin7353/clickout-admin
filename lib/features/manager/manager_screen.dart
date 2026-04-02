@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 FIX: IMPORT ADDED
 
 import 'widgets/onboard_staff_dialog.dart';
 import 'services/employee_service.dart';
 import 'providers/manager_provider.dart';
-import '../tenant_admin/providers/org_provider.dart';
 import '../../core/providers/access_control_provider.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 
@@ -71,10 +71,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
     final formKey = GlobalKey<FormState>();
 
     String selectedRole = staffData['role'] ?? 'CASHIER';
+    String selectedBranch =
+        staffData['branchCode'] ?? 'ALL'; // 🚀 TEXT CTRL KI JAGAH VARIABLE
     final phoneCtrl = TextEditingController(text: staffData['phone'] ?? '');
-    final branchCtrl = TextEditingController(
-      text: staffData['branchCode'] ?? '',
-    );
 
     final String empName = staffData['name'] ?? 'Unknown Staff';
     final String empId = staffData['empId'] ?? 'N/A';
@@ -94,7 +93,7 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: theme.cardColor, // 👈 Dynamic BG
+              backgroundColor: theme.cardColor,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 450),
                 child: Column(
@@ -170,7 +169,7 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      "Changing security role will immediately alter app permissions for this employee.",
+                                      "Changing security role will immediately alter app permissions.",
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: isDark
@@ -183,86 +182,48 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                 ],
                               ),
                             ),
-                            Consumer(
-                              builder: (context, ref, child) {
-                                final orgState = ref.watch(
-                                  orgStructureProvider,
-                                );
-                                return orgState.when(
-                                  loading: () => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  error: (err, _) => Text(
-                                    "Error: $err",
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                  data: (roles) {
-                                    if (roles.isEmpty) {
-                                      return const Text(
-                                        "⚠️ No Custom Roles found. Create roles first.",
-                                        style: TextStyle(color: Colors.orange),
-                                      );
-                                    }
-                                    final sortedRoles = [...roles];
-                                    sortedRoles.sort(
-                                      (a, b) => a.level.compareTo(b.level),
-                                    );
-                                    final List<DropdownMenuItem<String>>
-                                    dropdownItems = sortedRoles
-                                        .map(
-                                          (r) => DropdownMenuItem(
-                                            value: r.roleName,
-                                            child: Text(
-                                              "${r.roleName} (L${r.level})",
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                color: theme
-                                                    .textTheme
-                                                    .bodyLarge
-                                                    ?.color,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList();
-                                    bool roleExists = sortedRoles.any(
-                                      (r) => r.roleName == selectedRole,
-                                    );
-                                    if (!roleExists) {
-                                      dropdownItems.add(
-                                        DropdownMenuItem(
-                                          value: selectedRole,
-                                          child: Text(
-                                            "$selectedRole (Legacy)",
-                                            style: const TextStyle(
-                                              color: Colors.redAccent,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+
+                            // 🚀 STATIC ROLES LIST
+                            DropdownButtonFormField<String>(
+                              initialValue:
+                                  [
+                                    'MANAGER',
+                                    'CASHIER',
+                                    'GUARD',
+                                    'ALL',
+                                  ].contains(selectedRole.toUpperCase())
+                                  ? selectedRole.toUpperCase()
+                                  : 'CASHIER',
+                              decoration: _premiumInputStyle(
+                                context,
+                                "Security Role (Designation)",
+                                prefixIcon: Icons.shield_outlined,
+                              ),
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                              ),
+                              dropdownColor: theme.cardColor,
+                              borderRadius: BorderRadius.circular(12),
+                              items: ['MANAGER', 'CASHIER', 'GUARD']
+                                  .map(
+                                    (role) => DropdownMenuItem(
+                                      value: role,
+                                      child: Text(
+                                        role,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color:
+                                              theme.textTheme.bodyLarge?.color,
                                         ),
-                                      );
-                                    }
-                                    return DropdownButtonFormField<String>(
-                                      initialValue: selectedRole,
-                                      decoration: _premiumInputStyle(
-                                        context,
-                                        "Security Role (Designation)",
-                                        prefixIcon: Icons.shield_outlined,
                                       ),
-                                      icon: const Icon(
-                                        Icons.keyboard_arrow_down_rounded,
-                                      ),
-                                      dropdownColor: theme.cardColor,
-                                      borderRadius: BorderRadius.circular(12),
-                                      items: dropdownItems,
-                                      onChanged: (val) =>
-                                          setState(() => selectedRole = val!),
-                                    );
-                                  },
-                                );
-                              },
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (val) =>
+                                  setState(() => selectedRole = val!),
                             ),
                             const SizedBox(height: 20),
+
                             TextFormField(
                               controller: phoneCtrl,
                               style: TextStyle(
@@ -283,19 +244,104 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                   : null,
                             ),
                             const SizedBox(height: 20),
-                            TextFormField(
-                              controller: branchCtrl,
-                              style: TextStyle(
-                                color: theme.textTheme.bodyLarge?.color,
-                              ),
-                              textCapitalization: TextCapitalization.characters,
-                              decoration: _premiumInputStyle(
-                                context,
-                                "Branch Assignment Code",
-                                prefixIcon: Icons.store_mall_directory_outlined,
-                              ),
-                              validator: (v) =>
-                                  v!.isEmpty ? "Branch code is required" : null,
+
+                            // 🚀 DYNAMIC BRANCH SELECTION (StreamBuilder)
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('stores')
+                                  .where(
+                                    'tenantId',
+                                    isEqualTo: staffData['tenantId'],
+                                  )
+                                  .where('isDeleted', isEqualTo: false)
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                if (!snapshot.hasData) {
+                                  return const Center(
+                                    child: CircularProgressIndicator(),
+                                  );
+                                }
+
+                                List<DropdownMenuItem<String>> branchItems = [
+                                  DropdownMenuItem(
+                                    value: "ALL",
+                                    child: Text(
+                                      "ALL BRANCHES (HQ)",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        color: theme.primaryColor,
+                                      ),
+                                    ),
+                                  ),
+                                ];
+
+                                for (var doc in snapshot.data!.docs) {
+                                  final storeData =
+                                      doc.data() as Map<String, dynamic>;
+                                  final bCode = storeData['branchCode'] ?? '';
+                                  final sName =
+                                      storeData['storeName'] ?? 'Store';
+                                  if (bCode.isNotEmpty) {
+                                    branchItems.add(
+                                      DropdownMenuItem(
+                                        value: bCode,
+                                        child: Text(
+                                          "$bCode - $sName",
+                                          style: TextStyle(
+                                            color: theme
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.color,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+
+                                // 🛡️ Legacy branch fallback
+                                bool branchExists = branchItems.any(
+                                  (item) => item.value == selectedBranch,
+                                );
+                                if (!branchExists &&
+                                    selectedBranch.isNotEmpty) {
+                                  branchItems.add(
+                                    DropdownMenuItem(
+                                      value: selectedBranch,
+                                      child: Text(
+                                        "$selectedBranch (Legacy)",
+                                        style: const TextStyle(
+                                          color: Colors.redAccent,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                return DropdownButtonFormField<String>(
+                                  initialValue: selectedBranch.isEmpty
+                                      ? "ALL"
+                                      : selectedBranch,
+                                  dropdownColor: theme.cardColor,
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down_rounded,
+                                  ),
+                                  decoration: _premiumInputStyle(
+                                    context,
+                                    "Branch Assignment Code",
+                                    prefixIcon:
+                                        Icons.store_mall_directory_outlined,
+                                  ),
+                                  items: branchItems,
+                                  onChanged: (val) =>
+                                      setState(() => selectedBranch = val!),
+                                  validator: (v) => v == null
+                                      ? "Please select a branch"
+                                      : null,
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -341,6 +387,17 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                     }
                                     setState(() => isLoading = true);
                                     try {
+                                      // 🚀 FETCH CURRENT ADMIN DETAILS FOR AUDIT
+                                      final currentAdmin = ref
+                                          .read(adminRoleProvider)
+                                          .value;
+                                      final editorName =
+                                          currentAdmin?['name'] ??
+                                          'Unknown Admin';
+                                      final editorEmail =
+                                          currentAdmin?['email'] ??
+                                          'Unknown Email';
+
                                       await EmployeeService.updateEmployee(
                                         uid: staffData['docId'],
                                         collectionName:
@@ -348,7 +405,12 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                             'staff',
                                         role: selectedRole,
                                         phone: phoneCtrl.text.trim(),
-                                        branchCode: branchCtrl.text.trim(),
+                                        branchCode: selectedBranch,
+                                        tenantId: staffData['tenantId'],
+                                        editedBy:
+                                            editorName, // 🚀 NEW: Passed to service
+                                        editedByEmail:
+                                            editorEmail, // 🚀 NEW: Passed to service
                                       );
                                       if (context.mounted) {
                                         Navigator.pop(context);
@@ -1044,14 +1106,16 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
 }
 
 // BulkImportDialog code can remain exactly as before, just ensure text colors use Theme if needed.
-class BulkImportDialog extends StatefulWidget {
+class BulkImportDialog extends ConsumerStatefulWidget {
+  // 🚀 FIX: Added Consumer
   final VoidCallback onComplete;
   const BulkImportDialog({super.key, required this.onComplete});
   @override
-  State<BulkImportDialog> createState() => _BulkImportDialogState();
+  ConsumerState<BulkImportDialog> createState() => _BulkImportDialogState(); // 🚀 FIX: Added ConsumerState
 }
 
-class _BulkImportDialogState extends State<BulkImportDialog> {
+class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
+  // 🚀 FIX: Added ConsumerState
   final TextEditingController _csvController = TextEditingController();
   bool _isProcessing = false;
   int _totalRows = 0, _currentRow = 0, _successCount = 0, _failCount = 0;
@@ -1085,6 +1149,12 @@ class _BulkImportDialogState extends State<BulkImportDialog> {
         );
         continue;
       }
+      // 🚀 SAAS INJECTION: Loop ke bahar ek baar data fetch kar lo
+      final adminData = ref.read(adminRoleProvider).value;
+      final String? tenantId = adminData?['tenantId'];
+      final String creatorName = adminData?['name'] ?? 'Super Admin';
+      final String creatorEmail = adminData?['email'] ?? 'Unknown Email';
+
       try {
         await EmployeeService.createEmployee(
           empId: columns[0].trim(),
@@ -1093,6 +1163,11 @@ class _BulkImportDialogState extends State<BulkImportDialog> {
           phone: columns[3].trim(),
           role: columns[4].trim(),
           branchCode: columns[5].trim(),
+          tagPrefix: columns[4]
+              .trim(), // 🚀 Role name ko hi tagPrefix bana diya
+          tenantId: tenantId,
+          addedBy: creatorName,
+          addedByEmail: creatorEmail,
         );
         _successCount++;
       } catch (e) {

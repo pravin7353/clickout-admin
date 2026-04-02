@@ -114,6 +114,10 @@ class StockService {
         'clearanceActive': true,
         'clearanceType': type,
         'clearanceTag': offerData['tag'], // Jo tag popup se ban kar aaya
+        'value1':
+            offerData['value1'], // 🚀 FIX: Universal value 1 (For Bundle Qty etc.)
+        'value2':
+            offerData['value2'], // 🚀 FIX: Universal value 2 (For Bundle Price etc.)
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
@@ -165,7 +169,12 @@ class StockService {
   // ==========================================
   // 🔴 TASK E2: RIGHT SWIPE - BLOCK BATCH & LEDGER
   // ==========================================
-  static Future<int> blockBatchSafely(String productId) async {
+  // 🚀 FIX: Added tenantId and adminEmail for Tracking
+  static Future<int> blockBatchSafely(
+    String productId,
+    String tenantId,
+    String adminEmail,
+  ) async {
     final docRef = _db.collection('products').doc(productId);
     int stockRemoved = 0;
 
@@ -181,6 +190,7 @@ class StockService {
         'isBlocked': true,
         'blockedAt': FieldValue.serverTimestamp(),
         'expiredStock': FieldValue.increment(stockRemoved),
+        'lastEditedBy': adminEmail, // 🚀 Log in Product
       });
 
       final ledgerRef = _db.collection('ledger').doc();
@@ -189,6 +199,8 @@ class StockService {
         'productName': productName,
         'quantityRemoved': stockRemoved,
         'reason': 'EXPIRED_BATCH_BLOCKED',
+        'tenantId': tenantId, // 🚀 SaaS Bound
+        'blockedBy': adminEmail, // 🚀 Anti-Fraud
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
@@ -205,7 +217,8 @@ class StockService {
       transaction.update(docRef, {
         'physicalStock': FieldValue.increment(restoredStock),
         'isBlocked': false,
-        'expiredStock': FieldValue.increment(-restoredStock),
+        // 🚀 FIX: Hum 'expiredStock' ko minus nahi karenge.
+        // Naya stock aane se purana expiry khatam nahi hota, wo ledger history hai!
       });
     });
   }

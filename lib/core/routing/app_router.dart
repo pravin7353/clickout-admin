@@ -38,8 +38,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final adminData = ref.read(adminRoleProvider);
 
       final isLoggedIn = authState.value != null;
-      final isLoggingIn = state.uri.toString() == '/login';
-
+      final isLoggingIn = state.uri.path == '/login'; // 🚀 FIXED
       if (authState.isLoading || adminData.isLoading) return null;
 
       if (!isLoggedIn && !isLoggingIn) return '/login';
@@ -54,8 +53,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return '/login';
         }
 
-        final currentPath = state.uri.toString();
-
+        final currentPath = state.uri.path; // 🚀 FIXED
         // 🛡️ 1. TENANT_ADMIN RULES (LEVEL 2 ARCHITECTURE)
         if (role == 'TENANT_ADMIN') {
           final tenantAdminBlockedPaths = ['/register-client'];
@@ -128,21 +126,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
-          return AdminShell(currentPath: state.uri.toString(), child: child);
+          return AdminShell(currentPath: state.uri.path, child: child);
         },
         routes: [
           GoRoute(
             path: '/',
             builder: (context, state) {
-              final adminData = ref.read(adminRoleProvider).value;
-              final role = (adminData?['role'] ?? '').toString().toUpperCase();
+              return Consumer(
+                builder: (context, ref, child) {
+                  final adminState = ref.watch(adminRoleProvider);
 
-              if (role == 'SUPER_ADMIN') return const SuperAdminScreen();
-              if (role == 'TENANT_ADMIN') {
-                final tId = adminData?['tenantId']?.toString() ?? '';
-                return TenantDashboardScreen(tenantId: tId);
-              }
-              return const DashboardScreen(); // Level 3 Fallback
+                  // 🚀 FIX: Wait for Firebase data to load on refresh
+                  if (adminState.isLoading || adminState.value == null) {
+                    return const Scaffold(
+                      backgroundColor: Color(0xFF080B08), // bgDarkTheme
+                      body: Center(
+                        child: CircularProgressIndicator(
+                          color: Color(0xFF00C853),
+                        ),
+                      ),
+                    );
+                  }
+
+                  final role = (adminState.value?['role'] ?? '')
+                      .toString()
+                      .toUpperCase();
+
+                  if (role == 'SUPER_ADMIN') return const SuperAdminScreen();
+                  if (role == 'TENANT_ADMIN') {
+                    final tId = adminState.value?['tenantId']?.toString() ?? '';
+                    return TenantDashboardScreen(tenantId: tId);
+                  }
+                  return const DashboardScreen(); // Level 3 Fallback
+                },
+              );
             },
           ),
           GoRoute(

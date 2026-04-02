@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-// ignore: unused_import
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 NAYA IMPORT: RIVERPOD
-import '../providers/product_master/product_master_provider.dart'; // 🚀 NAYA IMPORT: PROVIDER
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/product_master/product_master_provider.dart';
 
-// 🚀 CHANGED TO ConsumerStatefulWidget
 class AddProductDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic>? existingData;
 
@@ -16,7 +14,6 @@ class AddProductDialog extends ConsumerStatefulWidget {
   ConsumerState<AddProductDialog> createState() => _AddProductDialogState();
 }
 
-// 🚀 CHANGED TO ConsumerState
 class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
@@ -24,6 +21,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   late TextEditingController _barcodeCtrl;
   late TextEditingController _nameCtrl;
   late TextEditingController _priceCtrl;
+  late TextEditingController _unitCostCtrl;
   late TextEditingController _weightCtrl;
   late TextEditingController _stockCtrl;
   late TextEditingController _expiryCtrl;
@@ -39,6 +37,14 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     '28% GST',
   ];
 
+  // 🎨 STRICT DARK THEME CONSTANTS
+  static const Color bgDark = Color(0xFF080B08);
+  static const Color cardDark = Color(0xFF111811);
+  static const Color accentGreen = Color(0xFF00C853);
+  static const Color textPrimary = Color(0xFFF0F0F0);
+  static const Color textSecondary = Color(0xFF888888);
+  static const Color inputBg = Color(0xFF1A221A);
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +52,9 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     _barcodeCtrl = TextEditingController(text: data?['barcode'] ?? '');
     _nameCtrl = TextEditingController(text: data?['name'] ?? '');
     _priceCtrl = TextEditingController(text: data?['price']?.toString() ?? '');
+    _unitCostCtrl = TextEditingController(
+      text: data?['unitCost']?.toString() ?? '',
+    ); // 🚀 NAYA
     _weightCtrl = TextEditingController(
       text: data?['weight']?.toString() ?? '',
     );
@@ -62,6 +71,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     _barcodeCtrl.dispose();
     _nameCtrl.dispose();
     _priceCtrl.dispose();
+    _unitCostCtrl.dispose();
     _weightCtrl.dispose();
     _stockCtrl.dispose();
     _expiryCtrl.dispose();
@@ -78,11 +88,13 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF2B3674),
-              onPrimary: Colors.white,
-              onSurface: Colors.black,
+            colorScheme: const ColorScheme.dark(
+              primary: accentGreen,
+              onPrimary: bgDark,
+              surface: cardDark,
+              onSurface: textPrimary,
             ),
+            dialogTheme: DialogThemeData(backgroundColor: bgDark),
           ),
           child: child!,
         );
@@ -96,7 +108,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     }
   }
 
-  // 🚀 REWIRED TO USE PROVIDER AND STRICT SCHEMA
   void _saveProduct() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -106,14 +117,13 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         'barcode': _barcodeCtrl.text.trim(),
         'name': _nameCtrl.text.trim(),
         'price': _priceCtrl.text.trim(),
+        'unitCost': _unitCostCtrl.text.trim(),
         'weight': _weightCtrl.text.trim(),
         'physicalStock': _stockCtrl.text.trim(),
         'gst': _selectedGst,
-        'expiryDate':
-            _selectedDate, // Send DateTime, Provider will convert to Timestamp
+        'expiryDate': _selectedDate,
       };
 
-      // Call the newly fixed Provider!
       await ref.read(productMasterProvider.notifier).addNewProduct(productData);
 
       if (mounted) {
@@ -121,8 +131,8 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("New Master SKU Added!"),
-            backgroundColor: Colors.green,
+            content: Text("✅ New Master SKU Added!"),
+            backgroundColor: accentGreen,
           ),
         );
       }
@@ -144,22 +154,18 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     final isEdit = widget.existingData != null;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      backgroundColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+      ),
+      backgroundColor: bgDark,
       elevation: 24,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: bgDark,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 30,
-                offset: const Offset(0, 15),
-              ),
-            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -171,12 +177,12 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: bgDark,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: Colors.grey.shade200),
+                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
                   ),
                 ),
                 child: Row(
@@ -184,14 +190,14 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2B3674).withOpacity(0.1),
+                        color: accentGreen.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         isEdit
                             ? Icons.edit_document
                             : Icons.qr_code_scanner_rounded,
-                        color: const Color(0xFF2B3674),
+                        color: accentGreen,
                         size: 26,
                       ),
                     ),
@@ -203,7 +209,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                           Text(
                             isEdit ? "Edit Master SKU" : "Add New Master SKU",
                             style: const TextStyle(
-                              color: Color(0xFF1E1E2D),
+                              color: textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.5,
@@ -214,8 +220,8 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                             isEdit
                                 ? "Update inventory specifications & pricing."
                                 : "Register a new product into the enterprise inventory.",
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
+                            style: const TextStyle(
+                              color: textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -224,7 +230,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: Colors.grey),
+                      icon: const Icon(Icons.close, color: textSecondary),
                       onPressed: () => Navigator.pop(context),
                       splashRadius: 24,
                     ),
@@ -242,7 +248,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // --- 📦 SECTION 1: PRODUCT IDENTITY ---
                         _buildSectionTitle("PRODUCT IDENTITY"),
                         _ResponsiveRow(
                           children: [
@@ -252,8 +257,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                               icon: Icons.barcode_reader,
                               readOnly: isEdit,
                               hintText: "Scan or enter barcode",
-                              helperText:
-                                  "Scan barcode or manually enter product code.",
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
@@ -266,28 +269,22 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                               controller: _nameCtrl,
                               icon: Icons.inventory_2_outlined,
                               hintText: "Example: Tata Salt 1kg",
-                              helperText:
-                                  "Enter the full recognizable product name.",
                               validator: (v) => v!.isEmpty
                                   ? 'Product name is required'
                                   : null,
                             ),
                           ],
                         ),
-
                         _buildDivider(),
 
-                        // --- 💰 SECTION 2: PRICING ---
                         _buildSectionTitle("PRICING"),
                         _ResponsiveRow(
                           children: [
                             _buildTextField(
-                              label: "Selling Price",
+                              label: "Selling Price (Bikri Bhav)",
                               controller: _priceCtrl,
-                              icon: Icons.currency_rupee,
+                              icon: Icons.sell_outlined,
                               hintText: "0.00",
-                              helperText:
-                                  "Final selling price inclusive of taxes.",
                               keyboardType:
                                   const TextInputType.numberWithOptions(
                                     decimal: true,
@@ -303,11 +300,41 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                 }
                                 if (double.tryParse(v) == null ||
                                     double.parse(v) <= 0) {
-                                  return 'Price must be greater than 0';
+                                  return 'Price must be > 0';
                                 }
                                 return null;
                               },
                             ),
+                            _buildTextField(
+                              label: "Unit Cost (Kharidi Bhav)",
+                              controller: _unitCostCtrl,
+                              icon: Icons.account_balance_wallet_outlined,
+                              hintText: "0.00",
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d+\.?\d{0,2}'),
+                                ),
+                              ],
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Cost is required';
+                                }
+                                if (double.tryParse(v) == null ||
+                                    double.parse(v) <= 0) {
+                                  return 'Cost must be > 0';
+                                }
+                                return null;
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _ResponsiveRow(
+                          children: [
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -316,7 +343,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1E1E2D),
+                                    color: textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -324,11 +351,12 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   initialValue: _selectedGst,
                                   decoration: _inputStyle(
                                     icon: Icons.receipt_long_outlined,
-                                    helperText:
-                                        "Select applicable tax bracket.",
                                   ),
-                                  dropdownColor: Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
+                                  dropdownColor: cardDark,
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: accentGreen,
+                                  ),
                                   items: _gstSlabs.map((String slab) {
                                     return DropdownMenuItem(
                                       value: slab,
@@ -336,6 +364,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                         slab,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
+                                          color: textPrimary,
                                         ),
                                       ),
                                     );
@@ -345,12 +374,11 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                 ),
                               ],
                             ),
+                            const SizedBox(), // Empty container to keep GST slab aligned left
                           ],
                         ),
-
                         _buildDivider(),
 
-                        // --- 🏢 SECTION 3: INVENTORY ---
                         _buildSectionTitle("INVENTORY"),
                         _ResponsiveRow(
                           children: [
@@ -359,8 +387,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                               controller: _stockCtrl,
                               icon: Icons.layers_outlined,
                               hintText: "Enter number of units",
-                              helperText:
-                                  "Number of items currently available in inventory.",
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -381,14 +407,11 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                               controller: _weightCtrl,
                               icon: Icons.scale_rounded,
                               hintText: "500g / 1kg / 1L",
-                              helperText: "Optional measurement for logistics.",
                             ),
                           ],
                         ),
-
                         _buildDivider(),
 
-                        // --- ⏳ SECTION 4: LIFECYCLE ---
                         _buildSectionTitle("LIFECYCLE"),
                         _ResponsiveRow(
                           children: [
@@ -400,7 +423,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF1E1E2D),
+                                    color: textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -410,18 +433,16 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   onTap: () => _pickDate(context),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.black87,
+                                    color: textPrimary,
                                   ),
                                   decoration:
                                       _inputStyle(
                                         icon: Icons.calendar_month_outlined,
-                                        hintText: "Select Date",
-                                        helperText:
-                                            "Leave empty for non-perishable items.",
+                                        hintText: "Select Date (Optional)",
                                       ).copyWith(
                                         suffixIcon: const Icon(
                                           Icons.arrow_drop_down,
-                                          color: Colors.grey,
+                                          color: textSecondary,
                                         ),
                                       ),
                                 ),
@@ -436,18 +457,20 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                 ),
               ),
 
-              // 🟩 FOOTER SECTION (Action Bar)
+              // 🟩 FOOTER SECTION
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
                   vertical: 20,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: bgDark,
                   borderRadius: const BorderRadius.vertical(
                     bottom: Radius.circular(16),
                   ),
-                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                  border: Border(
+                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -465,44 +488,45 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                       child: const Text(
                         "Cancel",
                         style: TextStyle(
-                          color: Colors.grey,
+                          color: textSecondary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
                       ),
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton(
+                    ElevatedButton.icon(
                       onPressed: _isLoading ? null : _saveProduct,
+                      icon: _isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: bgDark,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.check, size: 18),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2B3674),
-                        foregroundColor: Colors.white,
+                        backgroundColor: accentGreen,
+                        foregroundColor: bgDark,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 32,
-                          vertical: 20,
+                          vertical: 16,
                         ),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              isEdit ? "Update Product" : "Save Product",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
+                      label: Text(
+                        isEdit ? "Update Product" : "Save Product",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -514,8 +538,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     );
   }
 
-  // --- HELPER WIDGETS ---
-
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -524,7 +546,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w900,
-          color: Colors.grey.shade500,
+          color: textSecondary,
           letterSpacing: 1.5,
         ),
       ),
@@ -534,7 +556,11 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   Widget _buildDivider() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: textSecondary.withOpacity(0.1),
+      ),
     );
   }
 
@@ -543,7 +569,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     required TextEditingController controller,
     required IconData icon,
     String? hintText,
-    String? helperText,
     bool readOnly = false,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
@@ -557,7 +582,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Color(0xFF1E1E2D),
+            color: textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -568,12 +593,11 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
           inputFormatters: inputFormatters,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            color: readOnly ? Colors.grey.shade600 : Colors.black87,
+            color: readOnly ? textSecondary : textPrimary,
           ),
           decoration: _inputStyle(
             icon: icon,
             hintText: hintText,
-            helperText: helperText,
             readOnly: readOnly,
           ),
           validator: validator,
@@ -585,50 +609,38 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   InputDecoration _inputStyle({
     required IconData icon,
     String? hintText,
-    String? helperText,
     bool readOnly = false,
   }) {
     return InputDecoration(
       hintText: hintText,
-      helperText: helperText,
-      helperStyle: TextStyle(
-        color: Colors.grey.shade500,
-        fontSize: 11,
-        fontWeight: FontWeight.w500,
-      ),
       hintStyle: TextStyle(
-        color: Colors.grey.shade400,
+        color: textSecondary.withOpacity(0.5),
         fontWeight: FontWeight.normal,
       ),
-      prefixIcon: Icon(
-        icon,
-        color: readOnly ? Colors.grey.shade400 : Colors.grey.shade600,
-        size: 20,
-      ),
+      prefixIcon: Icon(icon, color: textSecondary, size: 20),
       filled: true,
-      fillColor: readOnly ? Colors.grey.shade100 : Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      fillColor: readOnly ? bgDark : inputBg,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300, width: 1),
+        borderSide: BorderSide.none,
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFF2B3674), width: 2),
+      focusedBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        borderSide: BorderSide(color: accentGreen, width: 1.5),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.red.shade300, width: 1.5),
+      errorBorder: const OutlineInputBorder(
+        borderRadius: BorderRadius.all(Radius.circular(8)),
+        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
       ),
     );
   }
 }
 
-// 📱 RESPONSIVE ROW HELPER
 class _ResponsiveRow extends StatelessWidget {
   final List<Widget> children;
   const _ResponsiveRow({required this.children});

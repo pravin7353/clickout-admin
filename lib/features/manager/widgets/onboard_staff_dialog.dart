@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 FIX: IMPORT ADDED
 
 import '../services/employee_service.dart';
-import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
-import '../../tenant_admin/providers/org_provider.dart'; // 🚀 NEW: DYNAMIC ROLES ENGINE
+import 'package:clickout_admin/features/auth/auth_provider.dart';
 
 class OnboardStaffDialog extends ConsumerStatefulWidget {
   const OnboardStaffDialog({super.key});
@@ -16,16 +16,24 @@ class OnboardStaffDialog extends ConsumerStatefulWidget {
 class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
   final _formKey = GlobalKey<FormState>();
 
-  CustomRole? _selectedRole; // 🚀 Now holds the full dynamic role object
+  String? _selectedRole;
+  String? _selectedBranch; // 🚀 NAYA: Dynamic Branch Dropdown variable
   final _empIdCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
-  final _branchCtrl = TextEditingController();
 
   bool _isLoading = false;
 
-  void _submitForm() async {
+  // 🎨 STRICT DARK THEME CONSTANTS
+  static const Color bgDark = Color(0xFF080B08);
+  static const Color cardDark = Color(0xFF111811);
+  static const Color accentGreen = Color(0xFF00C853);
+  static const Color textPrimary = Color(0xFFF0F0F0);
+  static const Color textSecondary = Color(0xFF888888);
+  static const Color inputBg = Color(0xFF1A221A);
+
+  void _submitForm(String defaultBranchCode) async {
     if (_selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -41,18 +49,22 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     setState(() => _isLoading = true);
 
     try {
-      // 🚀 SAAS INJECTION: Fetch Tenant ID safely
-      final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
+      final adminData = ref.read(adminRoleProvider).value;
+      final tenantId = adminData?['tenantId'];
+      final creatorName = adminData?['name'] ?? 'Super Admin';
+      final creatorEmail = adminData?['email'] ?? 'Unknown Email';
 
       await EmployeeService.createEmployee(
         empId: _empIdCtrl.text.trim(),
-        role: _selectedRole!.roleName, // 👈 Passing the dynamic Role Name
-        tagPrefix: _selectedRole!.tagPrefix, // 👈 Passing the Security Tag
+        role: _selectedRole!,
+        tagPrefix: _selectedRole!,
         name: _nameCtrl.text,
         phone: _phoneCtrl.text,
         email: _emailCtrl.text.isNotEmpty ? _emailCtrl.text : null,
-        branchCode: _branchCtrl.text,
+        branchCode: _selectedBranch ?? defaultBranchCode,
         tenantId: tenantId,
+        addedBy: creatorName,
+        addedByEmail: creatorEmail,
       );
 
       if (mounted) {
@@ -60,7 +72,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("✅ Staff account created! Welcome Email sent."),
-            backgroundColor: Colors.green,
+            backgroundColor: accentGreen,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -79,25 +91,33 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     }
   }
 
-  InputDecoration _enterpriseInputStyle(String label, {String? hint}) {
+  InputDecoration _darkInputStyle(
+    String label, {
+    String? hint,
+    IconData? prefixIcon,
+  }) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+      labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
+      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5), fontSize: 13),
       filled: true,
-      fillColor: Colors.grey.shade50,
+      fillColor: inputBg,
+      prefixIcon: prefixIcon != null
+          ? Icon(prefixIcon, color: textSecondary, size: 18)
+          : null,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide.none,
       ),
       focusedBorder: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: Color(0xFF2B3674), width: 2),
+        borderSide: BorderSide(color: accentGreen, width: 1.5),
       ),
       errorBorder: const OutlineInputBorder(
         borderRadius: BorderRadius.all(Radius.circular(8)),
@@ -109,52 +129,69 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
   @override
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final orgState = ref.watch(orgStructureProvider); // 📡 Fetching Live Tree
+
+    final adminData = ref.watch(adminRoleProvider).value;
+    final String autoFetchedBranch =
+        adminData?['branchCode']?.toString().toUpperCase() ?? 'HQ';
+    final role = (adminData?['role'] ?? '').toString().toUpperCase();
+    final isTenantAdmin = role == 'TENANT_ADMIN' || role == 'SUPER_ADMIN';
+
+    // 🚀 STATIC ROLES LIST
+    final List<String> availableRoles = ['MANAGER', 'CASHIER', 'GUARD'];
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      insetPadding: EdgeInsets.all(isMobile ? 0 : 20),
-      alignment: isMobile ? Alignment.bottomCenter : Alignment.center,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+      ),
+      backgroundColor: bgDark,
+      insetPadding: EdgeInsets.all(isMobile ? 15 : 20),
+      alignment: Alignment.center,
       child: Container(
-        width: isMobile ? double.infinity : 450,
+        width: isMobile ? double.infinity : 550,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: isMobile
-              ? const BorderRadius.vertical(top: Radius.circular(20))
-              : BorderRadius.circular(12),
+          color: bgDark,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // --- HEADER ---
             Padding(
               padding: const EdgeInsets.all(24),
               child: Row(
                 children: [
                   const Icon(
                     Icons.person_add_alt_1,
-                    color: Color(0xFF2B3674),
+                    color: accentGreen,
                     size: 24,
                   ),
                   const SizedBox(width: 12),
                   const Text(
-                    "Onboard New Staff",
+                    "Onboard Personnel",
                     style: TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2B3674),
+                      fontWeight: FontWeight.w900,
+                      color: textPrimary,
+                      letterSpacing: 0.5,
                     ),
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.grey),
+                    icon: const Icon(Icons.close, color: textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: textSecondary.withOpacity(0.1),
+            ),
 
+            // --- FORM CONTENT ---
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -163,72 +200,178 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // 🚀 THE NEW DYNAMIC DROPDOWN
-                      orgState.when(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (err, _) => Text(
-                          "Error: $err",
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                        data: (roles) {
-                          if (roles.isEmpty) {
+                      // 🚀 DYNAMIC BRANCH SELECTION OR STATIC WALL
+                      StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('stores')
+                            .where(
+                              'tenantId',
+                              isEqualTo: adminData?['tenantId'],
+                            )
+                            .where('isDeleted', isEqualTo: false)
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          // 🛡️ Agar Manager hai, toh purana non-editable Wall chip dikhao
+                          if (!isTenantAdmin) {
                             return Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(16),
+                              margin: const EdgeInsets.only(bottom: 20),
                               decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.amber),
-                              ),
-                              child: const Text(
-                                "⚠️ No Custom Roles found. Please create roles in 'Org Structure' first.",
-                                style: TextStyle(
-                                  color: Colors.orange,
-                                  fontWeight: FontWeight.bold,
+                                color: cardDark,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: accentGreen.withOpacity(0.3),
                                 ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    color: accentGreen,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "Deploying to Branch",
+                                          style: TextStyle(
+                                            color: textSecondary,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          autoFetchedBranch,
+                                          style: const TextStyle(
+                                            color: accentGreen,
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             );
                           }
 
-                          // Sort by hierarchy level
-                          final sortedRoles = [...roles];
-                          sortedRoles.sort(
-                            (a, b) => a.level.compareTo(b.level),
-                          );
+                          // 🏢 Agar Tenant Admin hai, toh unke saare stores ka Dropdown dikhao
+                          if (!snapshot.hasData) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: accentGreen,
+                              ),
+                            );
+                          }
 
-                          return DropdownButtonFormField<CustomRole>(
-                            initialValue: _selectedRole,
-                            decoration: _enterpriseInputStyle(
-                              "System Designation *",
+                          List<DropdownMenuItem<String>> branchItems = [
+                            const DropdownMenuItem(
+                              value: "ALL",
+                              child: Text(
+                                "ALL BRANCHES (HQ)",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  color: accentGreen,
+                                ),
+                              ),
                             ),
-                            dropdownColor: Colors.white,
-                            hint: const Text("Select Custom Role ▼"),
-                            items: sortedRoles
-                                .map(
-                                  (r) => DropdownMenuItem(
-                                    value: r,
-                                    child: Text(
-                                      "${r.roleName} (Level ${r.level})",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                          ];
+
+                          for (var doc in snapshot.data!.docs) {
+                            final storeData =
+                                doc.data() as Map<String, dynamic>;
+                            final bCode = storeData['branchCode'] ?? '';
+                            final sName = storeData['storeName'] ?? 'Store';
+                            if (bCode.isNotEmpty) {
+                              branchItems.add(
+                                DropdownMenuItem(
+                                  value: bCode,
+                                  child: Text(
+                                    "$bCode - $sName",
+                                    style: const TextStyle(
+                                      color: textPrimary,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (val) =>
-                                setState(() => _selectedRole = val),
+                                ),
+                              );
+                            }
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: DropdownButtonFormField<String>(
+                              initialValue: _selectedBranch,
+                              dropdownColor: cardDark,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: accentGreen,
+                              ),
+                              decoration: _darkInputStyle(
+                                "Assign to Branch *",
+                                prefixIcon: Icons.storefront,
+                              ),
+                              items: branchItems,
+                              onChanged: (val) =>
+                                  setState(() => _selectedBranch = val),
+                              validator: (v) =>
+                                  v == null ? "Please select a branch" : null,
+                            ),
                           );
                         },
+                      ),
+
+                      // 🚀 STATIC DROPDOWN (Replaced Org Engine)
+                      DropdownButtonFormField<String>(
+                        initialValue: _selectedRole,
+                        dropdownColor: cardDark,
+                        icon: const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: accentGreen,
+                        ),
+                        decoration: _darkInputStyle(
+                          "System Designation *",
+                          prefixIcon: Icons.shield_outlined,
+                        ),
+                        hint: const Text(
+                          "Select Role ▼",
+                          style: TextStyle(color: textSecondary),
+                        ),
+                        items: availableRoles
+                            .map(
+                              (role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(
+                                  role,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (val) => setState(() => _selectedRole = val),
+                        validator: (v) => v == null ? "Required" : null,
                       ),
                       const SizedBox(height: 20),
 
                       TextFormField(
                         controller: _empIdCtrl,
                         textCapitalization: TextCapitalization.characters,
-                        decoration: _enterpriseInputStyle(
+                        style: const TextStyle(
+                          color: textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        decoration: _darkInputStyle(
                           "Employee ID *",
                           hint: "e.g. EMP-001",
+                          prefixIcon: Icons.badge_outlined,
                         ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
@@ -243,9 +386,11 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
 
                       TextFormField(
                         controller: _nameCtrl,
-                        decoration: _enterpriseInputStyle(
+                        style: const TextStyle(color: textPrimary),
+                        decoration: _darkInputStyle(
                           "Full Name *",
                           hint: "e.g. John Doe",
+                          prefixIcon: Icons.person_outline,
                         ),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(
@@ -263,11 +408,18 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                         },
                       ),
                       const SizedBox(height: 20),
+
                       TextFormField(
                         controller: _phoneCtrl,
-                        decoration: _enterpriseInputStyle(
-                          "Phone Number (Login Credential) *",
-                        ).copyWith(prefixText: "+91  "),
+                        style: const TextStyle(color: textPrimary),
+                        decoration:
+                            _darkInputStyle(
+                              "Phone (Login Credential) *",
+                              prefixIcon: Icons.phone_android_outlined,
+                            ).copyWith(
+                              prefixText: "+91  ",
+                              prefixStyle: const TextStyle(color: textPrimary),
+                            ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
@@ -278,10 +430,13 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                             : null,
                       ),
                       const SizedBox(height: 20),
+
                       TextFormField(
                         controller: _emailCtrl,
-                        decoration: _enterpriseInputStyle(
+                        style: const TextStyle(color: textPrimary),
+                        decoration: _darkInputStyle(
                           "Official Email Address (Optional)",
+                          prefixIcon: Icons.email_outlined,
                         ),
                         validator: (v) {
                           if (v != null &&
@@ -294,25 +449,18 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _branchCtrl,
-                        decoration: _enterpriseInputStyle(
-                          "Branch Assignment Code *",
-                          hint: "e.g. MUM01",
-                        ),
-                        textCapitalization: TextCapitalization.characters,
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? "Branch code is required"
-                            : null,
-                      ),
                     ],
                   ),
                 ),
               ),
             ),
-            const Divider(height: 1, thickness: 1, color: Color(0xFFE2E8F0)),
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: textSecondary.withOpacity(0.1),
+            ),
 
+            // --- FOOTER BUTTONS ---
             Padding(
               padding: const EdgeInsets.all(24),
               child: Row(
@@ -323,40 +471,41 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                     child: const Text(
                       "Cancel",
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: textSecondary,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
+                  const SizedBox(width: 16),
+                  ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2B3674),
+                      backgroundColor: accentGreen,
+                      foregroundColor: bgDark,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 24,
                         vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
-                    onPressed: _isLoading ? null : _submitForm,
-                    child: _isLoading
+                    onPressed: _isLoading
+                        ? null
+                        : () => _submitForm(autoFetchedBranch),
+                    icon: _isLoading
                         ? const SizedBox(
-                            width: 20,
-                            height: 20,
+                            width: 18,
+                            height: 18,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: bgDark,
                               strokeWidth: 2,
                             ),
                           )
-                        : const Text(
-                            "Create Access",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                        : const Icon(Icons.rocket_launch, size: 18),
+                    label: Text(
+                      _isLoading ? "Processing..." : "Create Access",
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
                   ),
                 ],
               ),

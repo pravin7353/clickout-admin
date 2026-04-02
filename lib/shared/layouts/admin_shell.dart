@@ -119,6 +119,9 @@ class AdminShell extends ConsumerWidget {
                         context,
                         adminName,
                         adminRoleUI,
+                        rawRole, //
+                        adminData?['tenantId']?.toString() ?? '', //
+                        adminData?['branchCode']?.toString() ?? '',
                         roleColor,
                         ref,
                         bgSidebar,
@@ -200,6 +203,9 @@ class AdminShell extends ConsumerWidget {
     BuildContext context,
     String name,
     String roleUI,
+    String rawRole,
+    String tenantId,
+    String branchCode,
     Color roleColor,
     WidgetRef ref,
     Color bgTopBar,
@@ -275,6 +281,26 @@ class AdminShell extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  if (rawRole == 'TENANT_ADMIN' && tenantId.isNotEmpty)
+                    Text(
+                      tenantId,
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                        letterSpacing: 0.5,
+                      ),
+                    )
+                  else if (rawRole == 'MANAGER' && branchCode.isNotEmpty)
+                    Text(
+                      "STORE: $branchCode",
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 9,
+                        fontFamily: 'monospace',
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -438,6 +464,8 @@ class AdminShell extends ConsumerWidget {
                               : currentPath, // Fix: Tenant Admin default is /
                           tenantHqColor,
                         ),
+                        // 🚀 TEMPORARILY DISABLED: Org Structure hidden for now.
+                        /*
                         _buildNavItem(
                           context,
                           Icons.account_tree,
@@ -446,6 +474,7 @@ class AdminShell extends ConsumerWidget {
                           '/org-structure',
                           tenantHqColor,
                         ),
+                        */
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Divider(color: dividerColor, height: 1),

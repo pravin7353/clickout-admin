@@ -48,13 +48,76 @@ class AuthController extends Notifier<bool> {
           .limit(1)
           .get();
 
-      if (querySnapshot.docs.isEmpty) {
-        await FirebaseAuth.instance.signOut();
-        throw "SECURITY ALERT: Access Denied! You are not registered as an Admin.";
-      }
+      DocumentReference staffRef;
+      Map<String, dynamic> data;
 
-      final doc = querySnapshot.docs.first;
-      final data = doc.data();
+      if (querySnapshot.docs.isEmpty) {
+        // 🚀 ENTERPRISE PROVISIONING ENGINE: Perfect Schema Generator
+        final String rawName = currentUser.email!.split('@')[0].toUpperCase();
+        final String prefix = rawName.length >= 3
+            ? rawName.substring(0, 3)
+            : rawName;
+        final String newTenantId =
+            '${prefix}_${DateTime.now().millisecondsSinceEpoch}'; // Format: JYO_173...
+
+        staffRef = FirebaseFirestore.instance
+            .collection('staff')
+            .doc(currentUser.uid);
+        final batch = FirebaseFirestore.instance.batch();
+
+        // 1. Create Enterprise-Grade Tenant Doc (Matches your Exact Database Structure!)
+        batch.set(
+          FirebaseFirestore.instance.collection('tenants').doc(newTenantId),
+          {
+            'tenantId': newTenantId,
+            'companyName':
+                '${currentUser.email!.split('@')[0].toUpperCase()} ENTERPRISES',
+            'ownerName': currentUser.email!.split('@')[0],
+            'businessType': 'Super Mart', // Default fallback
+            'establishedYear': DateTime.now().year,
+            'isOnboardingComplete':
+                true, // 🚀 FIX: Skip that old deleted screen forever!
+            'status': 'ACTIVE',
+            'plan': 'PRO PLAN',
+            'activeStores': 0,
+            'contact': {'email': currentUser.email, 'phone': ''},
+            'location': {'address': '', 'city': '', 'state': '', 'pincode': ''},
+            'kyc': {'pan': '', 'gstin': ''},
+            'bankDetails': {
+              'accountName': '',
+              'accountNo': '',
+              'ifsc': '',
+              'upi': '',
+            },
+            'config': {
+              'openTime': '09:00 AM',
+              'closeTime': '10:00 PM',
+              'expectedEmployees': 0,
+              'monthlyVolume': 'Under 1,000',
+            },
+            'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+
+        // 2. Create Staff Record as TENANT_ADMIN
+        data = {
+          'uid': currentUser.uid,
+          'email': currentUser.email,
+          'role': 'TENANT_ADMIN',
+          'tenantId': newTenantId,
+          'name': currentUser.email!.split('@')[0],
+          'isActive': true,
+          'isDeleted': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        };
+        batch.set(staffRef, data);
+
+        await batch.commit();
+      } else {
+        staffRef = querySnapshot.docs.first.reference;
+        data = querySnapshot.docs.first.data();
+      }
       final role = (data['role'] ?? '').toString().toLowerCase();
 
       // 🚀 ALL SAAS ROLES ALLOWED
@@ -74,7 +137,8 @@ class AuthController extends Notifier<bool> {
 
       final newSessionId = DateTime.now().millisecondsSinceEpoch.toString();
 
-      await doc.reference.update({
+      // 🚀 FIX: Used 'staffRef' instead of 'doc.reference'
+      await staffRef.update({
         'activeSessionId': newSessionId,
         'lastLoginAt': FieldValue.serverTimestamp(),
         'deviceInfo': kIsWeb ? 'Web Browser' : 'Unknown',

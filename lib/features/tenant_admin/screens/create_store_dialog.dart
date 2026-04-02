@@ -19,8 +19,77 @@ class CreateStoreDialog extends StatefulWidget {
 
 class _CreateStoreDialogState extends State<CreateStoreDialog> {
   bool _isLoading = false;
+  bool _isFetchingTenant =
+      true; // 🚀 SAAS ENGINE: Loading state for Tenant Data
   final _formKey = GlobalKey<FormState>();
   final ScrollController _scrollController = ScrollController();
+
+  // 🚀 ENTERPRISE INHERITANCE ENGINE
+  bool _sameAsTenant = true;
+  Map<String, dynamic>? _tenantData;
+  final List<Map<String, String>> _dynamicLicenses = [];
+  final List<String> _licenseTypes = [
+    'GSTIN',
+    'FSSAI',
+    'Drug License',
+    'Liquor License',
+    'Trade License',
+    'Other',
+  ];
+
+  Future<void> _fetchTenantData() async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('tenants')
+          .doc(widget.tenantId)
+          .get();
+      if (doc.exists && doc.data() != null) {
+        if (mounted) {
+          setState(() {
+            _tenantData = doc.data();
+            _applyInheritance(); // Auto-fill fields if toggle is ON
+          });
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isFetchingTenant = false);
+    }
+  }
+
+  void _applyInheritance() {
+    if (_sameAsTenant && _tenantData != null) {
+      final loc = _tenantData!['location'] as Map<String, dynamic>? ?? {};
+      _addressCtrl.text = loc['address']?.toString() ?? '';
+      _cityCtrl.text = loc['city']?.toString() ?? '';
+      _pincodeCtrl.text = loc['pincode']?.toString() ?? '';
+
+      // 🚀 FIX: Handling Dropdown correctly instead of _stateCtrl
+      String inheritedState = loc['state']?.toString() ?? '';
+      _selectedState = _states.contains(inheritedState) ? inheritedState : null;
+
+      _dynamicLicenses.clear();
+      if (_tenantData!['licenses'] != null) {
+        for (var lic in _tenantData!['licenses']) {
+          _dynamicLicenses.add({
+            'type': lic['type'].toString(),
+            'number': lic['number'].toString(),
+          });
+        }
+      }
+    } else {
+      _addressCtrl.clear();
+      _cityCtrl.clear();
+      _pincodeCtrl.clear();
+      _selectedState = null; // 🚀 FIX: Cleared dropdown state
+      _dynamicLicenses.clear();
+    }
+  }
+
+  void _addLicenseRow() {
+    setState(() {
+      _dynamicLicenses.add({'type': 'GSTIN', 'number': ''});
+    });
+  }
 
   // --- THEME COLORS ---
   static const Color bgDark = Color(0xFF080B08);
@@ -142,6 +211,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
   @override
   void initState() {
     super.initState();
+    _fetchTenantData(); // 🚀 FIX: Moved here to the main initState!
     _cityCtrl.addListener(_autoGenerateBranchCode);
 
     // Bank Account Masking Logic
@@ -283,14 +353,6 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
     if (_selectedState == null) return _scrollTo(_kState);
     if (_pincodeCtrl.text.trim().length != 6) return _scrollTo(_kPincode);
 
-    final gst = _gstinCtrl.text.trim().toUpperCase();
-    if (gst.isNotEmpty &&
-        !RegExp(
-          r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9]{1}[A-Z]{1}[0-9A-Z]{1}$',
-        ).hasMatch(gst)) {
-      return _scrollTo(_kGst);
-    }
-
     int counters = int.tryParse(_countersCtrl.text.trim()) ?? 0;
     if (counters < 1 || counters > 50) return _scrollTo(_kCounters);
 
@@ -327,6 +389,9 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
       final adminEmail =
           FirebaseAuth.instance.currentUser?.email ?? 'Unknown Admin';
 
+      // 🚀 NEW: Reference to the parent tenant document to increment count
+      final tenantRef = db.collection('tenants').doc(widget.tenantId);
+
       // 🚀 1. FETCH TENANT BANK DETAILS FOR FALLBACK
       Map<String, dynamic> finalBankDetails = {};
 
@@ -356,10 +421,10 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
         };
       }
 
-      // 🚀 2. WRITE STORE (With Missing ID Fix)
+      // 🚀 2. WRITE STORE (With Smart Inheritance & Dynamic Licenses)
       batch.set(storeRef, {
-        'storeId': storeRef.id, // 👈 GAYAB THA (FIXED)
-        'tenantId': widget.tenantId, // 👈 GAYAB THA (FIXED)
+        'storeId': storeRef.id,
+        'tenantId': widget.tenantId,
         'storeName': _storeNameCtrl.text.trim(),
         'branchCode': _branchCodeCtrl.text.trim().toUpperCase(),
         'contactNumbers': _phoneControllers
@@ -370,28 +435,41 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
             .map((c) => c.text.trim())
             .where((t) => t.isNotEmpty)
             .toList(),
+
+        // 🚀 SMART INHERITANCE ENGINE LOGIC
+        'same_as_tenant': _sameAsTenant,
+        'overrides': _sameAsTenant
+            ? {}
+            : {
+                'location': {
+                  'address': _addressCtrl.text.trim(),
+                  'city': _cityCtrl.text.trim(),
+                  'pincode': _pincodeCtrl.text.trim(),
+                  'state': _selectedState,
+                },
+                'licenses': _dynamicLicenses,
+              },
+
+        // Standard fallback fields for easy reading on UI
         'location': {
           'address': _addressCtrl.text.trim(),
           'city': _cityCtrl.text.trim(),
           'state': _selectedState,
           'pincode': _pincodeCtrl.text.trim(),
         },
-        'legal': {
-          'gstin': _gstinCtrl.text.trim().toUpperCase(),
-          'fssai': _fssaiCtrl.text.trim().toUpperCase(),
-        },
+        'licenses': _dynamicLicenses,
         'operations': {
           'openingTime': _openTimeCtrl.text.trim(),
           'closingTime': _closeTimeCtrl.text.trim(),
           'billingCounters': counters,
         },
-        'bankDetails': finalBankDetails, // 👈 TENANT FALLBACK APPLIED
+        'bankDetails': finalBankDetails,
         'status': 'ACTIVE',
         'isActive': true,
         'isDeleted': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
-
+      batch.update(tenantRef, {'activeStores': FieldValue.increment(1)});
       // 3. Write Audit Log
       final auditRef = db.collection('admin_audit_logs').doc();
       batch.set(auditRef, {
@@ -735,7 +813,59 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                     const SizedBox(height: 40),
 
                     // --- SECTION 2 ---
-                    _buildSectionTitle("2. Location", Icons.location_on),
+                    _buildSectionTitle(
+                      "2. Location & Inheritance",
+                      Icons.location_on,
+                    ),
+
+                    // 🚀 ENTERPRISE DATA INHERITANCE TOGGLE
+                    if (_isFetchingTenant)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 20),
+                        child: Center(
+                          child: CircularProgressIndicator(color: accentGreen),
+                        ),
+                      )
+                    else
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: accentGreen.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: accentGreen.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Theme(
+                          data: ThemeData(unselectedWidgetColor: textSecondary),
+                          child: CheckboxListTile(
+                            title: const Text(
+                              "Same as Company / HQ Details",
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: const Text(
+                              "Auto-fill address and licenses from your master profile.",
+                              style: TextStyle(
+                                color: textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            value: _sameAsTenant,
+                            activeColor: accentGreen,
+                            checkColor: bgDark,
+                            onChanged: (val) {
+                              setState(() {
+                                _sameAsTenant = val ?? true;
+                                _applyInheritance();
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+
                     TextFormField(
                       key: _kAddress,
                       controller: _addressCtrl,
@@ -788,38 +918,73 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                     const SizedBox(height: 40),
 
                     // --- SECTION 3 ---
-                    _buildSectionTitle("3. Legal & Compliance", Icons.gavel),
-                    _responsiveRow(
-                      isMobile,
-                      TextFormField(
-                        key: _kGst,
-                        controller: _gstinCtrl,
-                        style: const TextStyle(color: textPrimary),
-                        textCapitalization: TextCapitalization.characters,
-                        maxLength: 15,
-                        decoration: _inputDeco(
-                          "Store GSTIN (Optional)",
-                        ).copyWith(counterText: ""),
-                        validator: (v) =>
-                            (v != null &&
-                                v.isNotEmpty &&
-                                !RegExp(
-                                  r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[0-9]{1}[A-Z]{1}[0-9A-Z]{1}$',
-                                ).hasMatch(v.toUpperCase()))
-                            ? "Invalid GST"
-                            : null,
-                      ),
-                      TextFormField(
-                        controller: _fssaiCtrl,
-                        style: const TextStyle(color: textPrimary),
-                        textCapitalization: TextCapitalization.characters,
-                        maxLength: 14,
-                        decoration: _inputDeco(
-                          "FSSAI License (Optional)",
-                        ).copyWith(counterText: ""),
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildSectionTitle(
+                          "3. Legal & Compliance",
+                          Icons.gavel,
+                        ),
+                        TextButton.icon(
+                          onPressed: _addLicenseRow,
+                          icon: const Icon(
+                            Icons.add,
+                            color: accentGreen,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            "Add License",
+                            style: TextStyle(color: accentGreen),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 40),
+                    ..._dynamicLicenses.asMap().entries.map((entry) {
+                      int idx = entry.key;
+                      Map<String, String> lic = entry.value;
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 15),
+                        child: _responsiveRow(
+                          isMobile,
+                          DropdownButtonFormField<String>(
+                            initialValue: _licenseTypes.contains(lic['type'])
+                                ? lic['type']
+                                : 'Other',
+                            dropdownColor: inputBg,
+                            style: const TextStyle(color: textPrimary),
+                            decoration: _inputDeco("License Type"),
+                            items: _licenseTypes
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(e),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (v) => setState(
+                              () => _dynamicLicenses[idx]['type'] = v!,
+                            ),
+                          ),
+                          TextFormField(
+                            initialValue: lic['number'],
+                            style: const TextStyle(color: textPrimary),
+                            textCapitalization: TextCapitalization.characters,
+                            decoration: _inputDeco("License Number"),
+                            onChanged: (v) =>
+                                _dynamicLicenses[idx]['number'] = v.trim(),
+                          ),
+                        ),
+                      );
+                    }),
+                    if (_dynamicLicenses.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 20),
+                        child: Text(
+                          "No licenses added. Click 'Add License' to add GST, FSSAI, etc.",
+                          style: TextStyle(color: textSecondary),
+                        ),
+                      ),
+                    const SizedBox(height: 25),
 
                     // --- SECTION 4 ---
                     _buildSectionTitle("4. Operations", Icons.access_time),

@@ -7,13 +7,15 @@ class EmployeeService {
   // 🟢 1. ENTERPRISE ONBOARDING (Strict Manual EMP ID)
   static Future<void> createEmployee({
     required String empId,
-    required String role, // 👈 Dynamic Role Name (e.g., Wealth Head)
-    String? tagPrefix, // 👈 🚀 NEW: The Security Tag (e.g., WEALTH)
+    required String role,
+    String? tagPrefix, // 🚀 YE RAHA MISSING PARAMETER
     required String name,
     required String phone,
     String? email,
     required String branchCode,
     String? tenantId,
+    required String addedBy, // 🚀 YE RAHA MISSING PARAMETER
+    required String addedByEmail, // 🚀 YE RAHA MISSING PARAMETER
   }) async {
     try {
       // 1. Duplicate checks (Phone & EmpID)
@@ -39,17 +41,30 @@ class EmployeeService {
       final cleanBranch = branchCode.toUpperCase().trim();
       final finalTag = tagPrefix?.toUpperCase() ?? role.toUpperCase();
 
+      // 🚀 SMART INJECTION: UI se storeId nahi lenge, yahan DB se auto-fetch karenge!
+      String storeId = "DEFAULT_STORE";
+      if (tenantId != null) {
+        final storeQuery = await _db
+            .collection('stores')
+            .where('tenantId', isEqualTo: tenantId)
+            .where('branchCode', isEqualTo: cleanBranch)
+            .limit(1)
+            .get();
+        if (storeQuery.docs.isNotEmpty) {
+          storeId = storeQuery.docs.first.id;
+        }
+      }
+
       await staffRef.set({
         'staffId': staffRef.id,
         'docId': staffRef.id,
+        'storeId': storeId,
+        'addedBy': addedBy,
+        'addedByEmail': addedByEmail,
         'empId': cleanEmpId,
         'role': role.toUpperCase(),
-        'tagPrefix': finalTag, // 🚀 NEW
-        // 🗝️ THE BILLION DOLLAR ARRAY: Yeh hume access filters me speed dega
-        'accessTags': [
-          finalTag, // (e.g. "WEALTH")
-          cleanBranch, // (e.g. "MUM01")
-        ],
+        'tagPrefix': finalTag,
+        'accessTags': [finalTag, cleanBranch],
         'name': name.trim(),
         'phone': phone.trim(),
         'email': email?.trim().toLowerCase() ?? '',
@@ -95,17 +110,47 @@ class EmployeeService {
     required String phone,
     required String branchCode,
     String? tenantId,
+    required String editedBy, // 🚀 Parameter received
+    required String editedByEmail, // 🚀 Parameter received
   }) async {
     try {
+      final cleanRole = role.toUpperCase();
+      final cleanBranch = branchCode.toUpperCase().trim();
+
+      // 🚀 SMART INJECTION: Naye branch ka naya storeId dhundo
+      String? newStoreId;
+      if (tenantId != null) {
+        final storeQuery = await _db
+            .collection('stores')
+            .where('tenantId', isEqualTo: tenantId)
+            .where('branchCode', isEqualTo: cleanBranch)
+            .limit(1)
+            .get();
+        if (storeQuery.docs.isNotEmpty) {
+          newStoreId = storeQuery.docs.first.id;
+        }
+      }
+
+      // 🚀 FIX: Yahan 'lastEditedBy' aur 'lastEditedByEmail' map me add kiye hain
+      final updateData = {
+        'role': cleanRole,
+        'tagPrefix': cleanRole,
+        'accessTags': [cleanRole, cleanBranch],
+        'phone': phone,
+        'branchCode': cleanBranch,
+        'lastEditedBy': editedBy, // 👈 FIREBASE MEIN AB SAVE HOGA
+        'lastEditedByEmail': editedByEmail, // 👈 FIREBASE MEIN AB SAVE HOGA
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (newStoreId != null) {
+        updateData['storeId'] = newStoreId;
+      }
+
       await FirebaseFirestore.instance
           .collection(collectionName)
           .doc(uid)
-          .update({
-            'role': role.toUpperCase(),
-            'phone': phone,
-            'branchCode': branchCode.toUpperCase(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
+          .update(updateData);
 
       // 🛡️ LOG THE ACTION
       await AuditService.logAction(
@@ -113,7 +158,7 @@ class EmployeeService {
         targetCollection: collectionName,
         targetId: uid,
         details:
-            'Updated profile. Re-assigned to Role: $role, Branch: $branchCode.',
+            'Updated profile. Re-assigned to Role: $role, Branch: $branchCode by $editedBy.',
         severity: 'WARNING',
         tenantId: tenantId ?? 'SYSTEM',
       );

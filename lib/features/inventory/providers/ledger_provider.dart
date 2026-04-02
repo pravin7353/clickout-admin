@@ -57,9 +57,15 @@ class LedgerNotifier extends AsyncNotifier<List<InventoryLedger>> {
 
       Query query = _db.collection('products');
 
-      // 🚀 SAAS ISOLATION
+      // 🚀 SAAS ISOLATION (Tenant Level)
       if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
         query = query.where('tenantId', isEqualTo: tenantId);
+      }
+
+      // 🛡️ THE WALL: Branch Isolation (Strictly for Managers)
+      final String? branchCode = adminData?['branchCode'];
+      if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+        query = query.where('branchCode', isEqualTo: branchCode);
       }
 
       final snapshot = await query.get();

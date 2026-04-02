@@ -35,6 +35,7 @@ final tenantStoresProvider =
       return FirebaseFirestore.instance
           .collection('stores')
           .where('tenantId', isEqualTo: tenantId)
+          .where('isDeleted', isEqualTo: false) // 🚀 FIX: Ignore deleted stores
           .snapshots()
           .map(
             (snapshot) => snapshot.docs.map((doc) {

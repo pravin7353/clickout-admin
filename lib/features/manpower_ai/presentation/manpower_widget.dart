@@ -8,14 +8,19 @@ class ManpowerRadarWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final intel = ref.watch(manpowerAiProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // ⚔️ TACTICAL COLOR CODING
+    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+    final adviceTextColor = isDark ? Colors.white70 : Colors.black87;
+
+    // 🎯 TACTICAL COLOR CODING
     Color threatColor;
     IconData threatIcon;
 
     switch (intel.rushLevel) {
       case 'CRITICAL':
-        threatColor = Colors.purple.shade700;
+        threatColor = isDark ? Colors.purpleAccent : Colors.purple.shade700;
         threatIcon = Icons.warning;
         break;
       case 'HIGH':
@@ -28,7 +33,7 @@ class ManpowerRadarWidget extends ConsumerWidget {
         break;
       case 'LOW':
       default:
-        threatColor = Colors.green;
+        threatColor = isDark ? const Color(0xFF00C853) : Colors.green;
         threatIcon = Icons.coffee;
         break;
     }
@@ -36,26 +41,29 @@ class ManpowerRadarWidget extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: threatColor.withOpacity(0.5), width: 2),
         boxShadow: [
-          BoxShadow(color: threatColor.withOpacity(0.1), blurRadius: 20),
+          BoxShadow(
+            color: threatColor.withOpacity(isDark ? 0.05 : 0.1),
+            blurRadius: 20,
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 📡 RADAR HEADER
+          // 🎯 RADAR HEADER
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "Tactical Staffing Radar 🤖",
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2B3674),
+                  color: textColor,
                 ),
               ),
               Container(
@@ -80,7 +88,7 @@ class ManpowerRadarWidget extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
 
-          // 🪖 DEPLOYMENT STATS
+          // 📊 DEPLOYMENT STATS
           Row(
             children: [
               Expanded(
@@ -89,6 +97,7 @@ class ManpowerRadarWidget extends ConsumerWidget {
                   "${intel.expectedFootfall} /hr",
                   Icons.directions_walk,
                   Colors.blueAccent,
+                  isDark,
                 ),
               ),
               const SizedBox(width: 15),
@@ -98,6 +107,7 @@ class ManpowerRadarWidget extends ConsumerWidget {
                   "${intel.recommendedCashiers}",
                   Icons.point_of_sale,
                   threatColor,
+                  isDark,
                 ),
               ),
               const SizedBox(width: 15),
@@ -107,19 +117,23 @@ class ManpowerRadarWidget extends ConsumerWidget {
                   "${intel.recommendedGuards}",
                   Icons.security,
                   threatColor,
+                  isDark,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
 
-          // 📢 MAJOR's ADVICE
+          // 🛡️ COMMANDER'S ADVICE
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: threatColor.withOpacity(0.1),
+              color: threatColor.withOpacity(isDark ? 0.15 : 0.1),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: threatColor.withOpacity(isDark ? 0.3 : 0),
+              ),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,8 +155,8 @@ class ManpowerRadarWidget extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         intel.tacticalAdvice,
-                        style: const TextStyle(
-                          color: Colors.black87,
+                        style: TextStyle(
+                          color: adviceTextColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -162,13 +176,14 @@ class ManpowerRadarWidget extends ConsumerWidget {
     String value,
     IconData icon,
     Color color,
+    bool isDark,
   ) {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: color.withOpacity(isDark ? 0.1 : 0.05),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withOpacity(isDark ? 0.3 : 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,8 +192,8 @@ class ManpowerRadarWidget extends ConsumerWidget {
           const SizedBox(height: 10),
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.grey,
+            style: TextStyle(
+              color: isDark ? Colors.grey.shade400 : Colors.grey,
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),

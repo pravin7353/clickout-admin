@@ -6,6 +6,21 @@ import '../providers/tenant_dashboard_provider.dart';
 import '../../auth/auth_provider.dart';
 import 'create_store_dialog.dart';
 import 'edit_tenant_profile_dialog.dart';
+// 🚀 Added for the Dialog Import
+
+// 🚀 STEP 5: STORE CONFIG STATUS PROVIDER
+final growthConfigProvider = FutureProvider.family<Map<String, dynamic>?, String>((
+  ref,
+  tenantId,
+) async {
+  // Fetch the first configured store just to show the health card on dashboard
+  final snap = await FirebaseFirestore.instance
+      .collection('growth_configs')
+      .where('tenantId', isEqualTo: tenantId)
+      .limit(1)
+      .get();
+  return snap.docs.isNotEmpty ? snap.docs.first.data() : null;
+});
 
 // --- THEME CONSTANTS (STRICT) ---
 const Color bgDark = Color(0xFF080B08);
@@ -112,6 +127,244 @@ class TenantDashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 🚀 SMART ONBOARDING GUIDANCE BANNER (Injected at the very top)
+            Builder(
+              builder: (context) {
+                final tenantData = profileState.value ?? {};
+                final location =
+                    tenantData['location'] as Map<String, dynamic>? ?? {};
+                final kyc = tenantData['kyc'] as Map<String, dynamic>? ?? {};
+
+                // Condition 1: Profile is incomplete
+                bool isProfileIncomplete =
+                    (location['address']?.toString().isEmpty ?? true) ||
+                    (kyc['pan']?.toString().isEmpty ?? true);
+
+                // Condition 2: No active stores (Using real-time store state)
+                final storesList = storesState.value ?? [];
+                final activeStoresCount = storesList
+                    .where((s) => s['isDeleted'] != true)
+                    .length;
+                bool isNoStores = activeStoresCount == 0;
+
+                // 🚀 STEP 4: CONDITION 3 - NO GROWTH CONFIG
+                final configState = ref.watch(growthConfigProvider(tenantId));
+                bool hasNoConfig =
+                    configState.value == null && !configState.isLoading;
+
+                if (isProfileIncomplete) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: InkWell(
+                      onTap: () => showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) =>
+                            EditTenantProfileDialog(tenantId: tenantId),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.redAccent.withOpacity(0.4),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "ACTION REQUIRED: Your Company Profile is incomplete. Click here to setup your business details.",
+                                style: TextStyle(
+                                  color: Colors.redAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.redAccent,
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                } else if (isNoStores) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: InkWell(
+                      onTap: () => showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (ctx) => CreateStoreDialog(
+                          tenantId: tenantId,
+                          companyName: tenantData['companyName'] ?? 'Unknown',
+                        ),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.blueAccent.withOpacity(0.4),
+                          ),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(
+                              Icons.storefront,
+                              color: Colors.blueAccent,
+                              size: 20,
+                            ),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "PROFILE COMPLETE: Next, click here to add your first Store/Branch.",
+                                style: TextStyle(
+                                  color: Colors.blueAccent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.blueAccent,
+                              size: 14,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                } else if (hasNoConfig) {
+                  // 🚀 TENANT HELICOPTER VIEW: Passive Information, no click allowed.
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.amber.withOpacity(0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.pending_actions,
+                            color: Colors.amber.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              "PENDING CONFIG: Store Managers need to setup their Growth AI Profiles from their respective dashboards.",
+                              style: TextStyle(
+                                color: Colors.amber.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return const SizedBox.shrink();
+              },
+            ),
+
+            // 🚀 STEP 5: DASHBOARD PER-STORE HEALTH CARD
+            Builder(
+              builder: (context) {
+                final configState = ref.watch(growthConfigProvider(tenantId));
+                if (configState.value != null && !configState.isLoading) {
+                  final catName =
+                      configState.value!['businessType'] ?? "Unknown";
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: accentGreen.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: accentGreen.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: accentGreen.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.rocket_launch,
+                            color: accentGreen,
+                            size: 24,
+                          ),
+                        ),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "Growth Engine Active",
+                                style: TextStyle(
+                                  color: accentGreen,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Category: $catName • Custom AI Logic Applied",
+                                style: const TextStyle(
+                                  color: textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: accentGreen,
+                            foregroundColor: bgDark,
+                          ),
+                          onPressed: () =>
+                              context.go('/growth'), // 🚀 Navigation to Radar
+                          child: const Text(
+                            "View Radar",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+
             // ==========================================
             // SECTION A: COMPANY HEADER
             // ==========================================

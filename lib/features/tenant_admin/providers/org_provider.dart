@@ -7,7 +7,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // 🏢 THE ROLE MODEL
 class CustomRole {
   final String id;
-  final String roleName;
+  final String roleName; // 👈 UI Display (e.g., "Store Head")
+  final String
+  systemRole; // 🚀 THE MEDIATOR (Strictly: MANAGER, CASHIER, GUARD)
   final String? reportsTo;
   final int level;
   final String tagPrefix;
@@ -15,6 +17,7 @@ class CustomRole {
   CustomRole({
     required this.id,
     required this.roleName,
+    required this.systemRole,
     this.reportsTo,
     required this.level,
     required this.tagPrefix,
@@ -24,6 +27,14 @@ class CustomRole {
     return CustomRole(
       id: data['id'] ?? data['roleId'],
       roleName: data['roleName'] ?? 'Unknown Role',
+      // 🚀 MEDIATOR: Agar purana data hai jisme systemRole nahi hai, toh naam se guess karega warna default CASHIER dega
+      systemRole:
+          data['systemRole'] ??
+          (data['roleName'].toString().toUpperCase().contains('MANAGE')
+              ? 'MANAGER'
+              : data['roleName'].toString().toUpperCase().contains('GUARD')
+              ? 'GUARD'
+              : 'CASHIER'),
       reportsTo: data['reportsTo'],
       level: data['level'] ?? 99,
       tagPrefix: data['tagPrefix'] ?? 'TAG',
