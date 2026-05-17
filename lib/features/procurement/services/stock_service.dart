@@ -109,37 +109,24 @@ class StockService {
     Map<String, dynamic> offerData,
   ) async {
     try {
-      // 1. Basic details jo har offer mein jayengi
       Map<String, dynamic> updatePayload = {
         'clearanceActive': true,
         'clearanceType': type,
-        'clearanceTag': offerData['tag'], // Jo tag popup se ban kar aaya
-        'value1':
-            offerData['value1'], // 🚀 FIX: Universal value 1 (For Bundle Qty etc.)
-        'value2':
-            offerData['value2'], // 🚀 FIX: Universal value 2 (For Bundle Price etc.)
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // 2. Smart Injection: Jo data aaya hai, wahi save hoga
-      if (type == 'BOGO' || type == 'BUY_X_GET_Y') {
-        updatePayload['buyQty'] = offerData['buyQty'];
-        updatePayload['freeQty'] = offerData['freeQty'];
-        if (type == 'BUY_X_GET_Y') {
-          updatePayload['freeProductId'] = offerData['freeProductId'];
-          updatePayload['freeProductName'] = offerData['freeProductName'];
-        }
-      } else if (type == 'PERCENT') {
-        updatePayload['clearanceValue'] = offerData['discountPercent'];
-      } else if (type == 'FLAT') {
-        updatePayload['flatDiscount'] = offerData['flatDiscount'];
-      } else if (type == 'COMBO') {
-        updatePayload['comboProducts'] = offerData['comboProducts'];
-        updatePayload['comboNames'] = offerData['comboNames'];
-        updatePayload['comboPrice'] = offerData['comboPrice'];
+      updatePayload.addAll(offerData);
+
+      // 🚀 FIX: Flash Sale Timer Engine - Calculate exact future expiry time!
+      if (type == 'FLASH_SALE' && offerData['durationHours'] != null) {
+        int hours = offerData['durationHours'] is int
+            ? offerData['durationHours']
+            : int.tryParse(offerData['durationHours'].toString()) ?? 0;
+        updatePayload['expiresAt'] = Timestamp.fromDate(
+          DateTime.now().add(Duration(hours: hours)),
+        );
       }
 
-      // 3. Firestore mein Save karo
       await _db.collection('products').doc(productId).update(updatePayload);
       debugPrint("✅ Advanced Clearance Applied: $type");
     } catch (e) {
@@ -149,7 +136,7 @@ class StockService {
   }
 
   static Future<void> undoClearance(String productId) async {
-    // Reversing the mistake!
+    // 🚀 FIX: Completely wipe all ghost data so old offers don't corrupt new ones!
     await _db.collection('products').doc(productId).update({
       'clearanceActive': FieldValue.delete(),
       'clearanceType': FieldValue.delete(),
@@ -163,6 +150,18 @@ class StockService {
       'comboProducts': FieldValue.delete(),
       'comboNames': FieldValue.delete(),
       'comboPrice': FieldValue.delete(),
+      // Ghost Data Removers
+      'value1': FieldValue.delete(),
+      'value2': FieldValue.delete(),
+      'discountPercent': FieldValue.delete(),
+      'discountAmount': FieldValue.delete(),
+      'durationHours': FieldValue.delete(),
+      'expiresAt': FieldValue.delete(),
+      'minQty': FieldValue.delete(),
+      'bundleQty': FieldValue.delete(),
+      'bundlePrice': FieldValue.delete(),
+      'targetProductId': FieldValue.delete(),
+      'targetProductName': FieldValue.delete(),
     });
   }
 

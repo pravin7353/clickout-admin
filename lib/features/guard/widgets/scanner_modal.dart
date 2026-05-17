@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 ADDED RIVERPOD
-import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 ADDED AUTH PROVIDER
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../services/guard_service.dart';
 
-// 🚀 CHANGED TO ConsumerStatefulWidget
 class ScannerModal extends ConsumerStatefulWidget {
   const ScannerModal({super.key});
 
@@ -34,31 +33,43 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
     if (_orderIdCtrl.text.isEmpty) return;
     setState(() => _isLoading = true);
 
-    // 🚀 SAAS INJECTION: Fetch Tenant ID
-    final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
+    // 🚀 SAAS INJECTION: Fetch Tenant & Branch for Strict Isolation
+    final adminData = ref.read(adminRoleProvider).value;
+    final String? tenantId = adminData?['tenantId'];
+    final String? branchCode = adminData?['branchCode'];
 
-    final result = await GuardService.processValidScan(
+    final Map<String, dynamic> result = await GuardService.processValidScan(
       _orderIdCtrl.text,
       tenantId,
+      branchCode,
     );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pop(context);
-
-    _showResult(
-      result['msg']?.toString() ?? 'Error',
-      result['success'] == true,
-    );
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (result['success'] == true) {
+        Navigator.pop(context); // Close the scanner modal
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['msg']), backgroundColor: Colors.green),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['msg']),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
-  void _processOverride() async {
+  // 🚨 OVERRIDE SUBMIT HANDLER (Cleaned up & Wired)
+  void _submitOverride() async {
     if (!_canSubmitOverride) return;
-
     setState(() => _isLoading = true);
 
-    // 🚀 SAAS INJECTION: Fetch Tenant ID
-    final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
+    // 🚀 SAAS INJECTION
+    final adminData = ref.read(adminRoleProvider).value;
+    final String? tenantId = adminData?['tenantId'];
 
     final Map<String, dynamic> result =
         await GuardService.processManualOverride(
@@ -69,59 +80,49 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
               : null,
         );
 
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-    Navigator.pop(context);
-
-    final String message =
-        result['msg']?.toString() ?? 'Unknown Error Occurred';
-    final bool isSuccess = result['success'] == true;
-
-    _showResult(message, isSuccess, isOverride: true);
-  }
-
-  void _showResult(String msg, bool success, {bool isOverride = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              success
-                  ? (isOverride
-                        ? Icons.warning_amber_rounded
-                        : Icons.check_circle)
-                  : Icons.error,
-              color: Colors.white,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                msg,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
+    if (mounted) {
+      setState(() => _isLoading = false);
+      if (result['success'] == true) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    result['msg'],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        ),
-        backgroundColor: success
-            ? (isOverride ? const Color(0xFFD13212) : const Color(0xFF0F9D58))
-            : const Color(0xFF232F3E),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
+            backgroundColor: const Color(0xFFD13212), // Emergency Red
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['msg']),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark =
+        Theme.of(context).brightness ==
+        Brightness.dark; // 🚀 YE LINE ADD KI HAI
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: Color(0xFF1E1E1E), // 🔲 MATCHING COMMAND CENTER DARK THEME
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
@@ -131,18 +132,20 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ➖ DRAG HANDLE
               Center(
                 child: Container(
                   width: 48,
                   height: 5,
                   margin: const EdgeInsets.only(bottom: 24),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: Colors.white24, // ⚪ Dark Mode Handle
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
 
+              // 🏷️ HEADER
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -154,8 +157,8 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
                       color: _showOverrideMode
-                          ? const Color(0xFFD13212)
-                          : const Color(0xFF232F3E),
+                          ? Colors.redAccent
+                          : Theme.of(context).textTheme.bodyLarge?.color,
                     ),
                   ),
                   IconButton(
@@ -166,10 +169,15 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
               ),
               const SizedBox(height: 24),
 
+              // 🔍 STANDARD SCAN MODE
               if (!_showOverrideMode) ...[
                 TextField(
                   controller: _orderIdCtrl,
                   autofocus: true,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1B2559),
+                    fontWeight: FontWeight.bold,
+                  ),
                   onSubmitted: (_) => _processScan(),
                   decoration: InputDecoration(
                     labelText: "Scan or Type Order ID",
@@ -177,16 +185,19 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                       color: Colors.grey,
                       fontWeight: FontWeight.w600,
                     ),
+                    filled: true,
+                    fillColor: Theme.of(context).scaffoldBackgroundColor,
                     prefixIcon: const Icon(
                       Icons.qr_code_scanner,
-                      color: Color(0xFF232F3E),
+                      color: Colors.grey,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: const BorderSide(
-                        color: Color(0xFF232F3E),
+                        color: Colors.green, // 🚀 CHANGED TO GREEN
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -199,7 +210,7 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                   height: 54,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF232F3E),
+                      backgroundColor: Colors.green, // 🚀 CHANGED TO GREEN
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -208,11 +219,13 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                     ),
                     onPressed: _isLoading ? null : _processScan,
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 24,
                             height: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1B2559),
                               strokeWidth: 2,
                             ),
                           )
@@ -226,25 +239,28 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                           ),
                   ),
                 ),
-              ] else ...[
+              ]
+              // 🚨 OVERRIDE MODE
+              else ...[
                 DropdownButtonFormField<String>(
                   initialValue: _selectedReason,
-                  icon: const Icon(
-                    Icons.arrow_drop_down,
-                    color: Color(0xFF232F3E),
-                  ),
+                  dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+                  icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
                   decoration: InputDecoration(
                     labelText: "Override Reason (Required)",
                     labelStyle: const TextStyle(
                       color: Colors.grey,
                       fontWeight: FontWeight.bold,
                     ),
+                    filled: true,
+                    fillColor: const Color(0xFF2A2A2A), // 🔲 DARK INPUT
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: const BorderSide(
-                        color: Color(0xFFD13212),
+                        color: Colors.redAccent,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -254,8 +270,8 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                       vertical: 16,
                     ),
                   ),
-                  style: const TextStyle(
-                    color: Color(0xFF232F3E),
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1B2559),
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
                   ),
@@ -267,7 +283,7 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                         style: TextStyle(
                           color: r == 'Select a reason'
                               ? Colors.grey
-                              : Colors.black87,
+                              : Colors.white,
                         ),
                       ),
                     );
@@ -278,18 +294,25 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
 
                 TextField(
                   controller: _overrideIdCtrl,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF1B2559),
+                    fontWeight: FontWeight.bold,
+                  ),
                   decoration: InputDecoration(
                     labelText: "Linked Order ID (Optional)",
                     labelStyle: const TextStyle(
                       color: Colors.grey,
                       fontWeight: FontWeight.w600,
                     ),
+                    filled: true,
+                    fillColor: const Color(0xFF2A2A2A), // 🔲 DARK INPUT
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderSide: const BorderSide(
-                        color: Color(0xFFD13212),
+                        color: Colors.redAccent,
                         width: 2,
                       ),
                       borderRadius: BorderRadius.circular(8),
@@ -303,24 +326,24 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                   height: 54,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _canSubmitOverride
-                          ? const Color(0xFFD13212)
-                          : Colors.grey.shade300,
-                      foregroundColor: _canSubmitOverride
-                          ? Colors.white
-                          : Colors.grey.shade600,
+                      backgroundColor:
+                          Colors.redAccent, // 🚨 EMERGENCY RED BUTTON
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 0,
                     ),
-                    onPressed: _processOverride,
+                    onPressed: _showOverrideMode
+                        ? (_canSubmitOverride ? _submitOverride : null)
+                        : _processScan,
                     child: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 24,
                             height: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF1B2559),
                               strokeWidth: 2,
                             ),
                           )
@@ -338,6 +361,7 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
 
               const SizedBox(height: 24),
 
+              // 🔄 TOGGLE BUTTON
               Center(
                 child: TextButton(
                   onPressed: () => setState(() {
@@ -352,8 +376,8 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                         : "Scanner Broken? Manual Override",
                     style: TextStyle(
                       color: _showOverrideMode
-                          ? Colors.grey.shade600
-                          : const Color(0xFFD13212),
+                          ? Colors.grey.shade400
+                          : Colors.redAccent,
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),

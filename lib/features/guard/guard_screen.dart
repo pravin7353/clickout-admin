@@ -5,21 +5,172 @@ import 'package:intl/intl.dart';
 
 import 'providers/guard_provider.dart';
 import 'widgets/scanner_modal.dart';
+import 'services/guard_service.dart';
+import 'package:clickout_admin/features/auth/auth_provider.dart';
 
 class GuardScreen extends ConsumerWidget {
   const GuardScreen({super.key});
 
-  // 👁️ THE DIGITAL GATE PASS (AUTOPSY PANEL)
+  // 🛑 REJECT GATEPASS LOGIC & POPUP
+  void _handleReject(BuildContext context, String orderId, WidgetRef ref) {
+    final TextEditingController reasonCtrl = TextEditingController();
+    bool isRejecting = false;
+    final isDark =
+        Theme.of(context).brightness ==
+        Brightness.dark; // 🚀 YE LINE ADD KARNI HAI
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Colors.white10),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.gpp_bad, color: Colors.redAccent),
+                SizedBox(width: 10),
+                Text(
+                  "Reject Gate Pass",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Why are you blocking this exit?",
+                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonCtrl,
+                  maxLines: 2,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText:
+                        "E.g., Extra unbilled items found, Weight Mismatch...",
+                    hintStyle: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 13,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFF121212),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.white10),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Colors.redAccent),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isRejecting ? null : () => Navigator.pop(ctx),
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                ),
+                icon: isRejecting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.block, size: 18),
+                label: Text(
+                  isRejecting ? "BLOCKING..." : "CONFIRM REJECT",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                onPressed: isRejecting
+                    ? null
+                    : () async {
+                        if (reasonCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text("Reason is required!"),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          return;
+                        }
+                        setState(() => isRejecting = true);
+                        final adminData = ref.read(adminRoleProvider).value;
+                        final tenantId = adminData?['tenantId'];
+
+                        final success = await GuardService.rejectGatePass(
+                          orderId, // 🚀 Direct pass, no 'orderId:' label
+                          tenantId, // 🚀 Direct pass, no 'tenantId:' label
+                        );
+
+                        if (success) {
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "🚨 Gate Pass Rejected & Logged!",
+                                ),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        } else {
+                          setState(() => isRejecting = false);
+                          if (ctx.mounted) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(
+                                content: Text("Error rejecting pass"),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        }
+                      },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // 👁️ THE DIGITAL GATE PASS (AUTOPSY PANEL) - 🚀 UPGRADED TO DARK THEME & RESPONSIVE
   void _showAutopsyPanel(
     BuildContext context,
     Map<String, dynamic> data,
     String orderId,
+    WidgetRef ref,
   ) {
     DateTime date =
         (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
     double finalTotal =
         double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
     List<dynamic> itemsList = data['cartItems'] ?? data['items'] ?? [];
+    String eStatus = (data['exitStatus'] ?? '').toString().toUpperCase();
 
     showGeneralDialog(
       context: context,
@@ -35,10 +186,20 @@ class GuardScreen extends ConsumerWidget {
               left: Radius.circular(20),
             ),
             child: Container(
-              width: 400, // Thoda patla rakha hai Guard ke liye
+              // 🚀 RESPONSIVE WIDTH: Auto-adjusts for mobile vs desktop
+              width: MediaQuery.of(context).size.width > 600
+                  ? 450
+                  : MediaQuery.of(context).size.width,
               height: double.infinity,
-              color: const Color(0xFFF9FAFC),
-              padding: const EdgeInsets.all(24),
+              color: MediaQuery.of(context).size.width > 600
+                  ? const Color(0xFF1E1E1E)
+                  : Colors.white, // ⬛ PREMIUM DARK
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 24,
+                left: 24,
+                right: 24,
+                bottom: 24,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -49,7 +210,7 @@ class GuardScreen extends ConsumerWidget {
                         children: [
                           Icon(
                             Icons.receipt_long,
-                            color: Color(0xFF2B3674),
+                            color: Colors.blueAccent,
                             size: 28,
                           ),
                           SizedBox(width: 10),
@@ -58,7 +219,7 @@ class GuardScreen extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF2B3674),
+                              color: Colors.white,
                             ),
                           ),
                         ],
@@ -69,16 +230,15 @@ class GuardScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const Divider(height: 15),
+                  const Divider(height: 15, color: Colors.white10),
 
-                  // ORDER INFO
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFF121212),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(color: Colors.white10),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,6 +246,7 @@ class GuardScreen extends ConsumerWidget {
                         Text(
                           "ORDER ID: ${orderId.toUpperCase()}",
                           style: const TextStyle(
+                            color: Colors.white,
                             fontWeight: FontWeight.w900,
                             fontFamily: 'monospace',
                             fontSize: 16,
@@ -94,8 +255,8 @@ class GuardScreen extends ConsumerWidget {
                         const SizedBox(height: 4),
                         Text(
                           DateFormat('dd MMM yyyy, hh:mm a').format(date),
-                          style: const TextStyle(
-                            color: Colors.grey,
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
                             fontSize: 12,
                           ),
                         ),
@@ -109,25 +270,19 @@ class GuardScreen extends ConsumerWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: Colors.redAccent,
+                      color: Colors.blueAccent,
                     ),
                   ),
                   const SizedBox(height: 12),
 
-                  // ITEMS LIST (🚀 BUG FIXED HERE)
                   Expanded(
                     child: Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: const Color(0xFF121212),
                         borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                          ),
-                        ],
+                        border: Border.all(color: Colors.white10),
                       ),
                       child: itemsList.isEmpty
                           ? const Center(
@@ -140,12 +295,10 @@ class GuardScreen extends ConsumerWidget {
                               physics: const BouncingScrollPhysics(),
                               itemCount: itemsList.length,
                               separatorBuilder: (context, index) =>
-                                  const Divider(),
+                                  const Divider(color: Colors.white10),
                               itemBuilder: (context, index) {
                                 final item =
                                     itemsList[index] as Map<String, dynamic>;
-
-                                // 🚀 THE FIX 1: Smart Quantity Extractor (Handles 'qty' and 'quantity')
                                 int qty =
                                     int.tryParse(
                                       item['qty']?.toString() ??
@@ -153,8 +306,6 @@ class GuardScreen extends ConsumerWidget {
                                           '1',
                                     ) ??
                                     1;
-
-                                // 🚀 THE FIX 2: Smart Price Extractor
                                 double price =
                                     double.tryParse(
                                       item['price']?.toString() ??
@@ -163,8 +314,6 @@ class GuardScreen extends ConsumerWidget {
                                           '0',
                                     ) ??
                                     0.0;
-
-                                // 🧠 CORRECT MATH FOR GUARD
                                 double itemTotal = qty * price;
                                 String itemName =
                                     item['name']?.toString() ??
@@ -178,20 +327,21 @@ class GuardScreen extends ConsumerWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
                                     children: [
-                                      // 🟢 DYNAMIC QUANTITY BADGE
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 8,
                                           vertical: 8,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.blue.shade50,
+                                          color: Colors.blueAccent.withValues(
+                                            alpha: 0.1,
+                                          ),
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
                                         ),
                                         child: Text(
-                                          "${qty}x", // 🚀 Ye ab hamesha exact DB quantity dikhayega!
+                                          "${qty}x",
                                           style: const TextStyle(
                                             fontWeight: FontWeight.w900,
                                             color: Colors.blueAccent,
@@ -200,8 +350,6 @@ class GuardScreen extends ConsumerWidget {
                                         ),
                                       ),
                                       const SizedBox(width: 12),
-
-                                      // 📦 PRODUCT DETAILS
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -212,14 +360,14 @@ class GuardScreen extends ConsumerWidget {
                                               style: const TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 14,
-                                                color: Colors.black87,
+                                                color: Colors.white,
                                               ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               "@ ₹${price.toStringAsFixed(2)} / unit",
                                               style: TextStyle(
-                                                color: Colors.grey.shade600,
+                                                color: Colors.grey.shade500,
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -227,14 +375,12 @@ class GuardScreen extends ConsumerWidget {
                                           ],
                                         ),
                                       ),
-
-                                      // 💰 ACCURATE ITEM TOTAL
                                       Text(
                                         "₹${itemTotal.toStringAsFixed(2)}",
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w900,
                                           fontSize: 14,
-                                          color: Colors.black,
+                                          color: Colors.white,
                                         ),
                                       ),
                                     ],
@@ -246,13 +392,14 @@ class GuardScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // TOTAL
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: Colors.greenAccent.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(
+                        color: Colors.greenAccent.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -262,7 +409,7 @@ class GuardScreen extends ConsumerWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
-                            color: Colors.green,
+                            color: Colors.greenAccent,
                           ),
                         ),
                         Text(
@@ -270,12 +417,41 @@ class GuardScreen extends ConsumerWidget {
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
                             fontSize: 24,
-                            color: Colors.green,
+                            color: Colors.greenAccent,
                           ),
                         ),
                       ],
                     ),
                   ),
+
+                  if (eStatus == 'PENDING' || eStatus == 'READY_FOR_EXIT') ...[
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent.withValues(
+                            alpha: 0.1,
+                          ),
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(Icons.gpp_bad),
+                        label: const Text(
+                          "REJECT & BLOCK EXIT",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        onPressed: () => _handleReject(context, orderId, ref),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -296,11 +472,14 @@ class GuardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final pendingState = ref.watch(pendingExitsProvider);
     final historyState = ref.watch(gateHistoryProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FE),
+      backgroundColor: Theme.of(
+        context,
+      ).scaffoldBackgroundColor, // 🌓 DYNAMIC BACKGROUND
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -308,7 +487,6 @@ class GuardScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🎩 HEADER
               Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
@@ -317,28 +495,32 @@ class GuardScreen extends ConsumerWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.security,
-                        color: Color(0xFF2B3674),
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
                         size: 36,
                       ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             "Super Guard 🛡️",
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF2B3674),
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyLarge?.color,
                               letterSpacing: -0.5,
                             ),
                           ),
                           Text(
                             "Gate Intelligence & Live Radar",
                             style: TextStyle(
-                              color: Colors.grey,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.labelLarge?.color,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -357,25 +539,20 @@ class GuardScreen extends ConsumerWidget {
                       "Scan Gate Pass",
                       style: TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800, // Bold thick text
+                        fontWeight: FontWeight.w800,
                         letterSpacing: 0.5,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(
-                        0xFF232F3E,
-                      ), // 🎩 Amazon Navy Blue
+                      backgroundColor: Colors.green, // 🚀 CHANGED TO GREEN
                       padding: const EdgeInsets.symmetric(
                         horizontal: 28,
                         vertical: 18,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          8,
-                        ), // Sharp corners like enterprise apps
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       elevation: 4,
-                      shadowColor: Colors.black45,
                     ),
                     onPressed: () {
                       showModalBottomSheet(
@@ -390,13 +567,12 @@ class GuardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
 
-              // 🚨 LIVE RADAR
-              const Text(
+              Text(
                 "Live Exit Radar (Action Required)",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2B3674),
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
                 ),
               ),
               const SizedBox(height: 12),
@@ -404,10 +580,12 @@ class GuardScreen extends ConsumerWidget {
               pendingState.when(
                 loading: () => const SizedBox(
                   height: 100,
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(
+                    child: CircularProgressIndicator(color: Colors.blueAccent),
+                  ),
                 ),
                 error: (err, stack) => _buildErrorCard(
-                  "Radar offline: Firebase Index required! Check debug console.",
+                  "Radar offline: Firebase Index required! Check console.",
                 ),
                 data: (pendingDocs) {
                   if (pendingDocs.isEmpty) {
@@ -433,13 +611,13 @@ class GuardScreen extends ConsumerWidget {
                         final minutesWaiting = DateTime.now()
                             .difference(date)
                             .inMinutes;
-                        Color riskColor = Colors.orange;
+                        Color riskColor = Colors.orangeAccent;
                         String riskText = "Waiting";
                         if (minutesWaiting > 30) {
-                          riskColor = Colors.red;
+                          riskColor = Colors.redAccent;
                           riskText = "CRITICAL: Stuck";
                         } else if (minutesWaiting > 10) {
-                          riskColor = Colors.deepOrange;
+                          riskColor = Colors.deepOrangeAccent;
                           riskText = "Delayed";
                         }
 
@@ -448,15 +626,15 @@ class GuardScreen extends ConsumerWidget {
                           margin: const EdgeInsets.only(right: 16),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: Theme.of(context).cardColor,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: riskColor.withOpacity(0.5),
-                              width: 2,
+                              color: riskColor.withValues(alpha: 0.5),
+                              width: 1.5,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: riskColor.withOpacity(0.1),
+                                color: riskColor.withValues(alpha: 0.1),
                                 blurRadius: 10,
                               ),
                             ],
@@ -470,7 +648,10 @@ class GuardScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     orderId,
-                                    style: const TextStyle(
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).textTheme.bodyLarge?.color,
                                       fontWeight: FontWeight.w900,
                                       fontSize: 16,
                                       fontFamily: 'monospace',
@@ -482,7 +663,7 @@ class GuardScreen extends ConsumerWidget {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: riskColor.withOpacity(0.1),
+                                      color: riskColor.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -499,9 +680,9 @@ class GuardScreen extends ConsumerWidget {
                               const Spacer(),
                               Text(
                                 "Amount: ₹${data['totalAmount'] ?? '0'}",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.grey,
+                                  color: Colors.grey.shade400,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -533,18 +714,18 @@ class GuardScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 32),
 
-              // 📜 RECENT GATE ACTIVITY TABLE
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: Theme.of(context).dividerColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 16,
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -554,24 +735,26 @@ class GuardScreen extends ConsumerWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           "Recent Gate Activity",
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2B3674),
+                            color: Theme.of(context).textTheme.bodyLarge?.color,
                           ),
                         ),
                         Chip(
                           label: const Text(
                             "Live Stream 🟢",
                             style: TextStyle(
-                              color: Colors.green,
+                              color: Colors.greenAccent,
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          backgroundColor: Colors.green.withOpacity(0.1),
+                          backgroundColor: Colors.greenAccent.withValues(
+                            alpha: 0.1,
+                          ),
                           side: BorderSide.none,
                         ),
                       ],
@@ -582,11 +765,13 @@ class GuardScreen extends ConsumerWidget {
                       loading: () => const Center(
                         child: Padding(
                           padding: EdgeInsets.all(40),
-                          child: CircularProgressIndicator(),
+                          child: CircularProgressIndicator(
+                            color: Colors.blueAccent,
+                          ),
                         ),
                       ),
                       error: (err, stack) => _buildErrorCard(
-                        "Table offline: Firebase Index required! Check debug console.",
+                        "Table offline: Firebase Index required! Check console.",
                       ),
                       data: (historyDocs) {
                         if (historyDocs.isEmpty) {
@@ -627,7 +812,7 @@ class GuardScreen extends ConsumerWidget {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: RawScrollbar(
-                                thumbColor: Colors.grey.shade400,
+                                thumbColor: Colors.grey.shade600,
                                 radius: const Radius.circular(4),
                                 thickness: 6,
                                 thumbVisibility: true,
@@ -642,17 +827,17 @@ class GuardScreen extends ConsumerWidget {
                                     child: DataTable(
                                       columnSpacing: 30,
                                       headingRowColor: WidgetStateProperty.all(
-                                        Colors.grey.shade50,
+                                        const Color(0xFF121212),
                                       ),
-                                      headingTextStyle: const TextStyle(
+                                      headingTextStyle: TextStyle(
                                         fontWeight: FontWeight.w800,
-                                        color: Color(0xFF2B3674),
+                                        color: Colors.grey.shade400,
                                         fontSize: 12,
                                       ),
                                       columns: const [
                                         DataColumn(label: Text("TIME")),
                                         DataColumn(label: Text("ORDER ID")),
-                                        DataColumn(label: Text("GUARD ID")),
+                                        DataColumn(label: Text("GUARD NAME")),
                                         DataColumn(label: Text("STATUS")),
                                         DataColumn(label: Text("AI RISK")),
                                         DataColumn(label: Text("ACTION")),
@@ -672,10 +857,13 @@ class GuardScreen extends ConsumerWidget {
                                             (data['exitStatus'] ?? 'UNKNOWN')
                                                 .toString()
                                                 .toUpperCase();
-                                        String guardId =
-                                            data['verifiedByGuardId'] ??
-                                            data['rejectedByGuardId'] ??
-                                            'EMP_UNKNOWN';
+
+                                        // 🚀 CHANGED TO GUARD NAME FOR BETTER READABILITY
+                                        String guardName =
+                                            data['verifiedByGuardName'] ??
+                                            data['rejectedByGuardName'] ??
+                                            'Guard';
+
                                         String riskLevel =
                                             (data['riskLevel'] ?? 'LOW')
                                                 .toString()
@@ -691,8 +879,8 @@ class GuardScreen extends ConsumerWidget {
                                                 DateFormat(
                                                   'hh:mm a',
                                                 ).format(date),
-                                                style: const TextStyle(
-                                                  color: Colors.grey,
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade400,
                                                   fontWeight: FontWeight.bold,
                                                 ),
                                               ),
@@ -702,7 +890,10 @@ class GuardScreen extends ConsumerWidget {
                                                 doc.id
                                                     .substring(0, 8)
                                                     .toUpperCase(),
-                                                style: const TextStyle(
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyLarge?.color,
                                                   fontWeight: FontWeight.bold,
                                                   fontFamily: 'monospace',
                                                 ),
@@ -710,9 +901,11 @@ class GuardScreen extends ConsumerWidget {
                                             ),
                                             DataCell(
                                               Text(
-                                                guardId,
-                                                style: const TextStyle(
-                                                  color: Colors.black87,
+                                                guardName,
+                                                style: TextStyle(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyMedium?.color,
                                                   fontWeight: FontWeight.w600,
                                                 ),
                                               ),
@@ -726,11 +919,14 @@ class GuardScreen extends ConsumerWidget {
                                                     ),
                                                 decoration: BoxDecoration(
                                                   color: isApproved
-                                                      ? Colors.green
-                                                            .withOpacity(0.1)
-                                                      : Colors.red.withOpacity(
-                                                          0.1,
-                                                        ),
+                                                      ? Colors.greenAccent
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            )
+                                                      : Colors.redAccent
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            ),
                                                   borderRadius:
                                                       BorderRadius.circular(6),
                                                 ),
@@ -738,8 +934,8 @@ class GuardScreen extends ConsumerWidget {
                                                   exitStatus,
                                                   style: TextStyle(
                                                     color: isApproved
-                                                        ? Colors.green
-                                                        : Colors.red,
+                                                        ? Colors.greenAccent
+                                                        : Colors.redAccent,
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.w800,
                                                   ),
@@ -755,7 +951,7 @@ class GuardScreen extends ConsumerWidget {
                                                               .warning_amber_rounded
                                                         : Icons.shield_outlined,
                                                     color: riskLevel == 'HIGH'
-                                                        ? Colors.orange
+                                                        ? Colors.orangeAccent
                                                         : Colors.grey,
                                                     size: 16,
                                                   ),
@@ -764,7 +960,7 @@ class GuardScreen extends ConsumerWidget {
                                                     riskLevel,
                                                     style: TextStyle(
                                                       color: riskLevel == 'HIGH'
-                                                          ? Colors.orange
+                                                          ? Colors.orangeAccent
                                                           : Colors.grey,
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -775,11 +971,10 @@ class GuardScreen extends ConsumerWidget {
                                               ),
                                             ),
                                             DataCell(
-                                              // 👁️ THE ACTION BUTTON WIRED UP!
                                               IconButton(
                                                 icon: const Icon(
                                                   Icons.remove_red_eye,
-                                                  color: Color(0xFF2B3674),
+                                                  color: Colors.blueAccent,
                                                 ),
                                                 tooltip: "View Gate Pass",
                                                 onPressed: () =>
@@ -787,6 +982,7 @@ class GuardScreen extends ConsumerWidget {
                                                       context,
                                                       data,
                                                       doc.id,
+                                                      ref,
                                                     ),
                                               ),
                                             ),
@@ -817,18 +1013,18 @@ class GuardScreen extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: Colors.greenAccent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.greenAccent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.verified_user, color: Colors.green),
+          const Icon(Icons.verified_user, color: Colors.greenAccent),
           const SizedBox(width: 12),
           Text(
             message,
             style: const TextStyle(
-              color: Colors.green,
+              color: Colors.greenAccent,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -842,19 +1038,19 @@ class GuardScreen extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.redAccent.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Colors.red),
+          const Icon(Icons.error_outline, color: Colors.redAccent),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               message,
               style: const TextStyle(
-                color: Colors.red,
+                color: Colors.redAccent,
                 fontWeight: FontWeight.bold,
               ),
             ),

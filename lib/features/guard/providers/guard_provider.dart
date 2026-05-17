@@ -9,6 +9,7 @@ final pendingExitsProvider = StreamProvider<List<QueryDocumentSnapshot>>((ref) {
   // 🚀 SAAS INJECTION: Get Tenant
   final adminData = ref.watch(adminRoleProvider).value;
   final String? tenantId = adminData?['tenantId'];
+  final String? branchCode = adminData?['branchCode'];
   final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
   Query query = FirebaseFirestore.instance
@@ -20,8 +21,17 @@ final pendingExitsProvider = StreamProvider<List<QueryDocumentSnapshot>>((ref) {
         isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
       );
 
-  if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
+  // 🚀 THE FIX: Bulletproof SaaS Isolation (Blacklist approach)
+  final bool isSuperAdmin = role == 'super_admin' || role == 'admin';
+
+  // Level 1: Lock to Tenant (Company)
+  if (!isSuperAdmin && tenantId != null && tenantId.isNotEmpty) {
     query = query.where('tenantId', isEqualTo: tenantId);
+  }
+
+  // Level 2: Lock strictly to Branch (Store)
+  if (!isSuperAdmin && branchCode != null && branchCode.isNotEmpty) {
+    query = query.where('branchCode', isEqualTo: branchCode);
   }
 
   return query
@@ -39,6 +49,7 @@ final gateHistoryProvider = StreamProvider<List<QueryDocumentSnapshot>>((ref) {
   // 🚀 SAAS INJECTION: Get Tenant
   final adminData = ref.watch(adminRoleProvider).value;
   final String? tenantId = adminData?['tenantId'];
+  final String? branchCode = adminData?['branchCode'];
   final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
   Query query = FirebaseFirestore.instance
@@ -52,8 +63,17 @@ final gateHistoryProvider = StreamProvider<List<QueryDocumentSnapshot>>((ref) {
         isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
       );
 
-  if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
+  // 🚀 THE FIX: Bulletproof SaaS Isolation (Blacklist approach)
+  final bool isSuperAdmin = role == 'super_admin' || role == 'admin';
+
+  // Level 1: Lock to Tenant (Company)
+  if (!isSuperAdmin && tenantId != null && tenantId.isNotEmpty) {
     query = query.where('tenantId', isEqualTo: tenantId);
+  }
+
+  // Level 2: Lock strictly to Branch (Store)
+  if (!isSuperAdmin && branchCode != null && branchCode.isNotEmpty) {
+    query = query.where('branchCode', isEqualTo: branchCode);
   }
 
   return query

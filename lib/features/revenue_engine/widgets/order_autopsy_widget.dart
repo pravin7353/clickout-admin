@@ -9,11 +9,26 @@ final employeeNameProvider = FutureProvider.family<String, String>((
 ) async {
   if (empId.isEmpty) return "SYSTEM / KIOSK";
   try {
-    final doc = await FirebaseFirestore.instance
+    // 🚀 FIX: Agar order Employee ne nahi, kisi Manager (User) ne banaya hai, toh Users table me bhi dhoondhega!
+    final empDoc = await FirebaseFirestore.instance
         .collection('employees')
         .doc(empId)
         .get();
-    return doc.data()?['name'] ?? "Unknown Staff ($empId)";
+    if (empDoc.exists && empDoc.data()?['name'] != null) {
+      return empDoc.data()!['name'];
+    }
+
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(empId)
+        .get();
+    if (userDoc.exists && userDoc.data() != null) {
+      return userDoc.data()?['name'] ??
+          userDoc.data()?['displayName'] ??
+          "Manager";
+    }
+
+    return "Unknown Staff ($empId)";
   } catch (e) {
     return "Verification Failed";
   }

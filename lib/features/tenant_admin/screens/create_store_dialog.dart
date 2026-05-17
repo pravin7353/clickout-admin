@@ -424,6 +424,15 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
       // 🚀 2. WRITE STORE (With Smart Inheritance & Dynamic Licenses)
       batch.set(storeRef, {
         'storeId': storeRef.id,
+        // 🚀 DUMMY PAYMENT CONFIG FOR TESTING (WILL BE REPLACED BY CENTRAL ROUTING LATER)
+        'paymentConfig': {
+          'isCustom': true,
+          'PHONEPE': {
+            'merchantId': 'PGTESTPAYUAT86',
+            'saltKey': '96434309-7796-489d-8924-ab56988a6076',
+            'saltIndex': '1',
+          },
+        },
         'tenantId': widget.tenantId,
         'storeName': _storeNameCtrl.text.trim(),
         'branchCode': _branchCodeCtrl.text.trim().toUpperCase(),

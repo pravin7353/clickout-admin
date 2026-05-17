@@ -11,13 +11,13 @@ class AppTheme {
   static const darkMuted = Color(0xFF888888);
 
   // ==========================================
-  // ☀️ LIGHT THEME COLORS
+  // ☀️ PREMIUM LIGHT THEME COLORS
   // ==========================================
-  static const lightBg = Color(0xFFF5F7F5);
-  static const lightCard = Color(0xFFFFFFFF);
-  static const lightAccent = Color(0xFF00A846);
-  static const lightText = Color(0xFF0A0F0A);
-  static const lightMuted = Color(0xFF666666);
+  static const lightBg = Color(0xFFF8FAFC); // Soft Slate Gray Bg
+  static const lightCard = Color(0xFFFFFFFF); // Pure White Cards
+  static const lightAccent = Color(0xFF00C853); // Fresh Green
+  static const lightText = Color(0xFF0F172A); // Deep Slate Text
+  static const lightMuted = Color(0xFF64748B); // Muted Slate
 
   static ThemeData get darkTheme {
     return ThemeData(
@@ -43,15 +43,23 @@ class AppTheme {
       scaffoldBackgroundColor: lightBg,
       primaryColor: lightAccent,
       cardColor: lightCard,
+      canvasColor: lightCard,
+      colorScheme: const ColorScheme.light(
+        primary: lightAccent,
+        surface: lightCard,
+        onSurface: lightText,
+      ),
       textTheme: const TextTheme(
         bodyLarge: TextStyle(color: lightText),
         bodyMedium: TextStyle(color: lightText),
         labelLarge: TextStyle(color: lightMuted),
       ),
-      iconTheme: const IconThemeData(color: lightText),
-      dividerColor: lightMuted.withOpacity(0.2),
+      iconTheme: const IconThemeData(color: lightMuted),
+      dividerColor: const Color(
+        0xFFE5E7EB,
+      ), // Very subtle Sequence-like borders
       useMaterial3: true,
-      tabBarTheme: TabBarThemeData(indicatorColor: lightAccent),
+      tabBarTheme: const TabBarThemeData(indicatorColor: lightAccent),
     );
   }
 }

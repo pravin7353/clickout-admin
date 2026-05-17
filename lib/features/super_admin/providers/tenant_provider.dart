@@ -10,6 +10,11 @@ class TenantModel {
   final int maxStores;
   final bool isActive;
   final DateTime createdAt;
+  // 🟢 NEW CODE: Added fields for subscription and billing
+  final String subscriptionPlan;
+  final String billingStatus;
+  final DateTime? subscriptionEndDate;
+  final int monthlyAmount;
 
   TenantModel({
     required this.id,
@@ -18,17 +23,40 @@ class TenantModel {
     required this.maxStores,
     required this.isActive,
     required this.createdAt,
+    // 🟢 NEW CODE: Required constructor params
+    required this.subscriptionPlan,
+    required this.billingStatus,
+    this.subscriptionEndDate,
+    required this.monthlyAmount,
   });
 
   factory TenantModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    // 🟢 NEW CODE: Parse plan and calculate monthlyAmount
+    final parsedPlan = (data['subscriptionPlan'] ?? 'BASIC')
+        .toString()
+        .toUpperCase();
+    final int amount =
+        data['monthlyAmount'] as int? ??
+        (parsedPlan == 'ENTERPRISE'
+            ? 9999
+            : (parsedPlan == 'PRO' ? 2999 : 999));
+
     return TenantModel(
       id: doc.id,
       companyName: data['companyName'] ?? 'Unknown',
-      plan: (data['subscriptionPlan'] ?? 'BASIC').toString().toUpperCase(),
+      plan: parsedPlan,
       maxStores: data['maxStores'] ?? 1,
       isActive: data['isActive'] ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      // 🟢 NEW CODE: Map new fields
+      subscriptionPlan: parsedPlan,
+      billingStatus: (data['billingStatus'] ?? 'ACTIVE')
+          .toString()
+          .toUpperCase(),
+      subscriptionEndDate: (data['subscriptionEndDate'] as Timestamp?)
+          ?.toDate(),
+      monthlyAmount: amount,
     );
   }
 }

@@ -28,15 +28,55 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
 
   Map<String, int> _salesDataCache = {};
   DateTime? _lastCacheTime;
+  final ScrollController _horizontalScrollController = ScrollController();
 
-  // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
-  static const Color accentGreen = Color(0xFF00C853);
-  static const Color accentOrange = Color(0xFFD4580A); // 🚀 3rd Primary
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color accentRed = Color(0xFFFE8181);
+  // 🎨 DYNAMIC PREMIUM THEME (Simple & Clean Look)
+  Color get bgDark => Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF080B08)
+      : const Color(0xFFF4F5F7); // 🚀 Light Gray (Clean look)
+  Color get cardDark => Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF111811)
+      : const Color(0xFFFFFFFF); // 🚀 Pure White
+  Color get accentGreen => Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFF00C853)
+      : const Color(0xFF2E7D32);
+  Color get accentOrange => const Color(0xFFFF6D00); // 🚀 Deep Sunset Orange
+  Color get textPrimary =>
+      Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+  Color get textSecondary =>
+      Theme.of(context).textTheme.labelLarge?.color ?? Colors.grey;
+  Color get accentRed => const Color(0xFFFE8181);
+
+  // 🧠 SMART DATE PARSER: 100% Crash-Proof (Handles Timestamp, MM/YYYY, DD/MM/YYYY)
+  DateTime? _parseExpiryDate(dynamic rawDate) {
+    if (rawDate == null) return null;
+    if (rawDate is Timestamp) return rawDate.toDate();
+    if (rawDate is String) {
+      if (rawDate.trim().isEmpty) return null;
+      try {
+        final parts = rawDate.replaceAll('-', '/').split('/');
+        if (parts.length == 2) {
+          // Format: MM/YYYY
+          return DateTime(
+            int.parse(parts[1]),
+            int.parse(parts[0]) + 1,
+            0,
+          ); // End of month
+        } else if (parts.length == 3) {
+          // Format: DD/MM/YYYY
+          return DateTime(
+            int.parse(parts[2]),
+            int.parse(parts[1]),
+            int.parse(parts[0]),
+          );
+        }
+        return DateTime.tryParse(rawDate);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
 
   final List<Map<String, dynamic>> _sortOptions = [
     {
@@ -89,6 +129,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _horizontalScrollController.dispose();
     super.dispose();
   }
 
@@ -162,8 +203,9 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
       int stA = dataA['physicalStock'] ?? dataA['stock'] ?? 0;
       int stB = dataB['physicalStock'] ?? dataB['stock'] ?? 0;
 
-      Timestamp? expA = dataA['expiryDate'] as Timestamp?;
-      Timestamp? expB = dataB['expiryDate'] as Timestamp?;
+      // 🚀 CRASH FIX: Ab sorting bhi safe parser use karegi!
+      DateTime? expA = _parseExpiryDate(dataA['expiryDate']);
+      DateTime? expB = _parseExpiryDate(dataB['expiryDate']);
 
       if (_selectedSort == 'Trending') {
         int cmp = salesB.compareTo(salesA);
@@ -208,13 +250,16 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    bool isMobile =
-        MediaQuery.of(context).size.width < 768; // 🚀 RESPONSIVE CHECK
+    bool isMobile = MediaQuery.of(context).size.width < 768;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tableHeaderBg = isDark
+        ? const Color(0xFF131A13)
+        : const Color(0xFFFFE0B2); // Amber 100
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
-        color: cardDark, // 🚀 DARK THEME
+        color: cardDark,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: textSecondary.withOpacity(0.1), width: 1),
       ),
@@ -226,16 +271,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
             children: [
               Row(
                 children: [
-                  const Icon(
-                    Icons.memory,
-                    color: accentOrange,
-                    size: 28,
-                  ), // 🚀 ORANGE
+                  Icon(Icons.memory, color: accentOrange, size: 28),
                   const SizedBox(width: 12),
                   Text(
                     "Quantum Promotion Engine 🌌",
                     style: TextStyle(
-                      fontSize: isMobile ? 18 : 22, // 📱 Responsive Font
+                      fontSize: isMobile ? 18 : 22,
                       fontWeight: FontWeight.w900,
                       color: textPrimary,
                     ),
@@ -273,13 +314,13 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                 child: Container(
                   height: 50,
                   decoration: BoxDecoration(
-                    color: bgDark, // 🚀 Dark Input
+                    color: bgDark,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: textSecondary.withOpacity(0.2)),
                   ),
                   child: TextField(
                     controller: _searchCtrl,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
@@ -292,10 +333,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                       hintStyle: TextStyle(
                         color: textSecondary.withOpacity(0.5),
                       ),
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: textSecondary,
-                      ),
+                      prefixIcon: Icon(Icons.search, color: textSecondary),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -311,16 +349,14 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                   decoration: BoxDecoration(
                     color: bgDark,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: accentOrange.withOpacity(0.5),
-                    ), // 🚀 ORANGE THEME
+                    border: Border.all(color: accentOrange.withOpacity(0.5)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       isExpanded: true,
-                      dropdownColor: cardDark, // 🚀 Dark Dropdown
+                      dropdownColor: cardDark,
                       value: _selectedSort,
-                      icon: const Icon(Icons.sort, color: accentOrange),
+                      icon: Icon(Icons.sort, color: accentOrange),
                       items: _sortOptions
                           .map(
                             (opt) => DropdownMenuItem<String>(
@@ -335,7 +371,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                   const SizedBox(width: 8),
                                   Text(
                                     opt['name'],
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                       color: textPrimary,
@@ -366,8 +402,8 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
           const SizedBox(height: 25),
 
           _isSorting
-              ? const Padding(
-                  padding: EdgeInsets.all(50),
+              ? Padding(
+                  padding: const EdgeInsets.all(50),
                   child: Center(
                     child: CircularProgressIndicator(color: accentOrange),
                   ),
@@ -375,13 +411,11 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
               : StreamBuilder<QuerySnapshot>(
                   stream: _engineStream,
                   builder: (context, snapshot) {
-                    // 🚀 FIX 2: Spinner tabhi dikhega jab DATA bilkul na ho (First time install).
-                    // Baad me offline cache use hoga aur UI flicker nahi karega!
                     if (snapshot.connectionState == ConnectionState.waiting &&
                         !snapshot.hasData) {
-                      return const Center(
+                      return Center(
                         child: Padding(
-                          padding: EdgeInsets.all(50.0),
+                          padding: const EdgeInsets.all(50.0),
                           child: CircularProgressIndicator(color: accentOrange),
                         ),
                       );
@@ -396,7 +430,9 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(40),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
+                          color: isDark
+                              ? const Color(0xFF111811)
+                              : Colors.green.shade50,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Center(
@@ -430,905 +466,926 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
 
                     return LayoutBuilder(
                       builder: (context, constraints) {
-                        final double tableWidth = constraints.maxWidth < 1000
+                        // 🚀 FIX: Prevent infinite width crash on shrink
+                        double safeWidth = constraints.maxWidth;
+                        if (safeWidth.isInfinite) {
+                          safeWidth = MediaQuery.of(context).size.width - 48;
+                        }
+                        final double tableWidth = safeWidth < 1000
                             ? 1000
-                            : constraints.maxWidth;
+                            : safeWidth;
 
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: SizedBox(
-                            width: tableWidth,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(
-                                      0xFF131A13,
-                                    ), // 🚀 Table Header Dark
-                                    borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(12),
+                        return Scrollbar(
+                          controller: _horizontalScrollController,
+                          thumbVisibility: true,
+                          interactive: true,
+                          thickness: 8,
+                          child: SingleChildScrollView(
+                            controller: _horizontalScrollController,
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: SizedBox(
+                              width: tableWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 14,
                                     ),
-                                    border: Border.all(
-                                      color: textSecondary.withOpacity(0.1),
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF131A13)
+                                          : const Color(
+                                              0xFF9EC2B6,
+                                            ), // 🚀 Requested Custom Header Color
+                                      borderRadius: const BorderRadius.vertical(
+                                        top: Radius.circular(12),
+                                      ),
+                                      border: Border.all(
+                                        color: textSecondary.withOpacity(0.1),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: Text(
+                                            "Product/Service Info",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            "Expiry Status",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            "Offer Status",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            "Stock",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            "Action",
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: textPrimary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: Row(
-                                    children: const [
-                                      Expanded(
-                                        flex: 3,
-                                        child: Text(
-                                          "Product Info",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          "Expiry Status",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          "Offer Status",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 1,
-                                        child: Text(
-                                          "Stock",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          "Action",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: textPrimary,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
 
-                                ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: pageProducts.length,
-                                  itemBuilder: (context, index) {
-                                    final doc = pageProducts[index];
-                                    final data =
-                                        doc.data() as Map<String, dynamic>;
-                                    final productId = doc.id;
-                                    final name = data['name'] ?? 'Unknown Item';
-                                    final stock =
-                                        data['physicalStock'] ??
-                                        data['stock'] ??
-                                        0;
-                                    final price =
-                                        data['price'] ?? data['mrp'] ?? 0;
-                                    final isClearanceActive =
-                                        data['clearanceActive'] == true;
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: pageProducts.length,
+                                    itemBuilder: (context, index) {
+                                      final doc = pageProducts[index];
+                                      final data =
+                                          doc.data() as Map<String, dynamic>;
+                                      final productId = doc.id;
+                                      final name =
+                                          data['name'] ?? 'Unknown Item';
+                                      final stock =
+                                          data['physicalStock'] ??
+                                          data['stock'] ??
+                                          0;
+                                      final price =
+                                          data['price'] ?? data['mrp'] ?? 0;
+                                      final isClearanceActive =
+                                          data['clearanceActive'] == true;
 
-                                    int daysLeft = 999;
-                                    if (data['expiryDate'] != null) {
-                                      daysLeft =
-                                          (data['expiryDate'] as Timestamp)
-                                              .toDate()
-                                              .difference(DateTime.now())
-                                              .inDays;
-                                    }
-                                    bool isDead = daysLeft < 0;
+                                      int daysLeft = 999;
 
-                                    return Dismissible(
-                                      key: Key(productId),
-                                      direction: DismissDirection.startToEnd,
-                                      confirmDismiss: (direction) async =>
-                                          await _showBlockConfirmDialog(
+                                      // 🚀 CRASH FIX: Ab yahan Smart Parser use ho raha hai!
+                                      DateTime? parsedExpiry = _parseExpiryDate(
+                                        data['expiryDate'],
+                                      );
+                                      if (parsedExpiry != null) {
+                                        daysLeft = parsedExpiry
+                                            .difference(DateTime.now())
+                                            .inDays;
+                                      }
+
+                                      bool isDead = daysLeft < 0;
+
+                                      return Dismissible(
+                                        key: Key(productId),
+                                        direction: DismissDirection.startToEnd,
+                                        confirmDismiss: (direction) async =>
+                                            await _showBlockConfirmDialog(
+                                              context,
+                                              name,
+                                            ),
+                                        onDismissed: (direction) async {
+                                          final adminData = ref
+                                              .read(adminRoleProvider)
+                                              .value;
+                                          await StockService.blockBatchSafely(
+                                            productId,
+                                            adminData?['tenantId'] ?? 'SYSTEM',
+                                            adminData?['email'] ?? 'Unknown',
+                                          );
+                                          ScaffoldMessenger.of(
                                             context,
-                                            name,
-                                          ),
-                                      onDismissed: (direction) async {
-                                        // 🚀 SAAS INJECTION: Fetch details for Audit Ledger
-                                        final adminData = ref
-                                            .read(adminRoleProvider)
-                                            .value;
-
-                                        await StockService.blockBatchSafely(
-                                          productId,
-                                          adminData?['tenantId'] ??
-                                              'SYSTEM', // 👈 2nd Parameter
-                                          adminData?['email'] ??
-                                              'Unknown', // 👈 3rd Parameter
-                                        );
-
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              "✅ $name Blocked & Logged!",
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "✅ $name Blocked & Logged!",
+                                              ),
+                                              backgroundColor: Colors.red,
                                             ),
-                                            backgroundColor: Colors.red,
+                                          );
+                                        },
+                                        background: Container(
+                                          color: Colors.redAccent,
+                                          alignment: Alignment.centerLeft,
+                                          padding: const EdgeInsets.only(
+                                            left: 20,
                                           ),
-                                        );
-                                      },
-                                      background: Container(
-                                        color: Colors.redAccent,
-                                        alignment: Alignment.centerLeft,
-                                        padding: const EdgeInsets.only(
-                                          left: 20,
-                                        ),
-                                        child: Row(
-                                          children: const [
-                                            Icon(
-                                              Icons.block,
-                                              color: Colors.white,
-                                              size: 28,
-                                            ),
-                                            SizedBox(width: 10),
-                                            Text(
-                                              "BLOCK ITEM",
-                                              style: TextStyle(
+                                          child: Row(
+                                            children: const [
+                                              Icon(
+                                                Icons.block,
                                                 color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
+                                                size: 28,
                                               ),
-                                            ),
-                                          ],
+                                              SizedBox(width: 10),
+                                              Text(
+                                                "BLOCK ITEM",
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 16,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: index % 2 == 0
-                                              ? bgDark
-                                              : cardDark, // 🚀 Dark Zebra Striping
-                                          border: Border(
-                                            bottom: BorderSide(
-                                              color: textSecondary.withOpacity(
-                                                0.1,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 16,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: index % 2 == 0
+                                                ? bgDark
+                                                : cardDark,
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: textSecondary
+                                                    .withOpacity(0.1),
                                               ),
-                                            ),
-                                            left: BorderSide(
-                                              color: textSecondary.withOpacity(
-                                                0.1,
+                                              left: BorderSide(
+                                                color: textSecondary
+                                                    .withOpacity(0.1),
                                               ),
-                                            ),
-                                            right: BorderSide(
-                                              color: textSecondary.withOpacity(
-                                                0.1,
+                                              right: BorderSide(
+                                                color: textSecondary
+                                                    .withOpacity(0.1),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            // 1. PRODUCT INFO
-                                            Expanded(
-                                              flex: 3,
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    name,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 14,
-                                                      color: textPrimary,
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                flex: 3,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      name,
+                                                      style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14,
+                                                        color: textPrimary,
+                                                      ),
                                                     ),
-                                                  ),
-                                                  Text(
-                                                    "7-Day Sales: ${_salesDataCache[productId] ?? 0}",
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color:
-                                                          accentOrange, // 🚀 ORANGE THEME
-                                                      fontWeight:
-                                                          FontWeight.bold,
+                                                    Text(
+                                                      "7-Day Sales: ${_salesDataCache[productId] ?? 0}",
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: accentOrange,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
-                                                  ),
-                                                  Text(
-                                                    "Price: ₹$price",
-                                                    style: const TextStyle(
-                                                      fontSize: 11,
-                                                      color: accentGreen,
-                                                      fontWeight:
-                                                          FontWeight.bold,
+                                                    Text(
+                                                      "Price: ₹$price",
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: accentGreen,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  const Text(
-                                                    "👉 Swipe right to Block",
-                                                    style: TextStyle(
-                                                      fontSize: 10,
-                                                      color: textSecondary,
-                                                      fontStyle:
-                                                          FontStyle.italic,
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      "👉 Swipe right to Block",
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: textSecondary,
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
-                                            ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: _buildSolidBadge(
+                                                    isDead
+                                                        ? "DEAD STOCK"
+                                                        : (daysLeft <= 7
+                                                              ? "EXPIRES: T-$daysLeft"
+                                                              : "SAFE"),
+                                                    isDead
+                                                        ? Icons.delete_forever
+                                                        : (daysLeft <= 3
+                                                              ? Icons
+                                                                    .warning_amber
+                                                              : (daysLeft <= 7
+                                                                    ? Icons
+                                                                          .timer
+                                                                    : Icons
+                                                                          .verified_user)),
+                                                    isDead
+                                                        ? [
+                                                            Colors
+                                                                .grey
+                                                                .shade800,
+                                                            Colors.black87,
+                                                          ]
+                                                        : (daysLeft <= 3
+                                                              ? [
+                                                                  Colors
+                                                                      .redAccent,
+                                                                  Colors
+                                                                      .red
+                                                                      .shade700,
+                                                                ]
+                                                              : (daysLeft <= 7
+                                                                    ? [
+                                                                        Colors
+                                                                            .orangeAccent,
+                                                                        Colors
+                                                                            .orange
+                                                                            .shade700,
+                                                                      ]
+                                                                    : [
+                                                                        Colors
+                                                                            .teal
+                                                                            .shade400,
+                                                                        Colors
+                                                                            .teal
+                                                                            .shade600,
+                                                                      ])),
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: isDead
+                                                      ? _buildSolidBadge(
+                                                          "NOT APPLICABLE",
+                                                          Icons.block,
+                                                          [
+                                                            Colors
+                                                                .grey
+                                                                .shade400,
+                                                            Colors
+                                                                .grey
+                                                                .shade500,
+                                                          ],
+                                                        )
+                                                      : (isClearanceActive
+                                                            ? Builder(
+                                                                builder: (context) {
+                                                                  final clearanceType =
+                                                                      data['clearanceType']
+                                                                          ?.toString() ??
+                                                                      '';
+                                                                  final double
+                                                                  pPrice =
+                                                                      double.tryParse(
+                                                                        price
+                                                                            .toString(),
+                                                                      ) ??
+                                                                      0;
+                                                                  final double
+                                                                  oPrice =
+                                                                      double.tryParse(
+                                                                        data['offerPrice']?.toString() ??
+                                                                            '',
+                                                                      ) ??
+                                                                      0;
 
-                                            // 2. EXPIRY STATUS (Unified Solid Button Theme)
-                                            Expanded(
-                                              flex: 2,
-                                              child: Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: _buildSolidBadge(
-                                                  isDead
-                                                      ? "DEAD STOCK"
-                                                      : (daysLeft <= 7
-                                                            ? "EXPIRES: T-$daysLeft"
-                                                            : "SAFE"),
-                                                  isDead
-                                                      ? Icons.delete_forever
-                                                      : (daysLeft <= 3
-                                                            ? Icons
-                                                                  .warning_amber
-                                                            : (daysLeft <= 7
-                                                                  ? Icons.timer
-                                                                  : Icons
-                                                                        .verified_user)),
-                                                  isDead
-                                                      ? [
-                                                          Colors.grey.shade800,
-                                                          Colors.black87,
-                                                        ]
-                                                      : (daysLeft <= 3
-                                                            ? [
-                                                                Colors
-                                                                    .redAccent,
-                                                                Colors
-                                                                    .red
-                                                                    .shade700,
-                                                              ]
-                                                            : (daysLeft <= 7
-                                                                  ? [
+                                                                  String
+                                                                  offerDisplayName =
+                                                                      'OFFER ACTIVE';
+                                                                  List<Color>
+                                                                  offerGradient = [
+                                                                    Colors
+                                                                        .purple
+                                                                        .shade400,
+                                                                    Colors
+                                                                        .purple
+                                                                        .shade600,
+                                                                  ];
+                                                                  IconData
+                                                                  offerIcon = Icons
+                                                                      .local_offer;
+
+                                                                  if (clearanceType ==
+                                                                          'PERCENTAGE' ||
+                                                                      clearanceType ==
+                                                                          'TIERED_QTY') {
+                                                                    int
+                                                                    percent =
+                                                                        (pPrice >
+                                                                                0 &&
+                                                                            oPrice >
+                                                                                0)
+                                                                        ? (((pPrice -
+                                                                                          oPrice) /
+                                                                                      pPrice) *
+                                                                                  100)
+                                                                              .round()
+                                                                        : 0;
+                                                                    offerDisplayName =
+                                                                        percent >
+                                                                            0
+                                                                        ? '$percent% OFF'
+                                                                        : 'PERCENT OFF';
+                                                                    offerGradient = [
+                                                                      const Color(
+                                                                        0xFF2962FF,
+                                                                      ),
                                                                       Colors
-                                                                          .orangeAccent,
+                                                                          .blue
+                                                                          .shade700,
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .percent_rounded;
+                                                                  } else if (clearanceType ==
+                                                                      'FLAT_AMOUNT') {
+                                                                    int flat =
+                                                                        (pPrice >
+                                                                                0 &&
+                                                                            oPrice >
+                                                                                0)
+                                                                        ? (pPrice -
+                                                                                  oPrice)
+                                                                              .round()
+                                                                        : 0;
+                                                                    offerDisplayName =
+                                                                        flat > 0
+                                                                        ? '₹$flat OFF'
+                                                                        : 'FLAT OFF';
+                                                                    offerGradient = [
+                                                                      const Color(
+                                                                        0xFF00C853,
+                                                                      ),
+                                                                      Colors
+                                                                          .green
+                                                                          .shade700,
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .currency_rupee_rounded;
+                                                                  } else if (clearanceType ==
+                                                                      'BOGO') {
+                                                                    offerDisplayName =
+                                                                        'B1G1';
+                                                                    offerGradient = [
+                                                                      const Color(
+                                                                        0xFFFF6D00,
+                                                                      ),
                                                                       Colors
                                                                           .orange
                                                                           .shade700,
-                                                                    ]
-                                                                  : [
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .shopping_bag_outlined;
+                                                                  } else if (clearanceType ==
+                                                                      'BUY_X_GET_Y') {
+                                                                    offerDisplayName =
+                                                                        'BXGY';
+                                                                    offerGradient = [
+                                                                      const Color(
+                                                                        0xFFFF6D00,
+                                                                      ),
+                                                                      Colors
+                                                                          .orange
+                                                                          .shade700,
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .shopping_bag_outlined;
+                                                                  } else if (clearanceType ==
+                                                                      'BUNDLE_PRICE') {
+                                                                    final v1 =
+                                                                        data['value1']
+                                                                            ?.toInt() ??
+                                                                        'X';
+                                                                    final v2 =
+                                                                        data['value2']
+                                                                            ?.toInt() ??
+                                                                        'Y';
+                                                                    offerDisplayName =
+                                                                        '$v1 for ₹$v2';
+                                                                    offerGradient = [
                                                                       Colors
                                                                           .teal
                                                                           .shade400,
                                                                       Colors
                                                                           .teal
                                                                           .shade600,
-                                                                    ])),
-                                                ),
-                                              ),
-                                            ),
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .inventory_2;
+                                                                  } else if (clearanceType ==
+                                                                      'FLASH_SALE') {
+                                                                    offerDisplayName =
+                                                                        'FLASH';
+                                                                    offerGradient = [
+                                                                      Colors
+                                                                          .redAccent,
+                                                                      Colors
+                                                                          .red
+                                                                          .shade700,
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .flash_on;
+                                                                  } else if (clearanceType ==
+                                                                          'CROSS_PRODUCT' ||
+                                                                      clearanceType ==
+                                                                          'BUY_X_GET_Y_CROSS') {
+                                                                    offerDisplayName =
+                                                                        'CROSS';
+                                                                    offerGradient = [
+                                                                      Colors
+                                                                          .deepPurple
+                                                                          .shade400,
+                                                                      Colors
+                                                                          .deepPurple
+                                                                          .shade600,
+                                                                    ];
+                                                                    offerIcon =
+                                                                        Icons
+                                                                            .compare_arrows;
+                                                                  }
 
-                                            // 3. OFFER STATUS (Unified Solid Button Theme)
-                                            Expanded(
-                                              flex: 2,
-                                              child: Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: isDead
-                                                    ? _buildSolidBadge(
-                                                        "NOT APPLICABLE",
-                                                        Icons.block,
-                                                        [
-                                                          Colors.grey.shade400,
-                                                          Colors.grey.shade500,
-                                                        ],
-                                                      )
-                                                    : (isClearanceActive
-                                                          ? Builder(
-                                                              builder: (context) {
-                                                                final clearanceType =
-                                                                    data['clearanceType']
-                                                                        ?.toString() ??
-                                                                    '';
-                                                                final double
-                                                                pPrice =
-                                                                    double.tryParse(
-                                                                      price
-                                                                          .toString(),
-                                                                    ) ??
-                                                                    0;
-                                                                final double
-                                                                oPrice =
-                                                                    double.tryParse(
-                                                                      data['offerPrice']
-                                                                              ?.toString() ??
-                                                                          '',
-                                                                    ) ??
-                                                                    0;
-
-                                                                String
-                                                                offerDisplayName =
-                                                                    'OFFER ACTIVE';
-                                                                List<Color>
-                                                                offerGradient = [
-                                                                  Colors
-                                                                      .purple
-                                                                      .shade400,
-                                                                  Colors
-                                                                      .purple
-                                                                      .shade600,
-                                                                ];
-                                                                IconData
-                                                                offerIcon = Icons
-                                                                    .local_offer;
-
-                                                                // 🧠 Smart Math & Universal Short Tags!
-                                                                if (clearanceType ==
-                                                                        'PERCENTAGE' ||
-                                                                    clearanceType ==
-                                                                        'TIERED_QTY') {
-                                                                  int percent =
-                                                                      (pPrice >
-                                                                              0 &&
-                                                                          oPrice >
-                                                                              0)
-                                                                      ? (((pPrice -
-                                                                                        oPrice) /
-                                                                                    pPrice) *
-                                                                                100)
-                                                                            .round()
-                                                                      : 0;
-                                                                  offerDisplayName =
-                                                                      percent >
-                                                                          0
-                                                                      ? '$percent% OFF'
-                                                                      : 'PERCENT OFF';
-                                                                  offerGradient = [
-                                                                    const Color(
-                                                                      0xFF2962FF,
-                                                                    ),
-                                                                    Colors
-                                                                        .blue
-                                                                        .shade700,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .percent_rounded;
-                                                                } else if (clearanceType ==
-                                                                    'FLAT_AMOUNT') {
-                                                                  int flat =
-                                                                      (pPrice >
-                                                                              0 &&
-                                                                          oPrice >
-                                                                              0)
-                                                                      ? (pPrice -
-                                                                                oPrice)
-                                                                            .round()
-                                                                      : 0;
-                                                                  offerDisplayName =
-                                                                      flat > 0
-                                                                      ? '₹$flat OFF'
-                                                                      : 'FLAT OFF';
-                                                                  offerGradient = [
-                                                                    const Color(
-                                                                      0xFF00C853,
-                                                                    ),
-                                                                    Colors
-                                                                        .green
-                                                                        .shade700,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .currency_rupee_rounded;
-                                                                } else if (clearanceType ==
-                                                                    'BOGO') {
-                                                                  offerDisplayName =
-                                                                      'B1G1';
-                                                                  offerGradient = [
-                                                                    const Color(
-                                                                      0xFFFF6D00,
-                                                                    ),
-                                                                    Colors
-                                                                        .orange
-                                                                        .shade700,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .shopping_bag_outlined;
-                                                                } else if (clearanceType ==
-                                                                    'BUY_X_GET_Y') {
-                                                                  offerDisplayName =
-                                                                      'BXGY';
-                                                                  offerGradient = [
-                                                                    const Color(
-                                                                      0xFFFF6D00,
-                                                                    ),
-                                                                    Colors
-                                                                        .orange
-                                                                        .shade700,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .shopping_bag_outlined;
-                                                                } else if (clearanceType ==
-                                                                    'BUNDLE_PRICE') {
-                                                                  final v1 =
-                                                                      data['value1']
-                                                                          ?.toInt() ??
-                                                                      'X';
-                                                                  final v2 =
-                                                                      data['value2']
-                                                                          ?.toInt() ??
-                                                                      'Y';
-                                                                  offerDisplayName =
-                                                                      '$v1 for ₹$v2'; // 🚀 Ex: "3 for ₹99"
-                                                                  offerGradient = [
-                                                                    Colors
-                                                                        .teal
-                                                                        .shade400,
-                                                                    Colors
-                                                                        .teal
-                                                                        .shade600,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .inventory_2;
-                                                                } else if (clearanceType ==
-                                                                    'FLASH_SALE') {
-                                                                  offerDisplayName =
-                                                                      'FLASH';
-                                                                  offerGradient = [
-                                                                    Colors
-                                                                        .redAccent,
-                                                                    Colors
-                                                                        .red
-                                                                        .shade700,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .flash_on;
-                                                                } else if (clearanceType ==
-                                                                        'CROSS_PRODUCT' ||
-                                                                    clearanceType ==
-                                                                        'BUY_X_GET_Y_CROSS') {
-                                                                  offerDisplayName =
-                                                                      'CROSS';
-                                                                  offerGradient = [
-                                                                    Colors
-                                                                        .deepPurple
-                                                                        .shade400,
-                                                                    Colors
-                                                                        .deepPurple
-                                                                        .shade600,
-                                                                  ];
-                                                                  offerIcon = Icons
-                                                                      .compare_arrows;
-                                                                }
-
-                                                                return Container(
-                                                                  height: 34,
-                                                                  width:
-                                                                      130, // Matched lightweight size
-                                                                  padding:
-                                                                      const EdgeInsets.only(
-                                                                        left: 8,
-                                                                        right:
-                                                                            4,
-                                                                      ),
-                                                                  decoration: BoxDecoration(
-                                                                    color: offerGradient
-                                                                        .first
-                                                                        .withOpacity(
-                                                                          0.1,
-                                                                        ), // 🚀 Tinted bg
-                                                                    border: Border.all(
+                                                                  return Container(
+                                                                    height: 34,
+                                                                    width: 130,
+                                                                    padding:
+                                                                        const EdgeInsets.only(
+                                                                          left:
+                                                                              8,
+                                                                          right:
+                                                                              4,
+                                                                        ),
+                                                                    decoration: BoxDecoration(
                                                                       color: offerGradient
                                                                           .first
+                                                                          .withOpacity(
+                                                                            0.1,
+                                                                          ),
+                                                                      border: Border.all(
+                                                                        color: offerGradient
+                                                                            .first
+                                                                            .withOpacity(
+                                                                              0.5,
+                                                                            ),
+                                                                        width:
+                                                                            1,
+                                                                      ),
+                                                                      borderRadius:
+                                                                          BorderRadius.circular(
+                                                                            6,
+                                                                          ),
+                                                                    ),
+                                                                    child: Row(
+                                                                      children: [
+                                                                        Icon(
+                                                                          offerIcon,
+                                                                          size:
+                                                                              14,
+                                                                          color:
+                                                                              offerGradient.first,
+                                                                        ),
+                                                                        const SizedBox(
+                                                                          width:
+                                                                              4,
+                                                                        ),
+                                                                        Expanded(
+                                                                          child: FittedBox(
+                                                                            fit:
+                                                                                BoxFit.scaleDown,
+                                                                            alignment:
+                                                                                Alignment.centerLeft,
+                                                                            child: Text(
+                                                                              offerDisplayName,
+                                                                              style: TextStyle(
+                                                                                color: offerGradient.first,
+                                                                                fontWeight: FontWeight.w900,
+                                                                                fontSize: 11,
+                                                                                letterSpacing: 0.5,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                        Tooltip(
+                                                                          message:
+                                                                              "REMOVE OFFER",
+                                                                          child: InkWell(
+                                                                            onTap: () async {
+                                                                              bool?
+                                                                              confirm =
+                                                                                  await showDialog<
+                                                                                    bool
+                                                                                  >(
+                                                                                    context: context,
+                                                                                    builder:
+                                                                                        (
+                                                                                          ctx,
+                                                                                        ) => AlertDialog(
+                                                                                          backgroundColor: cardDark,
+                                                                                          title: Text(
+                                                                                            "Remove Offer?",
+                                                                                            style: TextStyle(
+                                                                                              color: textPrimary,
+                                                                                              fontWeight: FontWeight.bold,
+                                                                                            ),
+                                                                                          ),
+                                                                                          content: Text(
+                                                                                            "Are you sure you want to deactivate this offer? Customer will no longer see this discount.",
+                                                                                            style: TextStyle(
+                                                                                              color: textSecondary,
+                                                                                            ),
+                                                                                          ),
+                                                                                          actions: [
+                                                                                            TextButton(
+                                                                                              onPressed: () => Navigator.pop(
+                                                                                                ctx,
+                                                                                                false,
+                                                                                              ),
+                                                                                              child: const Text(
+                                                                                                "Cancel",
+                                                                                                style: TextStyle(
+                                                                                                  color: Colors.grey,
+                                                                                                ),
+                                                                                              ),
+                                                                                            ),
+                                                                                            ElevatedButton(
+                                                                                              style: ElevatedButton.styleFrom(
+                                                                                                backgroundColor: Colors.redAccent,
+                                                                                              ),
+                                                                                              onPressed: () => Navigator.pop(
+                                                                                                ctx,
+                                                                                                true,
+                                                                                              ),
+                                                                                              child: const Text(
+                                                                                                "Remove",
+                                                                                                style: TextStyle(
+                                                                                                  color: Colors.white,
+                                                                                                ),
+                                                                                              ),
+                                                                                            ),
+                                                                                          ],
+                                                                                        ),
+                                                                                  );
+                                                                              if (confirm ==
+                                                                                  true) {
+                                                                                await StockService.undoClearance(
+                                                                                  productId,
+                                                                                );
+                                                                                if (context.mounted) {
+                                                                                  ScaffoldMessenger.of(
+                                                                                    context,
+                                                                                  ).showSnackBar(
+                                                                                    SnackBar(
+                                                                                      content: const Text(
+                                                                                        "✅ Offer Removed Successfully!",
+                                                                                      ),
+                                                                                      backgroundColor: accentOrange,
+                                                                                    ),
+                                                                                  );
+                                                                                }
+                                                                              }
+                                                                            },
+                                                                            child: Container(
+                                                                              padding: const EdgeInsets.all(
+                                                                                4,
+                                                                              ),
+                                                                              decoration: BoxDecoration(
+                                                                                color: offerGradient.first.withOpacity(
+                                                                                  0.2,
+                                                                                ),
+                                                                                borderRadius: BorderRadius.circular(
+                                                                                  4,
+                                                                                ),
+                                                                              ),
+                                                                              child: Icon(
+                                                                                Icons.close_rounded,
+                                                                                color: offerGradient.first,
+                                                                                size: 14,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                  );
+                                                                },
+                                                              )
+                                                            : InkWell(
+                                                                onTap: () =>
+                                                                    _handleApplyOffer(
+                                                                      context,
+                                                                      productId,
+                                                                      name,
+                                                                      price,
+                                                                    ),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      6,
+                                                                    ),
+                                                                child: Container(
+                                                                  height: 34,
+                                                                  width: 130,
+                                                                  decoration: BoxDecoration(
+                                                                    color: accentOrange
+                                                                        .withOpacity(
+                                                                          0.1,
+                                                                        ),
+                                                                    border: Border.all(
+                                                                      color: accentOrange
                                                                           .withOpacity(
                                                                             0.5,
                                                                           ),
                                                                       width: 1,
-                                                                    ), // 🚀 Outline
+                                                                    ),
                                                                     borderRadius:
                                                                         BorderRadius.circular(
                                                                           6,
                                                                         ),
                                                                   ),
                                                                   child: Row(
+                                                                    mainAxisAlignment:
+                                                                        MainAxisAlignment
+                                                                            .center,
                                                                     children: [
                                                                       Icon(
-                                                                        offerIcon,
+                                                                        Icons
+                                                                            .sell,
                                                                         size:
                                                                             14,
-                                                                        color: offerGradient
-                                                                            .first,
+                                                                        color:
+                                                                            accentOrange,
                                                                       ),
                                                                       const SizedBox(
                                                                         width:
                                                                             4,
                                                                       ),
-                                                                      Expanded(
-                                                                        child: FittedBox(
-                                                                          fit: BoxFit
-                                                                              .scaleDown,
-                                                                          alignment:
-                                                                              Alignment.centerLeft,
-                                                                          child: Text(
-                                                                            offerDisplayName,
-                                                                            style: TextStyle(
-                                                                              color: offerGradient.first, // 🚀 Text Color matching border
-                                                                              fontWeight: FontWeight.w900,
-                                                                              fontSize: 11,
-                                                                              letterSpacing: 0.5,
+                                                                      const FittedBox(
+                                                                        fit: BoxFit
+                                                                            .scaleDown,
+                                                                        child: Text(
+                                                                          "APPLY OFFER",
+                                                                          style: TextStyle(
+                                                                            color: Color(
+                                                                              0xFFFF6D00,
                                                                             ),
-                                                                          ),
-                                                                        ),
-                                                                      ),
-                                                                      Tooltip(
-                                                                        message:
-                                                                            "REMOVE OFFER",
-                                                                        child: InkWell(
-                                                                          onTap: () async {
-                                                                            // 🚀 FIX: Are you sure dialog added before removing offer!
-                                                                            bool?
-                                                                            confirm =
-                                                                                await showDialog<
-                                                                                  bool
-                                                                                >(
-                                                                                  context: context,
-                                                                                  builder:
-                                                                                      (
-                                                                                        ctx,
-                                                                                      ) => AlertDialog(
-                                                                                        backgroundColor: cardDark,
-                                                                                        title: const Text(
-                                                                                          "Remove Offer?",
-                                                                                          style: TextStyle(
-                                                                                            color: Colors.white,
-                                                                                            fontWeight: FontWeight.bold,
-                                                                                          ),
-                                                                                        ),
-                                                                                        content: const Text(
-                                                                                          "Are you sure you want to deactivate this offer? Customer will no longer see this discount.",
-                                                                                          style: TextStyle(
-                                                                                            color: Colors.white70,
-                                                                                          ),
-                                                                                        ),
-                                                                                        actions: [
-                                                                                          TextButton(
-                                                                                            onPressed: () => Navigator.pop(
-                                                                                              ctx,
-                                                                                              false,
-                                                                                            ),
-                                                                                            child: const Text(
-                                                                                              "Cancel",
-                                                                                              style: TextStyle(
-                                                                                                color: Colors.grey,
-                                                                                              ),
-                                                                                            ),
-                                                                                          ),
-                                                                                          ElevatedButton(
-                                                                                            style: ElevatedButton.styleFrom(
-                                                                                              backgroundColor: Colors.redAccent,
-                                                                                            ),
-                                                                                            onPressed: () => Navigator.pop(
-                                                                                              ctx,
-                                                                                              true,
-                                                                                            ),
-                                                                                            child: const Text(
-                                                                                              "Remove",
-                                                                                              style: TextStyle(
-                                                                                                color: Colors.white,
-                                                                                              ),
-                                                                                            ),
-                                                                                          ),
-                                                                                        ],
-                                                                                      ),
-                                                                                );
-                                                                            if (confirm ==
-                                                                                true) {
-                                                                              await StockService.undoClearance(
-                                                                                productId,
-                                                                              );
-                                                                              if (context.mounted) {
-                                                                                ScaffoldMessenger.of(
-                                                                                  context,
-                                                                                ).showSnackBar(
-                                                                                  const SnackBar(
-                                                                                    content: Text(
-                                                                                      "✅ Offer Removed Successfully!",
-                                                                                    ),
-                                                                                    backgroundColor: accentOrange,
-                                                                                  ),
-                                                                                );
-                                                                              }
-                                                                            }
-                                                                          },
-                                                                          child: Container(
-                                                                            padding: const EdgeInsets.all(
-                                                                              4,
-                                                                            ),
-                                                                            decoration: BoxDecoration(
-                                                                              color: offerGradient.first.withOpacity(
-                                                                                0.2,
-                                                                              ),
-                                                                              borderRadius: BorderRadius.circular(
-                                                                                4,
-                                                                              ),
-                                                                            ),
-                                                                            child: Icon(
-                                                                              Icons.close_rounded,
-                                                                              color: offerGradient.first,
-                                                                              size: 14,
-                                                                            ),
+                                                                            fontSize:
+                                                                                11,
+                                                                            fontWeight:
+                                                                                FontWeight.w900,
+                                                                            letterSpacing:
+                                                                                0.5,
                                                                           ),
                                                                         ),
                                                                       ),
                                                                     ],
                                                                   ),
-                                                                );
-                                                              },
-                                                            )
-                                                          : InkWell(
-                                                              onTap: () =>
-                                                                  _handleApplyOffer(
-                                                                    context,
-                                                                    productId,
-                                                                    name,
-                                                                    price,
-                                                                  ),
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    6,
-                                                                  ),
-                                                              child: Container(
-                                                                height: 34,
-                                                                width:
-                                                                    130, // Matches lightweight size
-                                                                decoration: BoxDecoration(
-                                                                  color: accentOrange
-                                                                      .withOpacity(
-                                                                        0.1,
-                                                                      ), // 🚀 Light Orange Tint
-                                                                  border: Border.all(
-                                                                    color: accentOrange
-                                                                        .withOpacity(
-                                                                          0.5,
-                                                                        ),
-                                                                    width: 1,
-                                                                  ), // 🚀 Orange Outline
-                                                                  borderRadius:
-                                                                      BorderRadius.circular(
-                                                                        6,
-                                                                      ),
                                                                 ),
-                                                                child: Row(
-                                                                  mainAxisAlignment:
-                                                                      MainAxisAlignment
-                                                                          .center,
-                                                                  children: const [
-                                                                    Icon(
-                                                                      Icons
-                                                                          .sell,
-                                                                      size: 14,
-                                                                      color:
-                                                                          accentOrange,
-                                                                    ),
-                                                                    SizedBox(
-                                                                      width: 4,
-                                                                    ),
-                                                                    FittedBox(
-                                                                      fit: BoxFit
-                                                                          .scaleDown,
-                                                                      child: Text(
-                                                                        "APPLY OFFER",
-                                                                        style: TextStyle(
-                                                                          color:
-                                                                              accentOrange,
-                                                                          fontSize:
-                                                                              11,
-                                                                          fontWeight:
-                                                                              FontWeight.w900,
-                                                                          letterSpacing:
-                                                                              0.5,
-                                                                        ),
-                                                                      ),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                              ),
-                                                            )),
-                                              ),
-                                            ),
-
-                                            // 4. STOCK
-                                            Expanded(
-                                              flex: 1,
-                                              child: Text(
-                                                stock.toString(),
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 16,
-                                                  color: stock <= 20
-                                                      ? accentRed
-                                                      : textPrimary, // 🚀 Dark Theme Text
+                                                              )),
                                                 ),
                                               ),
-                                            ),
-
-                                            // 5. ACTION (RAISE PO - Matched Width Lightweight)
-                                            Expanded(
-                                              flex: 2,
-                                              child: Align(
-                                                alignment: Alignment.centerLeft,
-                                                child: InkWell(
-                                                  onTap: () => showDialog(
-                                                    context: context,
-                                                    builder: (ctx) =>
-                                                        CreatePODialog(
-                                                          productId: productId,
-                                                          productName: name,
-                                                          currentStock: stock,
-                                                        ),
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  stock.toString(),
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.w900,
+                                                    fontSize: 16,
+                                                    color: stock <= 20
+                                                        ? accentRed
+                                                        : textPrimary,
                                                   ),
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                  child: Container(
-                                                    height: 34,
-                                                    width:
-                                                        130, // 🚀 Lightweight Match
-                                                    decoration: BoxDecoration(
-                                                      color: accentGreen
-                                                          .withOpacity(
-                                                            0.1,
-                                                          ), // 🚀 Light Green Tint
-                                                      border: Border.all(
-                                                        color: accentGreen
-                                                            .withOpacity(0.5),
-                                                        width: 1,
-                                                      ), // 🚀 Green Outline
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            6,
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Align(
+                                                  alignment:
+                                                      Alignment.centerLeft,
+                                                  child: InkWell(
+                                                    onTap: () => showDialog(
+                                                      context: context,
+                                                      builder: (ctx) =>
+                                                          CreatePODialog(
+                                                            productId:
+                                                                productId,
+                                                            productName: name,
+                                                            currentStock: stock,
                                                           ),
                                                     ),
-                                                    child: Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: const [
-                                                        Icon(
-                                                          Icons
-                                                              .add_shopping_cart,
-                                                          size: 14,
-                                                          color: accentGreen,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          6,
                                                         ),
-                                                        SizedBox(width: 4),
-                                                        FittedBox(
-                                                          fit: BoxFit.scaleDown,
-                                                          child: Text(
-                                                            "RAISE PO",
-                                                            style: TextStyle(
-                                                              color:
-                                                                  accentGreen,
-                                                              fontSize: 11,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w900,
-                                                              letterSpacing:
-                                                                  0.5,
+                                                    child: Container(
+                                                      height: 34,
+                                                      width: 130,
+                                                      decoration: BoxDecoration(
+                                                        color: accentGreen
+                                                            .withOpacity(0.1),
+                                                        border: Border.all(
+                                                          color: accentGreen
+                                                              .withOpacity(0.5),
+                                                          width: 1,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              6,
+                                                            ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                            Icons
+                                                                .add_shopping_cart,
+                                                            size: 14,
+                                                            color: accentGreen,
+                                                          ),
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
+                                                          FittedBox(
+                                                            fit: BoxFit
+                                                                .scaleDown,
+                                                            child: Text(
+                                                              "RAISE PO",
+                                                              style: TextStyle(
+                                                                color:
+                                                                    accentGreen,
+                                                                fontSize: 11,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w900,
+                                                                letterSpacing:
+                                                                    0.5,
+                                                              ),
                                                             ),
                                                           ),
-                                                        ),
-                                                      ],
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-
-                                // PAGINATION
-                                if (totalPages > 1) ...[
-                                  const SizedBox(height: 20),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: bgDark, // 🚀 Dark Pagination
-                                      borderRadius: BorderRadius.circular(10),
-                                      border: Border.all(
-                                        color: textSecondary.withOpacity(0.1),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          "Showing ${startIndex + 1} - $endIndex of ${processedProducts.length} Entries",
-                                          style: const TextStyle(
-                                            color: textSecondary,
-                                            fontWeight: FontWeight.bold,
+                                            ],
                                           ),
                                         ),
-                                        Row(
-                                          children: [
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.chevron_left,
-                                                color:
-                                                    accentOrange, // 🚀 ORANGE
-                                              ),
-                                              onPressed: _currentPage > 0
-                                                  ? () => setState(
-                                                      () => _currentPage--,
-                                                    )
-                                                  : null,
+                                      );
+                                    },
+                                  ),
+
+                                  if (totalPages > 1) ...[
+                                    const SizedBox(height: 20),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                        vertical: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: bgDark,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(
+                                          color: textSecondary.withOpacity(0.1),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            "Showing ${startIndex + 1} - $endIndex of ${processedProducts.length} Entries",
+                                            style: TextStyle(
+                                              color: textSecondary,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                            Container(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 12,
-                                                    vertical: 6,
-                                                  ),
-                                              decoration: BoxDecoration(
-                                                color:
-                                                    accentOrange, // 🚀 ORANGE
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
+                                          ),
+                                          Row(
+                                            children: [
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.chevron_left,
+                                                  color: accentOrange,
+                                                ),
+                                                onPressed: _currentPage > 0
+                                                    ? () => setState(
+                                                        () => _currentPage--,
+                                                      )
+                                                    : null,
                                               ),
-                                              child: Text(
-                                                "${_currentPage + 1} / $totalPages",
-                                                style: const TextStyle(
-                                                  color: bgDark,
-                                                  fontWeight: FontWeight.bold,
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 6,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: accentOrange,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  "${_currentPage + 1} / $totalPages",
+                                                  style: TextStyle(
+                                                    color: bgDark,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(
-                                                Icons.chevron_right,
-                                                color:
-                                                    accentOrange, // 🚀 ORANGE
+                                              IconButton(
+                                                icon: Icon(
+                                                  Icons.chevron_right,
+                                                  color: accentOrange,
+                                                ),
+                                                onPressed:
+                                                    _currentPage <
+                                                        totalPages - 1
+                                                    ? () => setState(
+                                                        () => _currentPage++,
+                                                      )
+                                                    : null,
                                               ),
-                                              onPressed:
-                                                  _currentPage < totalPages - 1
-                                                  ? () => setState(
-                                                      () => _currentPage++,
-                                                    )
-                                                  : null,
-                                            ),
-                                          ],
-                                        ),
-                                      ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
                           ),
                         );
@@ -1341,39 +1398,37 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
     );
   }
 
-  // 🚀 THE NEW LIGHTWEIGHT TINTED BADGE (Matches Product Control UI)
+  // 💎 PREMIUM SAAS PILL BADGE (Matches Reference Image)
   Widget _buildSolidBadge(
     String text,
     IconData icon,
     List<Color> gradientColors,
   ) {
-    Color primaryColor = gradientColors.first; // Extract main color
+    Color primaryColor = gradientColors.first;
     return Container(
-      height: 34,
-      width: 130, // Lightweight compact size
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: primaryColor.withOpacity(0.1), // 🚀 Light Tint
+        color: primaryColor.withValues(alpha: 0.1), // 🚀 Safe tint (No Warning)
+        borderRadius: BorderRadius.circular(20), // 🚀 Pill Shape (Gol)
         border: Border.all(
-          color: primaryColor.withOpacity(0.5),
+          color: primaryColor.withValues(alpha: 0.3),
           width: 1,
-        ), // 🚀 Thin Outline
-        borderRadius: BorderRadius.circular(6),
+        ),
       ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: primaryColor), // 🚀 Colored Icon
-          const SizedBox(width: 6),
+          Icon(icon, size: 12, color: primaryColor),
+          const SizedBox(width: 4),
           Flexible(
             child: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 text,
                 style: TextStyle(
-                  color: primaryColor, // 🚀 Colored Text
+                  color: primaryColor,
                   fontWeight: FontWeight.w900,
-                  fontSize: 11,
+                  fontSize: 10,
                   letterSpacing: 0.5,
                 ),
               ),

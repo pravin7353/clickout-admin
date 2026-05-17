@@ -13,13 +13,34 @@ class RiskEngineScreen extends ConsumerWidget {
     // 🚀 SAAS CONTEXT
     final adminData = ref.watch(adminRoleProvider).value;
     final String? tenantId = adminData?['tenantId'];
+    final String? branchCode = adminData?['branchCode'];
     final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
-    Query riskQuery = FirebaseFirestore.instance.collection('orders');
-    if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
+    // 🎨 DYNAMIC THEME SUPPORT
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final cardBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
+    // 🚀 COST OPTIMIZATION: Only fetch orders that are REJECTED!
+    Query riskQuery = FirebaseFirestore.instance
+        .collection('orders')
+        .where('exitStatus', isEqualTo: 'REJECTED'); // Backend Level Filter!
+
+    // 🚀 THE FIX: Bulletproof SaaS Isolation (Blacklist approach)
+    final bool isSuperAdmin = role == 'super_admin' || role == 'admin';
+
+    // Level 1: Lock to Tenant (Company)
+    if (!isSuperAdmin && tenantId != null && tenantId.isNotEmpty) {
       riskQuery = riskQuery.where('tenantId', isEqualTo: tenantId);
     }
-    riskQuery = riskQuery.orderBy('timestamp', descending: true).limit(100);
+
+    // Level 2: Lock strictly to Branch (Store)
+    if (!isSuperAdmin && branchCode != null && branchCode.isNotEmpty) {
+      riskQuery = riskQuery.where('branchCode', isEqualTo: branchCode);
+    }
+
+    // Sort by timestamp after the where clause
+    riskQuery = riskQuery.orderBy('timestamp', descending: true).limit(50);
 
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -76,29 +97,21 @@ class RiskEngineScreen extends ConsumerWidget {
                   );
                 }
 
-                final allOrders = snapshot.data!.docs;
-
-                // 🧠 THE AI FILTER
-                final rejectedLogs = allOrders.where((doc) {
-                  final data = doc.data() as Map<String, dynamic>;
-                  final exitStatus = (data['exitStatus'] ?? '')
-                      .toString()
-                      .toUpperCase();
-                  return exitStatus == 'REJECTED';
-                }).toList();
+                // 🧠 DATA IS ALREADY FILTERED BY BACKEND (Cost Saved!)
+                final rejectedLogs = snapshot.data!.docs;
 
                 if (rejectedLogs.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(
+                      children: [
+                        const Icon(
                           Icons.shield_outlined,
                           color: Colors.green,
                           size: 80,
                         ),
-                        SizedBox(height: 20),
-                        Text(
+                        const SizedBox(height: 20),
+                        const Text(
                           "SYSTEM SECURE",
                           style: TextStyle(
                             fontSize: 24,
@@ -109,7 +122,9 @@ class RiskEngineScreen extends ConsumerWidget {
                         ),
                         Text(
                           "No fraud or rejections detected today.",
-                          style: TextStyle(color: Colors.grey),
+                          style: TextStyle(
+                            color: isDark ? Colors.white54 : Colors.grey,
+                          ),
                         ),
                       ],
                     ),
@@ -126,6 +141,7 @@ class RiskEngineScreen extends ConsumerWidget {
                             "${rejectedLogs.length}",
                             Icons.do_not_disturb_alt,
                             Colors.redAccent,
+                            isDark, // 🚀 Pass isDark state
                           ),
                         ),
                         const SizedBox(width: 20),
@@ -135,6 +151,7 @@ class RiskEngineScreen extends ConsumerWidget {
                             "HIGH ALERT",
                             Icons.gpp_bad,
                             Colors.orange,
+                            isDark, // 🚀 Pass isDark state
                           ),
                         ),
                       ],
@@ -157,7 +174,9 @@ class RiskEngineScreen extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFFF5F5),
+                          color: isDark
+                              ? const Color(0xFF2A1515)
+                              : const Color(0xFFFFF5F5),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: Colors.red.withOpacity(0.3),
@@ -172,6 +191,7 @@ class RiskEngineScreen extends ConsumerWidget {
                                 fontWeight: FontWeight.bold,
                                 color: Colors.redAccent,
                               ),
+                              dataTextStyle: TextStyle(color: textColor),
                               columns: const [
                                 DataColumn(label: Text("INCIDENT TIME")),
                                 DataColumn(label: Text("ORDER ID")),
@@ -200,9 +220,12 @@ class RiskEngineScreen extends ConsumerWidget {
                                     ),
                                     DataCell(
                                       Text(
-                                        doc.id,
-                                        style: const TextStyle(
-                                          color: Colors.black87,
+                                        doc.id.substring(0, 8).toUpperCase(),
+                                        style: TextStyle(
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.black87,
+                                          fontFamily: 'monospace',
                                         ),
                                       ),
                                     ),
@@ -268,14 +291,22 @@ class RiskEngineScreen extends ConsumerWidget {
     String value,
     IconData icon,
     Color color,
+    bool isDark, // 🚀 Receive isDark
   ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark
+            ? const Color(0xFF1E1E1E)
+            : Colors.white, // 🎨 Dynamic Background
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withOpacity(0.3), width: 2),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.1), blurRadius: 15)],
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(isDark ? 0.05 : 0.1),
+            blurRadius: 15,
+          ),
+        ],
       ),
       child: Row(
         children: [

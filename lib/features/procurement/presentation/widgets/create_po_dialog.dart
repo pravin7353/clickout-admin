@@ -86,363 +86,435 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
   @override
   Widget build(BuildContext context) {
     final isProcessing = ref.watch(poEngineProvider);
-    final isMobile = MediaQuery.of(context).size.width < 600;
 
-    // 🎨 THEME CONSTANTS
+    // 🎨 THEME CONSTANTS (Standard Premium Dark)
     const Color bgDark = Color(0xFF080B08);
-    const Color cardDark = Color(0xFF111811);
-    const Color accentOrange = Color(0xFFD4580A);
+    const Color accentGreen = Color(0xFF00C853);
+    const Color textPrimary = Color(0xFFF0F0F0);
+    const Color textSecondary = Color(0xFF888888);
 
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(
-          color: accentOrange,
-          width: 1.5,
-        ), // 🚀 ORANGE BORDER
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: textSecondary.withOpacity(0.2), width: 1),
       ),
-      backgroundColor: Colors.transparent,
+      backgroundColor: bgDark,
+      elevation: 24,
       insetPadding: const EdgeInsets.all(16),
-      child: Container(
-        width: isMobile ? double.infinity : 600,
-        decoration: BoxDecoration(
-          color: bgDark,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.5),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 🎩 HEADER
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111811), // cardDark
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 600),
+        child: Container(
+          decoration: BoxDecoration(
+            color: bgDark,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 🎩 HEADER
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 24,
                 ),
-                border: Border(
-                  bottom: BorderSide(
-                    color: const Color(0xFFD4580A).withOpacity(0.2),
-                  ), // 🚀 ORANGE BORDER
+                decoration: BoxDecoration(
+                  color: bgDark,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
+                  border: Border(
+                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF2B3674).withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.local_shipping,
-                      color: Color(0xFF2B3674),
-                      size: 28,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Generate Purchase Order",
-                          style: TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1E1E2D),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "Target SKU: ${widget.productName}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blueGrey,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      "Shelf Stock: ${widget.currentStock}",
-                      style: const TextStyle(
-                        color: Colors.red,
-                        fontWeight: FontWeight.bold,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: accentGreen.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.local_shipping,
+                        color: accentGreen,
+                        size: 26,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 📦 BODY
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(30),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildSectionTitle("SUPPLIER DETAILS"),
-
-                      // 🔍 SMART AUTOCOMPLETE DROPDOWN
-                      _isLoadingSuppliers
-                          ? const Center(child: CircularProgressIndicator())
-                          : Autocomplete<Map<String, dynamic>>(
-                              displayStringForOption: (option) =>
-                                  option['name'] ?? 'Unknown',
-                              optionsBuilder:
-                                  (TextEditingValue textEditingValue) {
-                                    if (textEditingValue.text.isEmpty) {
-                                      return _suppliersList;
-                                    }
-                                    return _suppliersList.where((option) {
-                                      return option['name']
-                                          .toString()
-                                          .toLowerCase()
-                                          .contains(
-                                            textEditingValue.text.toLowerCase(),
-                                          );
-                                    });
-                                  },
-                              onSelected: (selection) {
-                                // 🚀 FIX: Actual ID jayega DB mein, Name nahi!
-                                _selectedSupplier = selection['id'];
-                              },
-                              fieldViewBuilder:
-                                  (
-                                    context,
-                                    textEditingController,
-                                    focusNode,
-                                    onFieldSubmitted,
-                                  ) {
-                                    return TextFormField(
-                                      controller: textEditingController,
-                                      focusNode: focusNode,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      decoration: _inputStyle(
-                                        icon: Icons.domain,
-                                        hintText: "Search Supplier Name...",
-                                        helperText:
-                                            "Type to search from database.",
-                                      ),
-                                      validator: (val) =>
-                                          val == null || val.isEmpty
-                                          ? "Please select a supplier"
-                                          : null,
-                                      onChanged: (val) => _selectedSupplier =
-                                          val, // Fallback if manually typed
-                                    );
-                                  },
-                            ),
-
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(),
-                      ),
-
-                      _buildSectionTitle("ORDER SPECIFICATIONS"),
-                      Wrap(
-                        spacing: 20,
-                        runSpacing: 20,
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            width: isMobile ? double.infinity : 220,
-                            child: TextFormField(
-                              controller: _qtyCtrl,
-                              keyboardType: TextInputType.number,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                              decoration: _inputStyle(
-                                icon: Icons.production_quantity_limits,
-                                hintText: "Enter Quantity",
-                              ),
-                              validator: (v) => v!.isEmpty ? 'Required' : null,
+                          const Text(
+                            "Generate Purchase Order",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w800,
+                              color: textPrimary,
+                              letterSpacing: -0.5,
                             ),
                           ),
-                          SizedBox(
-                            width: isMobile ? double.infinity : 220,
-                            child: TextFormField(
-                              controller: _branchCtrl,
-                              textCapitalization: TextCapitalization.characters,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                              decoration: _inputStyle(
-                                icon: Icons.store,
-                                hintText: "Branch Code",
-                              ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Target SKU: ${widget.productName}",
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: textSecondary,
                             ),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 20),
-
-                      InkWell(
-                        onTap: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: _deliveryDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 60),
-                            ),
-                          );
-                          if (date != null) {
-                            setState(() => _deliveryDate = date);
-                          }
-                        },
-                        child: InputDecorator(
-                          decoration: _inputStyle(
-                            icon: Icons.calendar_month,
-                            helperText: "When should the supplier deliver?",
-                          ),
-                          child: Text(
-                            DateFormat('dd MMM yyyy').format(_deliveryDate),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        "Shelf Stock: ${widget.currentStock}",
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ),
 
-            // 🦶 FOOTER (Actions)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF080B08), // bgDark
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(20),
-                ),
-                border: Border(
-                  top: BorderSide(
-                    color: const Color(0xFF888888).withOpacity(0.1),
+              // 📦 BODY
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(30),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle("SUPPLIER DETAILS"),
+
+                        const Text(
+                          "Select Supplier",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        _isLoadingSuppliers
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  color: accentGreen,
+                                ),
+                              )
+                            : Autocomplete<Map<String, dynamic>>(
+                                displayStringForOption: (option) =>
+                                    option['name'] ?? 'Unknown',
+                                optionsBuilder:
+                                    (TextEditingValue textEditingValue) {
+                                      if (textEditingValue.text.isEmpty) {
+                                        return _suppliersList;
+                                      }
+                                      return _suppliersList.where((option) {
+                                        return option['name']
+                                            .toString()
+                                            .toLowerCase()
+                                            .contains(
+                                              textEditingValue.text
+                                                  .toLowerCase(),
+                                            );
+                                      });
+                                    },
+                                onSelected: (selection) {
+                                  _selectedSupplier = selection['id'];
+                                },
+                                fieldViewBuilder:
+                                    (
+                                      context,
+                                      textEditingController,
+                                      focusNode,
+                                      onFieldSubmitted,
+                                    ) {
+                                      return TextFormField(
+                                        controller: textEditingController,
+                                        focusNode: focusNode,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
+                                        decoration: _inputStyle(
+                                          icon: Icons.domain,
+                                          hintText: "Search Supplier Name...",
+                                        ),
+                                        validator: (val) =>
+                                            val == null || val.isEmpty
+                                            ? "Please select a supplier"
+                                            : null,
+                                        onChanged: (val) =>
+                                            _selectedSupplier = val,
+                                      );
+                                    },
+                              ),
+
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: Divider(
+                            color: textSecondary.withOpacity(0.1),
+                            height: 1,
+                            thickness: 1,
+                          ),
+                        ),
+
+                        _buildSectionTitle("ORDER SPECIFICATIONS"),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Order Quantity",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: _qtyCtrl,
+                                    keyboardType: TextInputType.number,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
+                                    decoration: _inputStyle(
+                                      icon: Icons.production_quantity_limits,
+                                      hintText: "Enter Quantity",
+                                    ),
+                                    validator: (v) =>
+                                        v!.isEmpty ? 'Required' : null,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Branch Code",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: _branchCtrl,
+                                    textCapitalization:
+                                        TextCapitalization.characters,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
+                                    decoration: _inputStyle(
+                                      icon: Icons.store,
+                                      hintText: "Branch Code",
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Delivery Date",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: _deliveryDate,
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(
+                                    const Duration(days: 60),
+                                  ),
+                                  builder: (context, child) {
+                                    return Theme(
+                                      data: Theme.of(context).copyWith(
+                                        colorScheme: const ColorScheme.dark(
+                                          primary: accentGreen,
+                                          onPrimary: Colors.white,
+                                          surface: Color(0xFF111811),
+                                          onSurface: textPrimary,
+                                        ),
+                                        dialogBackgroundColor: bgDark,
+                                      ),
+                                      child: child!,
+                                    );
+                                  },
+                                );
+                                if (date != null) {
+                                  setState(() => _deliveryDate = date);
+                                }
+                              },
+                              child: InputDecorator(
+                                decoration: _inputStyle(
+                                  icon: Icons.calendar_month,
+                                ),
+                                child: Text(
+                                  DateFormat(
+                                    'dd MMM yyyy',
+                                  ).format(_deliveryDate),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: isProcessing
-                        ? null
-                        : () => Navigator.pop(context),
-                    child: const Text(
-                      "Cancel",
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
+
+              // 🦶 FOOTER
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 30,
+                  vertical: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: bgDark,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(16),
                   ),
-                  const SizedBox(width: 15),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4580A), // 🚀 ORANGE
-                      foregroundColor: const Color(0xFF080B08),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                  border: Border(
+                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: isProcessing
+                          ? null
+                          : () => Navigator.pop(context),
+                      child: const Text(
+                        "Cancel",
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                    onPressed: isProcessing
-                        ? null
-                        : () async {
-                            if (!_formKey.currentState!.validate()) return;
-                            if (_selectedSupplier.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text("Select a valid supplier!"),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-                            try {
-                              await ref
-                                  .read(poEngineProvider.notifier)
-                                  .createManualPO(
-                                    productId: widget.productId,
-                                    productName: widget.productName,
-                                    supplierId: _selectedSupplier,
-                                    orderQty: int.parse(_qtyCtrl.text),
-                                    deliveryDate: _deliveryDate,
-                                    branchCode: _branchCtrl.text,
-                                  );
-                              if (context.mounted) {
-                                Navigator.pop(context);
+                    const SizedBox(width: 16),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentGreen,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: isProcessing
+                          ? null
+                          : () async {
+                              if (!_formKey.currentState!.validate()) return;
+                              if (_selectedSupplier.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text(
-                                      "✅ PO Raised! Kindly check 'PENDING APPROVALS' to approve and send to supplier.",
+                                    content: Text("Select a valid supplier!"),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+                              try {
+                                await ref
+                                    .read(poEngineProvider.notifier)
+                                    .createManualPO(
+                                      productId: widget.productId,
+                                      productName: widget.productName,
+                                      supplierId: _selectedSupplier,
+                                      orderQty: int.parse(_qtyCtrl.text),
+                                      deliveryDate: _deliveryDate,
+                                      branchCode: _branchCtrl.text,
+                                    );
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "✅ PO Raised! Check PENDING APPROVALS.",
+                                      ),
+                                      backgroundColor: accentGreen,
                                     ),
-                                    backgroundColor: Colors.green,
+                                  );
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text("Error: $e"),
+                                    backgroundColor: Colors.redAccent,
                                   ),
                                 );
                               }
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text("Error: $e"),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          },
-                    icon: isProcessing
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded, size: 20),
-                    label: const Text(
-                      "Generate PO",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                            },
+                      icon: isProcessing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(Icons.check, size: 18),
+                      label: const Text(
+                        "Generate PO",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -450,36 +522,30 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
 
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         title,
-        style: TextStyle(
-          fontSize: 12,
+        style: const TextStyle(
+          fontSize: 11,
           fontWeight: FontWeight.w900,
-          color: Colors.grey.shade500,
+          color: Color(0xFF888888),
           letterSpacing: 1.5,
         ),
       ),
     );
   }
 
-  InputDecoration _inputStyle({
-    required IconData icon,
-    String? hintText,
-    String? helperText,
-  }) {
+  InputDecoration _inputStyle({required IconData icon, String? hintText}) {
     const Color inputBg = Color(0xFF1A221A);
-    const Color accentOrange = Color(0xFFD4580A);
+    const Color accentGreen = Color(0xFF00C853);
     const Color textSecondary = Color(0xFF888888);
 
     return InputDecoration(
       hintText: hintText,
       hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
-      helperText: helperText,
-      helperStyle: TextStyle(color: textSecondary.withOpacity(0.7)),
-      prefixIcon: Icon(icon, color: textSecondary),
+      prefixIcon: Icon(icon, color: textSecondary, size: 20),
       filled: true,
-      fillColor: inputBg, // 🚀 Dark Input
+      fillColor: inputBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -491,10 +557,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(
-          color: accentOrange,
-          width: 2,
-        ), // 🚀 ORANGE FOCUS
+        borderSide: const BorderSide(color: accentGreen, width: 1.5),
       ),
     );
   }

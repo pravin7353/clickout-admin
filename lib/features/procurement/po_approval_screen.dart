@@ -24,10 +24,20 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
   // 🚀 DISABLED AI TAB: Default tab is now 'Pending Approvals' (Tab 1)
   int _selectedTab = 1;
   bool _isUploadingCsv = false;
-  int _limit = 15; // 🚀 Universal Pagination Limit
+
+  // 🚀 NEW: Standard Pagination Setup
+  int _poCurrentPage = 0;
+  final int _poPageSize = 5;
+  final ScrollController _poScrollController = ScrollController();
 
   // 🚀 ANTI-FLICKER CACHE: Stores last valid docs to survive empty cache snapshots
   List<QueryDocumentSnapshot>? _cachedValidDocs;
+
+  @override
+  void dispose() {
+    _poScrollController.dispose();
+    super.dispose();
+  }
 
   // 🚀 CACHE ENGINE: Prevents infinite Firestore reads for Suppliers
   final Map<String, String> _supplierCache = {};
@@ -142,12 +152,26 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     final realStoreId =
         adminData?['branchCode'] ?? adminData?['storeId'] ?? "HQ";
 
-    const Color bgDark = Color(0xFF080B08);
-    const Color cardDark = Color(0xFF111811);
-    const Color accentGreen = Color(0xFF00C853);
-    const Color accentOrange = Color(0xFFD4580A);
-    const Color textPrimary = Color(0xFFF0F0F0);
-    const Color textSecondary = Color(0xFF888888);
+    // 🎨 DYNAMIC LIGHT/DARK THEME
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final Color bgDark = isDark
+        ? const Color(0xFF080B08)
+        : const Color(0xFFF4F5F7);
+    final Color cardDark = isDark
+        ? const Color(0xFF111811)
+        : const Color(0xFFFFFFFF);
+    final Color accentGreen = isDark
+        ? const Color(0xFF00C853)
+        : const Color(0xFF2E7D32);
+    final Color accentOrange = const Color(0xFFFF6D00); // 🚀 Sunset Amber
+    final Color textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
+    final Color textSecondary =
+        theme.textTheme.labelLarge?.color ?? Colors.grey;
+    final Color tableHeaderBg = isDark
+        ? const Color(0xFF1A1F1A)
+        : const Color(0xFFFFF3E0); // Light Orange Header
 
     return Scaffold(
       backgroundColor: bgDark,
@@ -173,7 +197,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                           color: accentOrange.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.business_center,
                           color: accentOrange,
                           size: 32,
@@ -192,7 +216,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                             ),
                           ),
                           const SizedBox(height: 4),
-                          const Text(
+                          Text(
                             "Smart Sourcing & Global Vendor Intelligence",
                             style: TextStyle(
                               color: textSecondary,
@@ -236,7 +260,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(
+                            : Icon(
                                 Icons.cloud_upload_outlined,
                                 size: 20,
                                 color: accentOrange,
@@ -274,8 +298,12 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF2B3674),
+                          backgroundColor: isDark
+                              ? Colors.white
+                              : const Color(0xFF2B3674),
+                          foregroundColor: isDark
+                              ? const Color(0xFF2B3674)
+                              : Colors.white,
                           elevation: 0,
                           side: BorderSide(color: Colors.grey.shade300),
                           padding: const EdgeInsets.symmetric(
@@ -298,97 +326,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
-                      // 🚀 DISABLED: Auto PO Engine Button Hidden completely
-                      /*
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [accentGreen, Color(0xFF00963E)],
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: accentGreen.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: isEngineRunning
-                              ? null
-                              : () async {
-                                  try {
-                                    int count = await ref
-                                        .read(poEngineProvider.notifier)
-                                        .generateDraftPOs();
-                                    if (context.mounted) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            count > 0
-                                                ? "✅ $count POs Auto-Generated!"
-                                                : "👍 Stock is healthy.",
-                                          ),
-                                          backgroundColor: count > 0
-                                              ? Colors.green
-                                              : Colors.blue,
-                                        ),
-                                      );
-                                      setState(() {
-                                        _selectedTab = 1;
-                                        _limit = 15;
-                                      }); // Switch to Pending Tab
-                                    }
-                                  } catch (e) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text("Error: $e"),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                },
-                          icon: isEngineRunning
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.auto_awesome,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                          label: Text(
-                            isEngineRunning
-                                ? "GENERATING..."
-                                : "RUN AUTO-PO ENGINE",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                      */
                     ],
                   ),
                 ],
@@ -401,23 +338,13 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                 child: ExpiryAlertDashboard(),
               ),
               const SizedBox(height: 40),
-              const Divider(),
+              Divider(color: textSecondary.withOpacity(0.2)),
               const SizedBox(height: 20),
 
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
-                    // 🚀 DISABLED: AI Suggestions Tab Hidden completely
-                    /*
-                    _buildTabButton(
-                      0,
-                      "🤖 AI Suggestions",
-                      Icons.psychology,
-                      Colors.purple,
-                    ),
-                    const SizedBox(width: 16),
-                    */
                     _buildTabButton(
                       1,
                       "Pending Approvals",
@@ -442,65 +369,54 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
-                    return const Center(
+                    return Center(
                       child: Padding(
-                        padding: EdgeInsets.all(40),
+                        padding: const EdgeInsets.all(40),
                         child: CircularProgressIndicator(color: accentOrange),
                       ),
                     );
                   }
 
-                  // 🧠 ANTI-FLICKER LOGIC: Ignore empty local cache if we already had data
                   if (snapshot.hasData) {
                     final isCacheEmpty =
                         snapshot.data!.docs.isEmpty &&
                         snapshot.data!.metadata.isFromCache;
-                    if (!isCacheEmpty) {
-                      _cachedValidDocs =
-                          snapshot.data!.docs; // Update cache with real data
-                    }
+                    if (!isCacheEmpty) _cachedValidDocs = snapshot.data!.docs;
                   }
 
                   final rawDocs = _cachedValidDocs ?? snapshot.data?.docs ?? [];
 
-                  // Agar abhi tak connect ho raha hai aur data nahi aaya, toh loading dikhao (Empty flash rokne ke liye)
                   if (rawDocs.isEmpty &&
                       snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
+                    return Center(
                       child: Padding(
-                        padding: EdgeInsets.all(40),
+                        padding: const EdgeInsets.all(40),
                         child: CircularProgressIndicator(color: accentOrange),
                       ),
                     );
                   }
 
-                  // 🧠 IN-MEMORY FILTERING & SORTING (Safe from Firebase Errors)
+                  // 🧠 IN-MEMORY FILTERING
                   List<QueryDocumentSnapshot> docs = [];
-
                   for (var doc in rawDocs) {
                     final data = doc.data() as Map<String, dynamic>;
-
                     if (_selectedTab == 1) {
                       final status = data['status'] ?? 'DRAFT';
-                      // 🚀 FIX: Auto PO generates 'PENDING', Run Button generates 'DRAFT', AI generates 'PENDING_APPROVAL'
                       if ([
                         'DRAFT',
                         'PENDING',
                         'PENDING_APPROVAL',
-                      ].contains(status)) {
+                      ].contains(status))
                         docs.add(doc);
-                      }
                     } else if (_selectedTab == 2) {
                       final status = data['status'] ?? '';
                       if ([
                         'APPROVED',
                         'REJECTED',
                         'DELIVERED',
-                      ].contains(status)) {
+                      ].contains(status))
                         docs.add(doc);
-                      }
                     } else {
-                      // Tab 0: AI Suggestions
                       docs.add(doc);
                     }
                   }
@@ -525,11 +441,19 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                     return bTime.compareTo(aTime);
                   });
 
-                  // Pagination Logic
-                  bool hasMoreData = docs.length > _limit;
-                  if (docs.length > _limit) {
-                    docs = docs.sublist(0, _limit);
+                  // 🚀 NEW PAGINATION ENGINE (5 Items limit, No Load More)
+                  final totalPages = (docs.length / _poPageSize).ceil();
+                  if (_poCurrentPage >= totalPages && totalPages > 0) {
+                    _poCurrentPage = totalPages - 1;
                   }
+
+                  final startIndex = _poCurrentPage * _poPageSize;
+                  final endIndex = (startIndex + _poPageSize > docs.length)
+                      ? docs.length
+                      : startIndex + _poPageSize;
+                  final pageDocs = docs.isEmpty
+                      ? []
+                      : docs.sublist(startIndex, endIndex);
 
                   if (docs.isEmpty) {
                     return Container(
@@ -546,21 +470,17 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       child: Column(
                         children: [
                           Icon(
-                            _selectedTab == 0
-                                ? Icons.check_circle
-                                : (_selectedTab == 1
-                                      ? Icons.inventory_2_outlined
-                                      : Icons.history),
+                            _selectedTab == 1
+                                ? Icons.inventory_2_outlined
+                                : Icons.history,
                             size: 60,
-                            color: Colors.grey,
+                            color: Colors.grey.withOpacity(0.5),
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            _selectedTab == 0
-                                ? "AI has no suggestions today. Stock is optimized! ✨"
-                                : (_selectedTab == 1
-                                      ? "No Pending POs!"
-                                      : "No approved orders yet."),
+                            _selectedTab == 1
+                                ? "No Pending POs!"
+                                : "No approved orders yet.",
                             style: const TextStyle(
                               fontSize: 16,
                               color: Colors.grey,
@@ -572,462 +492,443 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                     );
                   }
 
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: docs.length + (hasMoreData ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      // 🚀 LOAD MORE BUTTON
-                      if (index == docs.length) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: Center(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: cardDark,
-                                foregroundColor: accentOrange,
-                                side: BorderSide(
-                                  color: accentOrange.withOpacity(0.5),
-                                ),
-                              ),
-                              onPressed: () => setState(() => _limit += 15),
-                              icon: const Icon(Icons.keyboard_arrow_down),
-                              label: const Text("Load More Records"),
-                            ),
-                          ),
-                        );
-                      }
+                  // ==========================================
+                  // 📦 TABLE UI (Tab 1 & 2)
+                  // ==========================================
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      double safeWidth = constraints.maxWidth;
+                      if (safeWidth.isInfinite)
+                        safeWidth = MediaQuery.of(context).size.width - 48;
+                      final double tableWidth = safeWidth < 1000
+                          ? 1000
+                          : safeWidth;
 
-                      final doc = docs[index];
-                      final data = doc.data() as Map<String, dynamic>;
-
-                      // ==========================================
-                      // 🤖 TAB 0: AI SUGGESTIONS UI
-                      // ==========================================
-                      if (_selectedTab == 0) {
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            side: BorderSide(
-                              color: Colors.purple.withOpacity(0.5),
-                              width: 1.5,
-                            ),
-                          ),
-                          color: cardDark,
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(
-                                          Icons.auto_awesome,
-                                          color: Colors.purple,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          "AI Restock Alert",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.purple,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    // 🚀 FIX: FutureBuilder with Caching for AI Suggestions
-                                    FutureBuilder<String>(
-                                      future: _getSupplierName(
-                                        data['supplierId'],
-                                      ),
-                                      builder: (context, supSnap) {
-                                        return Text(
-                                          supSnap.data ?? 'Loading...',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: textPrimary,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                ),
-                                Divider(color: textSecondary.withOpacity(0.1)),
-                                Text(
-                                  data['productName'] ?? 'Unknown Item',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  "Reason: ${data['reason'] ?? 'Stock is low'}",
-                                  style: const TextStyle(
-                                    color: textSecondary,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                ),
-                                const SizedBox(height: 15),
-                                Wrap(
-                                  alignment: WrapAlignment.spaceBetween,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  spacing: 15,
-                                  runSpacing: 10,
-                                  children: [
-                                    // 🚀 FIX: Default fallback to 10 if backend sends null
-                                    Text(
-                                      "Suggested Qty: ${data['recommendedQty'] ?? 10} Units",
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        color: accentOrange,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    Wrap(
-                                      spacing: 10,
-                                      runSpacing: 10,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () => ref
-                                              .read(poEngineProvider.notifier)
-                                              .rejectAiSuggestion(
-                                                data['suggestionId'] ?? doc.id,
-                                              ),
-                                          child: const Text(
-                                            "Dismiss",
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                        ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.purple,
-                                          ),
-                                          onPressed: () async {
-                                            await ref
-                                                .read(poEngineProvider.notifier)
-                                                .approveAIPo(
-                                                  data,
-                                                  data['recommendedQty'] ?? 0,
-                                                  realStoreId,
-                                                );
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                const SnackBar(
-                                                  content: Text(
-                                                    "✅ AI PO Approved & Email Sent!",
-                                                  ),
-                                                  backgroundColor: Colors.green,
-                                                ),
-                                              );
-                                            }
-                                          },
-                                          icon: const Icon(
-                                            Icons.flash_on,
-                                            color: Colors.white,
-                                            size: 16,
-                                          ),
-                                          label: const Text(
-                                            "APPROVE & SEND",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      // ==========================================
-                      // 📦 TAB 1 & 2: PURCHASE ORDERS UI
-                      // ==========================================
-                      final items = data['items'] as List<dynamic>? ?? [];
-                      DateTime date =
-                          (data['createdAt'] ??
-                                  data['approvedAt'] as Timestamp?)
-                              ?.toDate() ??
-                          DateTime.now();
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          side: BorderSide(
-                            color: const Color(0xFF888888).withOpacity(0.1),
-                          ),
-                        ),
-                        elevation: 0,
-                        color: cardDark,
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // 🚀 FIX: Restored the Correct PO Header with FutureBuilder for Real Supplier Names!
-                              Wrap(
-                                alignment: WrapAlignment.spaceBetween,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.domain,
-                                        color: _selectedTab == 1
-                                            ? Colors.orange
-                                            : Colors.green,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      FutureBuilder<String>(
-                                        future: _getSupplierName(
-                                          data['supplierId'],
-                                        ),
-                                        builder: (context, supSnap) {
-                                          return Text(
-                                            "Supplier: ${supSnap.data ?? 'Loading...'}",
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                              color: textPrimary,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    DateFormat('dd MMM, hh:mm a').format(date),
-                                    style: const TextStyle(
-                                      color: textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Divider(
-                                height: 30,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: cardDark,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
                                 color: textSecondary.withOpacity(0.1),
                               ),
-                              ...items.map(
-                                (item) => Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 6,
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          "• ${item['name']}",
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
+                            ),
+                            child: Scrollbar(
+                              controller: _poScrollController,
+                              thumbVisibility: true,
+                              thickness: 8,
+                              child: SingleChildScrollView(
+                                controller: _poScrollController,
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                child: SizedBox(
+                                  width: tableWidth,
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(
+                                      tableHeaderBg,
+                                    ),
+                                    dataRowMaxHeight:
+                                        double.infinity, // Allows items to wrap
+                                    dataRowMinHeight: 70,
+                                    dividerThickness: 0.5,
+                                    columns: [
+                                      DataColumn(
+                                        label: Text(
+                                          "Date & Time",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
                                             color: textPrimary,
+                                            fontSize: 12,
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 10),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: bgDark,
-                                          border: Border.all(
-                                            color: accentOrange.withOpacity(
-                                              0.3,
-                                            ),
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            6,
+                                      DataColumn(
+                                        label: Text(
+                                          "Supplier Details",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: textPrimary,
+                                            fontSize: 12,
                                           ),
                                         ),
-                                        child: Text(
-                                          "Req: ${item['orderQty']} units",
-                                          style: const TextStyle(
-                                            color: accentOrange,
-                                            fontWeight: FontWeight.bold,
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          "Order Items & Qty",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: textPrimary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      DataColumn(
+                                        label: Text(
+                                          "Actions / Status",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w900,
+                                            color: textPrimary,
                                             fontSize: 12,
                                           ),
                                         ),
                                       ),
                                     ],
+                                    rows: pageDocs.map((doc) {
+                                      final data =
+                                          doc.data() as Map<String, dynamic>;
+                                      final items =
+                                          data['items'] as List<dynamic>? ?? [];
+                                      DateTime date =
+                                          (data['createdAt'] ??
+                                                  data['approvedAt']
+                                                      as Timestamp?)
+                                              ?.toDate() ??
+                                          DateTime.now();
+
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(
+                                            Text(
+                                              DateFormat(
+                                                'dd MMM yyyy\nhh:mm a',
+                                              ).format(date),
+                                              style: TextStyle(
+                                                color: textPrimary,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            FutureBuilder<String>(
+                                              future: _getSupplierName(
+                                                data['supplierId'],
+                                              ),
+                                              builder: (context, supSnap) {
+                                                return Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.domain,
+                                                      color: _selectedTab == 1
+                                                          ? Colors.orange
+                                                          : Colors.green,
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      supSnap.data ??
+                                                          'Loading...',
+                                                      style: TextStyle(
+                                                        color: accentOrange,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 14,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                          DataCell(
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 12,
+                                                  ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: items
+                                                    .map(
+                                                      (item) => Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              bottom: 4,
+                                                            ),
+                                                        child: Text(
+                                                          "• ${item['name']} (Req: ${item['orderQty']} units)",
+                                                          style: TextStyle(
+                                                            color: textPrimary,
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    )
+                                                    .toList(),
+                                              ),
+                                            ),
+                                          ),
+                                          DataCell(
+                                            _selectedTab == 1
+                                                ? Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      IconButton(
+                                                        icon: const Icon(
+                                                          Icons.delete_outline,
+                                                          color:
+                                                              Colors.redAccent,
+                                                        ),
+                                                        tooltip: "Discard PO",
+                                                        onPressed: () =>
+                                                            FirebaseFirestore
+                                                                .instance
+                                                                .collection(
+                                                                  'purchase_orders',
+                                                                )
+                                                                .doc(doc.id)
+                                                                .delete(),
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      ElevatedButton.icon(
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              accentGreen,
+                                                          foregroundColor:
+                                                              Colors.white,
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 16,
+                                                                vertical: 12,
+                                                              ),
+                                                        ),
+                                                        icon: const Icon(
+                                                          Icons.send,
+                                                          size: 14,
+                                                        ),
+                                                        label: const Text(
+                                                          "APPROVE & SEND",
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                        onPressed: () async {
+                                                          try {
+                                                            final supplierId =
+                                                                data['supplierId'];
+                                                            String senderName =
+                                                                adminData?['name'] ??
+                                                                'Store Manager';
+                                                            final supplierSnap =
+                                                                await FirebaseFirestore
+                                                                    .instance
+                                                                    .collection(
+                                                                      'suppliers',
+                                                                    )
+                                                                    .doc(
+                                                                      supplierId,
+                                                                    )
+                                                                    .get();
+                                                            final supplierInfo =
+                                                                supplierSnap
+                                                                    .data() ??
+                                                                {};
+
+                                                            if (context
+                                                                .mounted) {
+                                                              showDialog(
+                                                                context:
+                                                                    context,
+                                                                barrierDismissible:
+                                                                    false,
+                                                                builder: (ctx) => PoExportDialog(
+                                                                  poId: doc.id,
+                                                                  supplierName:
+                                                                      supplierInfo['name'] ??
+                                                                      'Unknown Supplier',
+                                                                  supplierEmail:
+                                                                      supplierInfo['email'] ??
+                                                                      '',
+                                                                  supplierPhone:
+                                                                      supplierInfo['phone'] ??
+                                                                      '',
+                                                                  items: items,
+                                                                  senderName:
+                                                                      senderName,
+                                                                  onMarkAsRead: () async {
+                                                                    await ref
+                                                                        .read(
+                                                                          poEngineProvider
+                                                                              .notifier,
+                                                                        )
+                                                                        .approvePO(
+                                                                          doc.id,
+                                                                        );
+                                                                    if (mounted) {
+                                                                      ScaffoldMessenger.of(
+                                                                        context,
+                                                                      ).showSnackBar(
+                                                                        const SnackBar(
+                                                                          content: Text(
+                                                                            "✅ PO Moved to History!",
+                                                                          ),
+                                                                          backgroundColor:
+                                                                              Colors.green,
+                                                                        ),
+                                                                      );
+                                                                    }
+                                                                  },
+                                                                ),
+                                                              );
+                                                            }
+                                                          } catch (e) {
+                                                            ScaffoldMessenger.of(
+                                                              context,
+                                                            ).showSnackBar(
+                                                              SnackBar(
+                                                                content: Text(
+                                                                  "🚨 Error: $e",
+                                                                ),
+                                                                backgroundColor:
+                                                                    Colors
+                                                                        .redAccent,
+                                                              ),
+                                                            );
+                                                          }
+                                                        },
+                                                      ),
+                                                    ],
+                                                  )
+                                                : Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 10,
+                                                          vertical: 6,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: accentGreen
+                                                          .withOpacity(0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            20,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: accentGreen
+                                                            .withOpacity(0.3),
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          Icons.verified,
+                                                          color: accentGreen,
+                                                          size: 14,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 6,
+                                                        ),
+                                                        Text(
+                                                          "Approved by ${data['approvedBy'] ?? 'Admin'}",
+                                                          style: TextStyle(
+                                                            color: accentGreen,
+                                                            fontSize: 10,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                              Wrap(
-                                alignment: WrapAlignment.end,
-                                spacing: 15,
-                                runSpacing: 10,
-                                children: _selectedTab == 1
-                                    ? [
-                                        TextButton.icon(
-                                          onPressed: () => FirebaseFirestore
-                                              .instance
-                                              .collection('purchase_orders')
-                                              .doc(doc.id)
-                                              .delete(),
-                                          icon: const Icon(
-                                            Icons.delete,
-                                            color: Colors.red,
-                                          ),
-                                          label: const Text(
-                                            "Discard",
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                        ElevatedButton.icon(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.green,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 20,
-                                              vertical: 12,
-                                            ),
-                                          ),
-                                          onPressed: () async {
-                                            try {
-                                              final supplierId =
-                                                  data['supplierId'];
-                                              String senderName =
-                                                  adminData?['name'] ??
-                                                  'Store Manager';
-
-                                              final supplierSnap =
-                                                  await FirebaseFirestore
-                                                      .instance
-                                                      .collection('suppliers')
-                                                      .doc(supplierId)
-                                                      .get();
-                                              final supplierInfo =
-                                                  supplierSnap.data() ?? {};
-
-                                              if (context.mounted) {
-                                                showDialog(
-                                                  context: context,
-                                                  barrierDismissible: false,
-                                                  builder: (ctx) => PoExportDialog(
-                                                    poId: doc.id,
-                                                    supplierName:
-                                                        supplierInfo['name'] ??
-                                                        'Unknown Supplier',
-                                                    supplierEmail:
-                                                        supplierInfo['email'] ??
-                                                        '',
-                                                    supplierPhone:
-                                                        supplierInfo['phone'] ??
-                                                        '',
-                                                    items: items,
-                                                    senderName: senderName,
-                                                    onMarkAsRead: () async {
-                                                      await ref
-                                                          .read(
-                                                            poEngineProvider
-                                                                .notifier,
-                                                          )
-                                                          .approvePO(doc.id);
-                                                      if (mounted) {
-                                                        ScaffoldMessenger.of(
-                                                          context,
-                                                        ).showSnackBar(
-                                                          const SnackBar(
-                                                            content: Text(
-                                                              "✅ PO Moved to History!",
-                                                            ),
-                                                            backgroundColor:
-                                                                Colors.green,
-                                                          ),
-                                                        );
-                                                      }
-                                                    },
-                                                  ),
-                                                );
-                                              }
-                                            } catch (e) {
-                                              ScaffoldMessenger.of(
-                                                context,
-                                              ).showSnackBar(
-                                                SnackBar(
-                                                  content: Text("🚨 Error: $e"),
-                                                  backgroundColor:
-                                                      Colors.redAccent,
-                                                ),
-                                              );
-                                            }
-                                          },
-                                          icon: const Icon(
-                                            Icons.send,
-                                            color: Colors.white,
-                                            size: 18,
-                                          ),
-                                          label: const Text(
-                                            "APPROVE & SEND PO",
-                                            style: TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ]
-                                    : [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green.withOpacity(
-                                              0.1,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                            border: Border.all(
-                                              color: Colors.green.withOpacity(
-                                                0.3,
-                                              ),
-                                            ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(
-                                                Icons.verified,
-                                                color: Colors.green,
-                                                size: 18,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                "Approved by ${data['approvedBy'] ?? 'Admin'}",
-                                                style: const TextStyle(
-                                                  color: Colors.green,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          // 🚀 PAGINATION FOOTER
+                          const SizedBox(height: 16),
+                          if (totalPages > 1)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: cardDark,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: textSecondary.withOpacity(0.1),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "Showing ${startIndex + 1} - $endIndex of ${docs.length} Entries",
+                                    style: TextStyle(
+                                      color: textSecondary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.chevron_left,
+                                          color: accentOrange,
+                                        ),
+                                        onPressed: _poCurrentPage > 0
+                                            ? () => setState(
+                                                () => _poCurrentPage--,
+                                              )
+                                            : null,
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: accentOrange.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          "${_poCurrentPage + 1} / $totalPages",
+                                          style: TextStyle(
+                                            color: accentOrange,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.chevron_right,
+                                          color: accentOrange,
+                                        ),
+                                        onPressed:
+                                            _poCurrentPage < totalPages - 1
+                                            ? () => setState(
+                                                () => _poCurrentPage++,
+                                              )
+                                            : null,
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       );
                     },
                   );
@@ -1053,7 +954,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     return InkWell(
       onTap: () => setState(() {
         _selectedTab = index;
-        _limit = 15;
+        _poCurrentPage = 0; // 🚀 FIX: Reset pagination to page 1
         _cachedValidDocs =
             null; // 🚀 FIX: Flush cache on tab switch to stop Ghost Data Leak!
       }),

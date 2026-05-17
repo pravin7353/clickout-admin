@@ -4,45 +4,86 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+// ignore: unused_import
 import 'dart:convert';
+// ignore: unused_import, avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
 import 'providers/auditor_provider.dart';
 import 'providers/ledger_provider.dart';
 import '../auditor/widgets/cash_reconciliation_cart.dart';
 import 'widgets/risk_alert_strip.dart';
-import 'widgets/time_intelligence_card.dart';
+//import 'widgets/time_intelligence_card.dart';
 import 'widgets/audit_vault_screen.dart';
+import '../invoice/invoice_rules_dialog.dart';
 
 // 🚀 INVOICE SERVICE IMPORT
 import '../invoice/pdf_invoice_service.dart';
-
-// 🏢 SAAS TENANT CONFIGURATION
-class TenantConfig {
-  static const String companyName = "CLICKOUT RETAIL PVT. LTD.";
-  static const String branchCode = "MART01";
-  static const String gstin = "27AAAAA1234A1Z5";
-  static const IconData logoIcon = Icons.storefront;
-}
 
 class AuditorScreen extends ConsumerWidget {
   const AuditorScreen({super.key});
 
   // 📥 THE ULTIMATE CA-GRADE CSV EXPORT (Item-Level Sales Register)
-  void _downloadCsvReport(
+  Future<void> _downloadCsvReport(
     BuildContext context,
     String type,
     List<QueryDocumentSnapshot> records,
-  ) {
-    if (!kIsWeb) return;
+  ) async {
+    if (!kIsWeb || records.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("No records to export."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     try {
       // CA Grade Headers
       String csv =
           "Company Name,Branch Code,GSTIN,Bill Time,Exit Time,Order ID,Payment Mode,UPI Txn ID,Product Name,Qty,Unit Price,Gross Amount,Taxable Value,GST %,CGST Amount,SGST Amount,Item Total,Exit Status\n";
 
+      // 🚀 SaaS Fix: Cache store details to prevent N+1 queries during export
+      Map<String, Map<String, String>> storeCache = {};
+
       for (var doc in records) {
         final data = doc.data() as Map<String, dynamic>;
+
+        // 🚀 DYNAMIC ROW-LEVEL STORE FETCHER
+        String rowBranch = data['branchCode']?.toString() ?? "STORE";
+        String companyName = "CLICKOUT RETAIL";
+        String gstin = "N/A";
+
+        if (rowBranch != "STORE" && rowBranch.isNotEmpty) {
+          if (!storeCache.containsKey(rowBranch)) {
+            final sSnap = await FirebaseFirestore.instance
+                .collection('stores')
+                .where('branchCode', isEqualTo: rowBranch)
+                .limit(1)
+                .get();
+            if (sSnap.docs.isNotEmpty) {
+              final sData = sSnap.docs.first.data();
+              storeCache[rowBranch] = {
+                'name':
+                    (sData['storeName'] ??
+                            sData['branchName'] ??
+                            sData['companyName'] ??
+                            companyName)
+                        .toString()
+                        .toUpperCase()
+                        .replaceAll('"', '""'),
+                'gstin': sData['gstin']?.toString() ?? gstin,
+              };
+            } else {
+              storeCache[rowBranch] = {'name': companyName, 'gstin': gstin};
+            }
+          }
+          companyName = storeCache[rowBranch]!['name']!;
+          gstin = storeCache[rowBranch]!['gstin']!;
+        }
+
+        String branchCode = rowBranch;
 
         // Timestamps
         DateTime billDate =
@@ -64,9 +105,14 @@ class AuditorScreen extends ConsumerWidget {
             data['exitStatus'] ?? data['paymentStatus'] ?? 'PENDING';
         List<dynamic> items = data['cartItems'] ?? data['items'] ?? [];
 
+        // 🚀 Ensure commas in string are safely escaped for CSV
+        String safeCompany = '"$companyName"';
+        String safeBranch = '"$branchCode"';
+        String safeGstin = '"$gstin"';
+
         if (items.isEmpty) {
           csv +=
-              '"${TenantConfig.companyName}","${TenantConfig.branchCode}","${TenantConfig.gstin}","$billTime","$exitTime","${doc.id}","$mode","$upiTxn","NO ITEMS","0","0","0","0","0","0","0","0","$status"\n';
+              '$safeCompany,$safeBranch,$safeGstin,"$billTime","$exitTime","${doc.id}","$mode","$upiTxn","NO ITEMS","0","0","0","0","0","0","0","0","$status"\n';
           continue;
         }
 
@@ -107,7 +153,33 @@ class AuditorScreen extends ConsumerWidget {
           double sgst = totalGst / 2;
 
           csv +=
-              '"${TenantConfig.companyName}","${TenantConfig.branchCode}","${TenantConfig.gstin}","$billTime","$exitTime","${doc.id}","$mode","$upiTxn","$itemName","$qty","${price.toStringAsFixed(2)}","${grossAmt.toStringAsFixed(2)}","${taxableValue.toStringAsFixed(2)}","$gstRate","${cgst.toStringAsFixed(2)}","${sgst.toStringAsFixed(2)}","${grossAmt.toStringAsFixed(2)}","$status"\n';
+              '$safeCompany,$safeBranch,$safeGstin,"$billTime","$exitTime","${doc.id}","$mode","$upiTxn","$itemName","$qty","${price.toStringAsFixed(2)}","${grossAmt.toStringAsFixed(2)}","${taxableValue.toStringAsFixed(2)}","$gstRate","${cgst.toStringAsFixed(2)}","${sgst.toStringAsFixed(2)}","${grossAmt.toStringAsFixed(2)}","$status"\n';
+        }
+
+        // 🚀 DELTA FIX: ADD EXCHANGE DEDUCTION AS A LINE ITEM TO BALANCE THE SHEET
+        if (data['type'] == 'EXCHANGE_INVOICE' &&
+            data['exchangedItem'] != null) {
+          var exItem = data['exchangedItem'];
+          String exName =
+              "RETURN: ${exItem['name']?.toString().replaceAll('"', '""') ?? 'Returned Item'}";
+          int exQty =
+              int.tryParse(
+                exItem['qty']?.toString() ??
+                    exItem['quantity']?.toString() ??
+                    '1',
+              ) ??
+              1;
+          double exPrice =
+              double.tryParse(
+                exItem['price']?.toString() ??
+                    exItem['originalPrice']?.toString() ??
+                    '0',
+              ) ??
+              0.0;
+          double exGross = -(exPrice * exQty); // Negative for return
+
+          csv +=
+              '$safeCompany,$safeBranch,$safeGstin,"$billTime","$exitTime","${doc.id}","$mode","$upiTxn","$exName","$exQty","-${exPrice.toStringAsFixed(2)}","${exGross.toStringAsFixed(2)}","${exGross.toStringAsFixed(2)}","0","0","0","${exGross.toStringAsFixed(2)}","$status"\n';
         }
       }
 
@@ -122,7 +194,7 @@ class AuditorScreen extends ConsumerWidget {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("✅ CA-Grade CSV Downloaded!"),
+          content: Text("✅ Dynamic CA-Grade CSV Downloaded!"),
           backgroundColor: Colors.green,
         ),
       );
@@ -142,81 +214,74 @@ class AuditorScreen extends ConsumerWidget {
     Map<String, dynamic> data,
     String orderId,
   ) {
-    DateTime billingDate =
-        (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+    String paymentMode = (data['paymentMode'] ?? 'UPI')
+        .toString()
+        .toUpperCase();
 
-    String eStatus = (data['exitStatus'] ?? '').toString().toUpperCase();
-    bool isCleanExit = ['COMPLETED', 'EXITED', 'APPROVED'].contains(eStatus);
-
-    DateTime? exitDate;
-    if (isCleanExit) {
-      exitDate =
-          (data['verifiedAt'] as Timestamp?)?.toDate() ??
-          (data['exitTimestamp'] as Timestamp?)?.toDate();
+    // 🚀 Billed-By Logic
+    String cashierId = 'Self Checkout';
+    if (paymentMode == 'CASH') {
+      cashierId =
+          data['scannedByName']?.toString() ??
+          data['cashierName']?.toString() ??
+          data['collectedBy']?.toString() ??
+          data['cashierId']?.toString() ??
+          'Unknown Cashier';
     }
 
-    String rawCashier = data['cashierId']?.toString() ?? '';
-    String cashierId = rawCashier.isNotEmpty ? rawCashier : 'ONLINE PAY';
-
-    // 🚀 BINDING FIX: Strict Guard ID Check
     String rawGuard =
         data['verifiedByGuardId']?.toString() ??
         data['exitVerifiedBy']?.toString() ??
         '';
     String guardId = rawGuard.isNotEmpty ? rawGuard : 'Pending/None';
-
-    String paymentMode = (data['paymentMode'] ?? 'UPI')
-        .toString()
-        .toUpperCase();
-    String upiTxnId =
-        data['upiTransactionId'] ?? data['transactionId'] ?? 'N/A';
-
     double fraudScore = (data['fraudScore'] ?? 0.0).toDouble();
     List<dynamic> itemsList = data['cartItems'] ?? data['items'] ?? [];
 
-    double calculatedSubtotal = 0.0;
-    double totalBasePrice = 0.0;
-    double totalGSTAmount = 0.0;
+    // 🧠 100% SYNCED: Fetching directly from Database
+    double calculatedSubtotal =
+        double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
+    double totalBasePrice =
+        double.tryParse(data['taxableValue']?.toString() ?? '0') ?? 0.0;
+    double totalGSTAmount =
+        double.tryParse(data['gstTotal']?.toString() ?? '0') ?? 0.0;
+    double totalSavings =
+        double.tryParse(data['totalSavings']?.toString() ?? '0') ?? 0.0;
+    double totalBagWeight =
+        double.tryParse(data['totalWeight']?.toString() ?? '0') ?? 0.0;
 
-    for (var item in itemsList) {
-      int qty =
+    // 🚀 ORIGINAL BUSINESS LOGIC (Exchange aur Discount Zinda Hai!)
+    double discount =
+        double.tryParse(data['discount']?.toString() ?? '0') ?? 0.0;
+    double exchangeDeduction = 0.0;
+    String exchangeItemName = '';
+    if (data['type'] == 'EXCHANGE_INVOICE' && data['exchangedItem'] != null) {
+      var exItem = data['exchangedItem'];
+      exchangeItemName = exItem['name'] ?? 'Returned Item';
+      int exQty =
           int.tryParse(
-            item['qty']?.toString() ?? item['quantity']?.toString() ?? '1',
+            exItem['qty']?.toString() ?? exItem['quantity']?.toString() ?? '1',
           ) ??
           1;
-      double price =
+      double exPrice =
           double.tryParse(
-            item['price']?.toString() ??
-                item['discountedPrice']?.toString() ??
-                item['originalPrice']?.toString() ??
+            exItem['price']?.toString() ??
+                exItem['originalPrice']?.toString() ??
                 '0',
           ) ??
           0.0;
-
-      double itemTotal = price * qty;
-      calculatedSubtotal += itemTotal;
-
-      double gstRate = 0.0;
-      if (item['gst'] != null && item['gst'].toString().isNotEmpty) {
-        String rawGst = item['gst'].toString().replaceAll(
-          RegExp(r'[^0-9.]'),
-          '',
-        );
-        gstRate = double.tryParse(rawGst) ?? 0.0;
-      }
-
-      double base = itemTotal / (1 + (gstRate / 100));
-      totalBasePrice += base;
-      totalGSTAmount += (itemTotal - base);
+      exchangeDeduction = exPrice * exQty;
     }
 
-    double discount =
-        double.tryParse(data['discount']?.toString() ?? '0') ?? 0.0;
-    double finalTotal = calculatedSubtotal - discount;
-    if (finalTotal < 0) finalTotal = 0;
+    // Final calculations based on DB
+    double dbTotal =
+        double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
+    double finalTotal = dbTotal > 0
+        ? dbTotal
+        : (calculatedSubtotal - discount - exchangeDeduction);
 
-    double cgst = totalGSTAmount / 2;
-    double sgst = totalGSTAmount / 2;
+    double dbWeight =
+        double.tryParse(data['totalWeight']?.toString() ?? '0') ?? 0.0;
+    if (dbWeight > 0 && totalBagWeight == 0) totalBagWeight = dbWeight;
 
     showGeneralDialog(
       context: context,
@@ -224,6 +289,7 @@ class AuditorScreen extends ConsumerWidget {
       barrierLabel: "Autopsy",
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return Align(
           alignment: Alignment.centerRight,
           child: Material(
@@ -235,7 +301,8 @@ class AuditorScreen extends ConsumerWidget {
               width: MediaQuery.of(context).size.width > 600
                   ? 500
                   : double.infinity,
-              color: const Color(0xFFF9FAFC),
+              height: MediaQuery.of(context).size.height,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -243,27 +310,30 @@ class AuditorScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Row(
+                      Row(
                         children: [
                           Icon(
                             Icons.policy,
-                            color: Color(0xFF2B3674),
+                            color: isDark
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
                             size: 28,
                           ),
-                          SizedBox(width: 10),
+                          const SizedBox(width: 10),
                           Text(
                             "Order Autopsy",
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF2B3674),
+                              color: isDark
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
                             ),
                           ),
                         ],
                       ),
                       Row(
                         children: [
-                          // 🚀 PDF FIX: Changed to shareInvoice to force web download
                           IconButton(
                             icon: const Icon(
                               Icons.picture_as_pdf,
@@ -307,12 +377,58 @@ class AuditorScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
 
+                  if (data['hasExchange'] == true)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blueAccent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.blueAccent.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.swap_horizontal_circle,
+                            color: Colors.blueAccent,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "EXCHANGE PROCESSED",
+                                  style: TextStyle(
+                                    color: Colors.blueAccent,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Text(
+                                  "Delta Invoice Generated: ${data['exchangeRef'] ?? 'Unknown'}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   const Text(
-                    "Tax Invoice Receipt",
+                    "Tax Invoice / Bill of Supply",
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                       color: Colors.grey,
+                      letterSpacing: 1.2,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -322,243 +438,831 @@ class AuditorScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
+                        color: const Color(
+                          0xFF141414,
+                        ), // 🔲 PITCH BLACK REALISTIC RECEIPT BG
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 15,
                           ),
                         ],
                       ),
-                      child: Column(
-                        children: [
-                          Icon(
-                            TenantConfig.logoIcon,
-                            size: 28,
-                            color: Colors.black87,
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            TenantConfig.companyName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 14,
-                              letterSpacing: 1,
-                            ),
-                          ),
-                          Text(
-                            "GSTIN: ${TenantConfig.gstin}",
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              children: [
-                                _buildReceiptRow(
-                                  "Bill Time",
-                                  DateFormat(
-                                    'dd MMM, hh:mm a',
-                                  ).format(billingDate),
+                      child: FutureBuilder<Map<String, dynamic>>(
+                        future: () async {
+                          Map<String, dynamic> result = {
+                            'storeName': "CLICKOUT RETAIL",
+                            'gstin': "N/A",
+                            'address': "N/A",
+                            'phone': "N/A",
+                            'invPrefix': "INV-",
+                            'documentTitle': "TAX INVOICE",
+                            'terms': [
+                              "1. Exchange within 7 days with original receipt.",
+                              "2. Goods once sold will not be refunded.",
+                            ],
+                          };
+                          try {
+                            String bc =
+                                (data['branchCode'] ??
+                                        data['branchId'] ??
+                                        data['storeId'])
+                                    ?.toString()
+                                    .trim() ??
+                                '';
+                            if (bc.isNotEmpty && bc != 'STORE') {
+                              var sSnap = await FirebaseFirestore.instance
+                                  .collection('stores')
+                                  .where('branchCode', isEqualTo: bc)
+                                  .limit(1)
+                                  .get();
+                              if (sSnap.docs.isNotEmpty) {
+                                var sData = sSnap.docs.first.data();
+                                result['storeName'] =
+                                    (sData['storeName'] ??
+                                            sData['branchName'] ??
+                                            sData['companyName'] ??
+                                            result['storeName'])
+                                        .toString()
+                                        .toUpperCase();
+                                result['gstin'] =
+                                    sData['gstin']?.toString() ??
+                                    result['gstin'];
+                                result['phone'] =
+                                    sData['primaryContact'] ??
+                                    sData['mobile'] ??
+                                    sData['phone'] ??
+                                    result['phone'];
+                                String baseAddr =
+                                    sData['address'] ??
+                                    sData['fullAddress'] ??
+                                    "";
+                                String city = sData['city'] ?? "";
+                                String pin =
+                                    sData['pincode'] ??
+                                    sData['zip'] ??
+                                    sData['zipCode'] ??
+                                    "";
+                                List<String> addrParts = [];
+                                if (baseAddr.isNotEmpty)
+                                  addrParts.add(baseAddr);
+                                if (city.isNotEmpty) addrParts.add(city);
+                                if (pin.isNotEmpty) addrParts.add(pin);
+                                if (addrParts.isNotEmpty)
+                                  result['address'] = addrParts.join(", ");
+                              }
+                            }
+                            String tid =
+                                data['tenantId']?.toString().trim() ?? '';
+                            if (tid.isNotEmpty && tid != 'ALL') {
+                              var tSnap = await FirebaseFirestore.instance
+                                  .collection('tenants')
+                                  .doc(tid)
+                                  .get();
+                              if (tSnap.exists) {
+                                var tData =
+                                    tSnap.data() as Map<String, dynamic>;
+                                var config =
+                                    tData['invoiceConfig']
+                                        as Map<String, dynamic>? ??
+                                    {};
+                                result['invPrefix'] =
+                                    config['prefix']?.toString() ??
+                                    config['invoicePrefix']?.toString() ??
+                                    result['invPrefix'];
+                                if (config['documentTitle'] != null)
+                                  result['documentTitle'] =
+                                      config['documentTitle'].toString();
+                                if (config['terms'] != null &&
+                                    config['terms'].toString().isNotEmpty) {
+                                  result['terms'] = config['terms']
+                                      .toString()
+                                      .split(RegExp(r'\\n|\n'));
+                                }
+                              }
+                            }
+                          } catch (e) {}
+                          return result;
+                        }(),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(20),
+                                child: CircularProgressIndicator(
+                                  color: Colors.greenAccent,
                                 ),
-                                _buildReceiptRow(
-                                  "Exit Time",
-                                  exitDate != null
-                                      ? DateFormat(
-                                          'dd MMM, hh:mm a',
-                                        ).format(exitDate)
-                                      : "PENDING",
-                                  color: exitDate != null
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                                _buildReceiptRow(
-                                  "Order ID",
-                                  orderId.length >= 8
-                                      ? orderId.substring(0, 8).toUpperCase()
-                                      : orderId,
-                                ),
-                                if (paymentMode == 'UPI')
-                                  _buildReceiptRow(
-                                    "UPI Txn",
-                                    upiTxnId,
-                                    color: Colors.blueAccent,
-                                  ),
-                              ],
-                            ),
-                          ),
-
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 10.0),
-                            child: Text(
-                              "- - - - - - - - - - - - - - - - - - - - - -",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                letterSpacing: 2,
                               ),
-                              maxLines: 1,
-                            ),
-                          ),
+                            );
+                          }
 
-                          Expanded(
-                            child: itemsList.isEmpty
-                                ? const Center(
+                          final meta =
+                              snapshot.data ??
+                              {
+                                'storeName': "CLICKOUT RETAIL",
+                                'gstin': "N/A",
+                                'address': "N/A",
+                                'phone': "N/A",
+                                'invPrefix': "INV-",
+                                'documentTitle': "TAX INVOICE",
+                                'terms': [
+                                  "1. Exchange within 7 days with original receipt.",
+                                  "2. Goods once sold will not be refunded.",
+                                ],
+                              };
+
+                          String storeDisplayName = meta['storeName'];
+                          String gstin = meta['gstin'];
+                          String branchCode =
+                              (data['branchCode'] ??
+                                      data['branchId'] ??
+                                      data['storeId'])
+                                  ?.toString() ??
+                              "STORE";
+                          String address = meta['address'];
+                          String phone = meta['phone'];
+                          String invPrefix = meta['invPrefix'];
+                          List<String> terms = List<String>.from(meta['terms']);
+                          String documentTitle = meta['documentTitle'];
+
+                          DateTime billingDate =
+                              (data['timestamp'] as Timestamp?)?.toDate() ??
+                              DateTime.now();
+                          String paymentMode =
+                              data['paymentMode']?.toString() ??
+                              data['mode']?.toString() ??
+                              'CASH';
+                          String upiTxnId =
+                              data['upiTxnId']?.toString() ??
+                              data['txnId']?.toString() ??
+                              'N/A';
+
+                          String cName =
+                              (data['customerName'] ??
+                                      data['buyerName'] ??
+                                      data['clientName'] ??
+                                      data['customer'] ??
+                                      "Walk-in Customer")
+                                  .toString();
+                          if (cName.trim().isEmpty ||
+                              cName.trim().toLowerCase() == 'customer' ||
+                              cName == 'null')
+                            cName = "Walk-in Customer";
+                          String cPhone =
+                              (data['customerPhone'] ??
+                                      data['buyerPhone'] ??
+                                      data['phone'] ??
+                                      "")
+                                  .toString();
+                          if (cPhone == 'null') cPhone = "";
+
+                          Widget buildRecRow(
+                            String label,
+                            String value, {
+                            Color color = Colors.white,
+                          }) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 3.0,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    label,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white54,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    value,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: color,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return SingleChildScrollView(
+                            physics: const BouncingScrollPhysics(),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // 🏢 1. STORE HEADER
+                                Text(
+                                  documentTitle,
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Icon(
+                                  Icons.storefront,
+                                  size: 32,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  storeDisplayName,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 18,
+                                    color: Colors.white,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                if (address != "N/A")
+                                  Text(
+                                    address,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Ph: $phone  |  GSTIN: $gstin",
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Branch: $branchCode",
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                                  child: Text(
+                                    "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
+                                    style: TextStyle(
+                                      color: Colors.white24,
+                                      letterSpacing: 2,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+
+                                // 📄 2. INVOICE META (Fixed invoice DB Fetch)
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        RichText(
+                                          text: TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: "Inv No: ",
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text:
+                                                    data['invoiceNo']
+                                                        ?.toString() ??
+                                                    "$invPrefix${orderId.length >= 8 ? orderId.substring(0, 8).toUpperCase() : orderId}",
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        RichText(
+                                          text: TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: "Date: ",
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: DateFormat(
+                                                  'dd-MM-yyyy',
+                                                ).format(billingDate),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        RichText(
+                                          text: TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: "Time: ",
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: DateFormat(
+                                                  'hh:mm a',
+                                                ).format(billingDate),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        RichText(
+                                          text: TextSpan(
+                                            children: [
+                                              const TextSpan(
+                                                text: "Pay Mode: ",
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text: paymentMode,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (paymentMode == 'UPI') ...[
+                                          const SizedBox(height: 4),
+                                          RichText(
+                                            text: TextSpan(
+                                              children: [
+                                                const TextSpan(
+                                                  text: "Txn ID: ",
+                                                  style: TextStyle(
+                                                    color: Colors.white54,
+                                                    fontSize: 11,
+                                                  ),
+                                                ),
+                                                TextSpan(
+                                                  text: upiTxnId,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
+
+                                // 👤 3. CUSTOMER DETAILS
+                                if (data['customerName'] != null ||
+                                    data['customerPhone'] != null) ...[
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 8.0,
+                                    ),
                                     child: Text(
-                                      "No items recorded in DB.",
+                                      "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                       style: TextStyle(
-                                        color: Colors.grey,
-                                        fontStyle: FontStyle.italic,
+                                        color: Colors.white24,
+                                        letterSpacing: 2,
+                                      ),
+                                      maxLines: 1,
+                                    ),
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          "BILLED TO:",
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.white54,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          cName,
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        if (cPhone.isNotEmpty)
+                                          Text(
+                                            "Ph: $cPhone",
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                                  child: Text(
+                                    "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
+                                    style: TextStyle(
+                                      color: Colors.white24,
+                                      letterSpacing: 2,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+
+                                // 🛒 4. ITEMS TABLE HEADER
+                                Row(
+                                  children: const [
+                                    Expanded(
+                                      flex: 4,
+                                      child: Text(
+                                        "ITEM",
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 1,
+                                      child: Text(
+                                        "QTY",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        "RATE",
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        "AMOUNT",
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white54,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+
+                                // 🛒 5. ITEMS LIST
+                                if (itemsList.isEmpty)
+                                  const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(10),
+                                      child: Text(
+                                        "No items recorded.",
+                                        style: TextStyle(
+                                          color: Colors.white54,
+                                          fontStyle: FontStyle.italic,
+                                        ),
                                       ),
                                     ),
                                   )
-                                : ListView.builder(
-                                    physics: const BouncingScrollPhysics(),
-                                    itemCount: itemsList.length,
-                                    itemBuilder: (context, index) {
-                                      final item =
-                                          itemsList[index]
-                                              as Map<String, dynamic>;
-                                      int qty =
-                                          int.tryParse(
-                                            item['qty']?.toString() ??
-                                                item['quantity']?.toString() ??
-                                                '1',
-                                          ) ??
-                                          1;
-                                      double price =
+                                else
+                                  ...itemsList.map((item) {
+                                    int qty =
+                                        int.tryParse(
+                                          item['qty']?.toString() ??
+                                              item['quantity']?.toString() ??
+                                              '1',
+                                        ) ??
+                                        1;
+                                    double itemOriginalPrice =
+                                        double.tryParse(
+                                          item['originalPrice']?.toString() ??
+                                              '0',
+                                        ) ??
+                                        0.0;
+                                    double price =
+                                        double.tryParse(
+                                          item['price']?.toString() ?? '',
+                                        ) ??
+                                        double.tryParse(
+                                          item['unitPrice']?.toString() ?? '',
+                                        ) ??
+                                        double.tryParse(
+                                          item['discountedPrice']?.toString() ??
+                                              '',
+                                        ) ??
+                                        itemOriginalPrice;
+                                    double gstRate = 0.0;
+                                    if (item['gst'] != null) {
+                                      gstRate =
                                           double.tryParse(
-                                            item['price']?.toString() ??
-                                                item['discountedPrice']
-                                                    ?.toString() ??
-                                                item['originalPrice']
-                                                    ?.toString() ??
-                                                '0',
+                                            item['gst'].toString().replaceAll(
+                                              RegExp(r'[^0-9.]'),
+                                              '',
+                                            ),
                                           ) ??
                                           0.0;
+                                    }
+                                    double itemTotal = qty * price;
+                                    String itemName =
+                                        item['name']?.toString() ??
+                                        item['productName']?.toString() ??
+                                        'Unknown Item';
+                                    String clearanceType =
+                                        item['clearanceType']?.toString() ?? '';
+                                    if (price == 0 ||
+                                        clearanceType == 'FREE_ITEM' ||
+                                        clearanceType == 'BOGO') {
+                                      itemName = "[FREE] $itemName";
+                                    }
 
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12.0,
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              "${qty}x",
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.w900,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(
-                                                    "${item['name'] ?? 'Unknown Item'}",
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      fontSize: 13,
-                                                    ),
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 8.0,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                flex: 4,
+                                                child: Text(
+                                                  itemName,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.w600,
                                                   ),
-                                                  Text(
-                                                    "@ ₹${price.toStringAsFixed(2)} / unit",
-                                                    style: TextStyle(
-                                                      color:
-                                                          Colors.grey.shade600,
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 1,
+                                                child: Text(
+                                                  "$qty",
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.white,
                                                   ),
-                                                ],
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Text(
+                                                  price.toStringAsFixed(2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                              Expanded(
+                                                flex: 2,
+                                                child: Text(
+                                                  itemTotal.toStringAsFixed(2),
+                                                  textAlign: TextAlign.right,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (gstRate > 0)
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 2.0,
+                                              ),
+                                              child: Text(
+                                                "HSN: ${item['hsn'] ?? 'N/A'} | GST: ${gstRate.toStringAsFixed(0)}%",
+                                                style: const TextStyle(
+                                                  fontSize: 9,
+                                                  color: Colors.white38,
+                                                ),
                                               ),
                                             ),
-                                            Text(
-                                              "₹${(qty * price).toStringAsFixed(2)}",
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    },
+                                        ],
+                                      ),
+                                    );
+                                  }),
+
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                                  child: Text(
+                                    "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
+                                    style: TextStyle(
+                                      color: Colors.white24,
+                                      letterSpacing: 2,
+                                    ),
+                                    maxLines: 1,
                                   ),
-                          ),
-
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text(
-                              "- - - - - - - - - - - - - - - - - - - - - -",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                letterSpacing: 2,
-                              ),
-                              maxLines: 1,
-                            ),
-                          ),
-
-                          _buildReceiptRow(
-                            "Gross Subtotal",
-                            calculatedSubtotal,
-                          ),
-                          if (discount > 0)
-                            _buildReceiptRow(
-                              "Discount Applied",
-                              -discount,
-                              color: Colors.green,
-                            ),
-                          _buildReceiptRow("Taxable Value", totalBasePrice),
-                          _buildReceiptRow("CGST", cgst),
-                          _buildReceiptRow("SGST", sgst),
-
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 8.0),
-                            child: Text(
-                              "- - - - - - - - - - - - - - - - - - - - - -",
-                              style: TextStyle(
-                                color: Colors.grey,
-                                letterSpacing: 2,
-                              ),
-                              maxLines: 1,
-                            ),
-                          ),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                "GRAND TOTAL",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 16,
                                 ),
-                              ),
-                              Text(
-                                "₹${finalTotal.toStringAsFixed(2)}",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 24,
-                                  color: Colors.green,
+
+                                // 💰 6. TAX, DISCOUNTS & TOTALS (Full Unified UI)
+                                buildRecRow(
+                                  "Gross Subtotal:",
+                                  "₹${calculatedSubtotal.toStringAsFixed(2)}",
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
+
+                                if (exchangeDeduction > 0)
+                                  buildRecRow(
+                                    "Returned: $exchangeItemName",
+                                    "-₹${exchangeDeduction.toStringAsFixed(2)}",
+                                    color: Colors.purpleAccent,
+                                  ),
+
+                                if (discount > 0)
+                                  buildRecRow(
+                                    "Discount Applied:",
+                                    "-₹${discount.toStringAsFixed(2)}",
+                                    color: Colors.greenAccent,
+                                  ),
+
+                                buildRecRow(
+                                  "Taxable Value:",
+                                  "₹${totalBasePrice.toStringAsFixed(2)}",
+                                ),
+                                buildRecRow(
+                                  "Total GST:",
+                                  "₹${totalGSTAmount.toStringAsFixed(2)}",
+                                ),
+
+                                buildRecRow(
+                                  "Total Bag Weight:",
+                                  totalBagWeight >= 1000
+                                      ? "${(totalBagWeight / 1000).toStringAsFixed(2)} KG"
+                                      : "${totalBagWeight.toStringAsFixed(0)} g",
+                                ),
+
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                                  child: Text(
+                                    "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
+                                    style: TextStyle(
+                                      color: Colors.white24,
+                                      letterSpacing: 2,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+
+                                if (totalSavings > 0) ...[
+                                  buildRecRow(
+                                    "TOTAL SAVINGS:",
+                                    "₹${totalSavings.toStringAsFixed(2)}",
+                                    color: Colors.greenAccent,
+                                  ),
+                                  const SizedBox(height: 5),
+                                ],
+
+                                // 🏆 7. GRAND TOTAL
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      finalTotal < 0
+                                          ? "REFUND DUE"
+                                          : (exchangeDeduction > 0
+                                                ? "GRAND TOTAL (DELTA)"
+                                                : "GRAND TOTAL"),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 16,
+                                        color: finalTotal < 0
+                                            ? Colors.purpleAccent
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                    Text(
+                                      finalTotal < 0
+                                          ? "-₹${finalTotal.abs().toStringAsFixed(2)}"
+                                          : "₹${finalTotal.toStringAsFixed(2)}",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 24,
+                                        color: finalTotal < 0
+                                            ? Colors.purpleAccent
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                                  child: Text(
+                                    "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
+                                    style: TextStyle(
+                                      color: Colors.white24,
+                                      letterSpacing: 2,
+                                    ),
+                                    maxLines: 1,
+                                  ),
+                                ),
+
+                                // 🙏 8. FOOTER (DYNAMIC T&C)
+                                const Text(
+                                  "Thank You for Shopping with Us!",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                ...terms.map(
+                                  (t) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 2.0),
+                                    child: Text(
+                                      t.trim(),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.white38,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -567,14 +1271,14 @@ class AuditorScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: fraudScore > 50
-                          ? Colors.red.shade50
-                          : Colors.green.shade50,
+                      color: const Color(
+                        0xFF2A2A2A,
+                      ), // 🔲 GREY COMBINATION THEME
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: fraudScore > 50
-                            ? Colors.red.shade200
-                            : Colors.green.shade200,
+                            ? Colors.redAccent.withOpacity(0.3)
+                            : Colors.green.withOpacity(0.3),
                       ),
                     ),
                     child: Row(
@@ -588,8 +1292,8 @@ class AuditorScreen extends ConsumerWidget {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: fraudScore > 50
-                                    ? Colors.red.shade900
-                                    : Colors.green.shade900,
+                                    ? Colors.redAccent
+                                    : Colors.green.shade400,
                                 fontSize: 12,
                               ),
                             ),
@@ -625,6 +1329,38 @@ class AuditorScreen extends ConsumerWidget {
                       ],
                     ),
                   ),
+
+                  if (data['paymentStatus'] == 'PENDING_DELTA_PAYMENT' ||
+                      data['paymentStatus'] == 'PENDING') ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.greenAccent.shade700,
+                          foregroundColor: Colors
+                              .black, // Dark text for contrast on neon green
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        icon: const Icon(
+                          Icons.point_of_sale,
+                          color: Colors.black,
+                        ),
+                        label: Text(
+                          "COLLECT ₹${finalTotal.toStringAsFixed(0)} & APPROVE GATEPASS",
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 14,
+                          ),
+                        ),
+                        onPressed: () =>
+                            _collectPayment(context, orderId, finalTotal, data),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -641,6 +1377,169 @@ class AuditorScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  // 💰 🚀 THE DELTA PAYMENT COLLECTOR
+  void _collectPayment(
+    BuildContext context,
+    String orderId,
+    double amount,
+    Map<String, dynamic> data,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          "Collect Delta Payment",
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          "How did the customer pay the pending ₹${amount.toStringAsFixed(0)}?",
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.grey.shade700,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+            icon: const Icon(Icons.money, color: Colors.white, size: 18),
+            label: const Text(
+              "CASH",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: () =>
+                _processDeltaPayment(context, ctx, orderId, 'CASH', data),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            icon: const Icon(Icons.qr_code, color: Colors.white, size: 18),
+            label: const Text(
+              "UPI",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onPressed: () =>
+                _processDeltaPayment(context, ctx, orderId, 'UPI', data),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _processDeltaPayment(
+    BuildContext mainContext,
+    BuildContext dialogContext,
+    String orderId,
+    String mode,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      // 🧠 STEP 1: SMART INVOICE ENGINE (Checks if already exists)
+      String invoiceNo = data['invoiceNo']?.toString() ?? '';
+
+      if (invoiceNo.isEmpty) {
+        String tenantId = data['tenantId']?.toString() ?? '';
+        String branchCode = data['branchCode']?.toString() ?? 'STORE';
+        String prefix = "INV/"; // Default Fallback
+
+        // 🔄 THE LOOP: Fetch Custom Admin Prefix from Database
+        if (tenantId.isNotEmpty && tenantId != 'ALL' && tenantId != 'GLOBAL') {
+          var tDoc = await FirebaseFirestore.instance
+              .collection('tenants')
+              .doc(tenantId)
+              .get();
+          if (tDoc.exists) {
+            var config =
+                tDoc.data()?['invoiceConfig'] as Map<String, dynamic>? ?? {};
+            String adminPrefix =
+                config['invoicePrefix']?.toString().trim() ?? '';
+            if (adminPrefix.isNotEmpty) {
+              prefix = adminPrefix;
+              // Formatting: Add slash or dash if Admin forgot to put it at the end
+              if (!prefix.endsWith('/') && !prefix.endsWith('-')) prefix += '/';
+            }
+          }
+        }
+
+        // 📅 STEP 2: Generate YY-YY and MM-DD
+        final now = DateTime.now();
+        int startYear = now.month >= 4 ? now.year : now.year - 1;
+        String fyStr =
+            "${(startYear % 100).toString().padLeft(2, '0')}-${((startYear + 1) % 100).toString().padLeft(2, '0')}";
+        String dateStr =
+            "${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+        String todayKey =
+            "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+
+        // ⚡ STEP 3: Atomic Daily Counter (Safe from Race Conditions)
+        String tenantPrefix = tenantId.isNotEmpty && tenantId != 'ALL'
+            ? tenantId
+            : 'GLOBAL';
+        DocumentReference counterRef = FirebaseFirestore.instance
+            .collection('daily_invoice_counters')
+            .doc("${tenantPrefix}_${branchCode}_$todayKey");
+        int seq = await FirebaseFirestore.instance.runTransaction((
+          transaction,
+        ) async {
+          DocumentSnapshot snapshot = await transaction.get(counterRef);
+          if (!snapshot.exists) {
+            transaction.set(counterRef, {'count': 1});
+            return 1;
+          } else {
+            int newCount =
+                (snapshot.data() as Map<String, dynamic>)['count'] + 1;
+            transaction.update(counterRef, {'count': newCount});
+            return newCount;
+          }
+        });
+
+        // 🎯 STEP 4: Combine everything (e.g., MART/26-27/04-23-01)
+        invoiceNo = "$prefix$fyStr/$dateStr-${seq.toString().padLeft(2, '0')}";
+      }
+
+      // 💾 STEP 5: SAVE EVERYTHING TO DATABASE
+      await FirebaseFirestore.instance.collection('orders').doc(orderId).update(
+        {
+          'paymentStatus': 'PAID',
+          'paymentMode': mode,
+          'exitStatus': 'APPROVED',
+          'verifiedAt': FieldValue.serverTimestamp(),
+          'invoiceNo': invoiceNo, // 🔥 THE MISSING FIELD HAS BEEN ADDED!
+        },
+      );
+
+      if (dialogContext.mounted) Navigator.pop(dialogContext); // Close alert
+      if (mainContext.mounted) {
+        Navigator.pop(mainContext); // Close autopsy panel
+        ScaffoldMessenger.of(mainContext).showSnackBar(
+          const SnackBar(
+            content: Text("✅ Payment Collected! Gatepass Activated."),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (dialogContext.mounted) {
+        ScaffoldMessenger.of(dialogContext).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   // 🚀 FALLBACK FIX: Shows Phone Number if Name is missing
@@ -721,43 +1620,16 @@ class AuditorScreen extends ConsumerWidget {
                     ),
                   )
                 else
-                  FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance
-                        .collection('employees')
-                        .doc(uid)
-                        .get()
-                        .then(
-                          (v) => v.exists
-                              ? v
-                              : FirebaseFirestore.instance
-                                    .collection('guards')
-                                    .doc(uid)
-                                    .get(),
-                        ),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Text(
-                          "Loading...",
-                          style: TextStyle(fontSize: 12),
-                        );
-                      }
-
-                      // 🚀 THE FIX: Agar Data null aaye toh raw 'uid' (phone number) print kar do
-                      String name = uid;
-                      if (snapshot.data?.data() != null) {
-                        name = (snapshot.data!.data() as Map)['name'] ?? uid;
-                      }
-
-                      return Text(
-                        name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          color: Colors.black87,
-                          fontSize: 12,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      );
-                    },
+                  // 🚀 SaaS Fix: Removed N+1 FutureBuilder to prevent UI freeze and read explosions.
+                  // We now directly render the denormalized name/ID stored in the order document.
+                  Text(
+                    uid,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black87,
+                      fontSize: 12,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
               ],
             ),
@@ -767,40 +1639,7 @@ class AuditorScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildReceiptRow(
-    String label,
-    dynamic amountOrString, {
-    Color? color,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            amountOrString is num
-                ? (amountOrString < 0
-                      ? "-₹${amountOrString.abs().toStringAsFixed(2)}"
-                      : "₹${amountOrString.toStringAsFixed(2)}")
-                : amountOrString.toString(),
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-              color: color ?? Colors.black87,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // 🗑️ _buildReceiptRow successfully removed as it is no longer used
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -808,8 +1647,19 @@ class AuditorScreen extends ConsumerWidget {
     final ledgerState = ref.watch(ledgerProvider);
     final ledgerNotifier = ref.read(ledgerProvider.notifier);
 
+    // 🎨 DYNAMIC LIGHT/DARK THEME
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final Color bgColor = isDark
+        ? const Color(0xFF121212)
+        : const Color(0xFFF4F5F7);
+    final Color cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final Color textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+    final Color textDimColor = isDark ? Colors.white54 : Colors.grey.shade600;
+    final Color borderColor = isDark ? Colors.white10 : Colors.grey.shade300;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FE),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -820,100 +1670,142 @@ class AuditorScreen extends ConsumerWidget {
               LayoutBuilder(
                 builder: (context, constraints) {
                   bool isMobile = constraints.maxWidth < 600;
-                  return Flex(
-                    direction: isMobile ? Axis.vertical : Axis.horizontal,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: isMobile
-                        ? CrossAxisAlignment.start
-                        : CrossAxisAlignment.center,
+
+                  Widget headerText = Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.admin_panel_settings,
-                            color: Color(0xFF2B3674),
-                            size: 36,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
-                                Text(
-                                  "Financial Intelligence",
-                                  style: TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF2B3674),
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                                Text(
-                                  "Audit Command Center (Realized Accounting)",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.admin_panel_settings,
+                        color: textColor,
+                        size: 36,
                       ),
-                      if (isMobile) const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AuditVaultScreen(),
-                          ),
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: Colors.grey.shade800,
-                              width: 2,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Command Center",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: textColor,
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 10,
-                                offset: Offset(0, 4),
+                            Text(
+                              "Audit Command Center (Realized Accounting)",
+                              style: TextStyle(
+                                color: textDimColor,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
-                              Icon(
-                                Icons.archive,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                "THE BLACK BOX",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 14,
-                                  letterSpacing: 2,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   );
+
+                  Widget theBlackBox = GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AuditVaultScreen(),
+                      ),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.black : const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.grey.shade800
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.archive, color: Colors.white, size: 20),
+                          SizedBox(width: 12),
+                          Text(
+                            "THE BLACK BOX",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 14,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+
+                  // 🚀 NEW: INVOICE RULES BUTTON
+                  Widget invoiceRulesBtn = OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textColor,
+                      side: BorderSide(color: borderColor),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    icon: const Icon(Icons.gavel, size: 18),
+                    label: const Text(
+                      "INVOICE RULES",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (context) => const InvoiceRulesDialog(),
+                    ),
+                  );
+
+                  // 🚀 FIX: Prevent 'Expanded' crashes inside unbounded columns
+                  if (isMobile) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        headerText,
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [invoiceRulesBtn, theBlackBox],
+                        ),
+                      ],
+                    );
+                  } else {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(child: headerText),
+                        const SizedBox(width: 16),
+                        invoiceRulesBtn,
+                        const SizedBox(width: 12),
+                        theBlackBox,
+                      ],
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 32),
@@ -946,6 +1838,7 @@ class AuditorScreen extends ConsumerWidget {
                             childAspectRatio: 2.5,
                             children: [
                               _buildPremiumCard(
+                                context,
                                 "Realized Revenue",
                                 "₹${finData.totalRevenue.toStringAsFixed(0)}",
                                 Icons.account_balance_wallet,
@@ -953,6 +1846,7 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "Only verified exits",
                               ),
                               _buildPremiumCard(
+                                context,
                                 "Financial Leakage",
                                 "₹${finData.totalLeakage.toStringAsFixed(0)}",
                                 Icons.hourglass_bottom,
@@ -960,6 +1854,7 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "Paid but pending exit",
                               ),
                               _buildPremiumCard(
+                                context,
                                 "Guard Rejects",
                                 "${finData.rejectedCount} Orders",
                                 Icons.gpp_bad,
@@ -967,6 +1862,7 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "Security interventions",
                               ),
                               _buildPremiumCard(
+                                context,
                                 "Refunds Initiated",
                                 "₹${finData.refundAmount.toStringAsFixed(0)}",
                                 Icons.currency_exchange,
@@ -982,43 +1878,59 @@ class AuditorScreen extends ConsumerWidget {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           bool isMobile = constraints.maxWidth < 800;
-                          return Flex(
-                            direction: isMobile
-                                ? Axis.vertical
-                                : Axis.horizontal,
-                            children: [
-                              Expanded(
-                                flex: isMobile ? 0 : 1,
-                                child: CashReconciliationCard(
+                          // 🚀 FIX: Safe Layout - No Expanded inside ScrollView for mobile vertical view
+                          if (isMobile) {
+                            return Column(
+                              children: [
+                                CashReconciliationCard(
                                   expectedCash: finData.cashExpected,
                                 ),
-                              ),
-                              SizedBox(
-                                width: isMobile ? 0 : 24,
-                                height: isMobile ? 24 : 0,
-                              ),
-                              Expanded(
-                                flex: isMobile ? 0 : 1,
-                                child: _buildUpiReconciliationCard(
+                                const SizedBox(height: 24),
+                                _buildUpiReconciliationCard(
+                                  context,
                                   finData.digitalExpected,
                                 ),
-                              ),
-                            ],
-                          );
+                              ],
+                            );
+                          } else {
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: CashReconciliationCard(
+                                    expectedCash: finData.cashExpected,
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                                Expanded(
+                                  child: _buildUpiReconciliationCard(
+                                    context,
+                                    finData.digitalExpected,
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
                         },
                       ),
                       const SizedBox(height: 24),
 
-                      const TimeIntelligenceCard(),
-                      const SizedBox(height: 24),
-
+                      // 🚀 REMOVED: const TimeIntelligenceCard(),
+                      // const SizedBox(height: 24),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: cardColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade200),
+                          border: Border.all(color: borderColor),
+                          boxShadow: [
+                            if (!isDark)
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 15,
+                                offset: const Offset(0, 4),
+                              ),
+                          ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1028,12 +1940,12 @@ class AuditorScreen extends ConsumerWidget {
                               crossAxisAlignment: WrapCrossAlignment.center,
                               runSpacing: 15,
                               children: [
-                                const Text(
+                                Text(
                                   "Global Audit Ledger",
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2B3674),
+                                    color: textColor,
                                   ),
                                 ),
                                 Row(
@@ -1093,6 +2005,7 @@ class AuditorScreen extends ConsumerWidget {
                               runSpacing: 8,
                               children: [
                                 _buildDropdownFilter(
+                                  context,
                                   "Time",
                                   ['ALL_TIME', 'TODAY', 'LAST_7_DAYS'],
                                   ledgerState.currentFilters.timeRange,
@@ -1101,6 +2014,7 @@ class AuditorScreen extends ConsumerWidget {
                                   ),
                                 ),
                                 _buildDropdownFilter(
+                                  context,
                                   "Mode",
                                   ['ALL', 'CASH', 'UPI', 'CARD'],
                                   ledgerState.currentFilters.mode,
@@ -1146,17 +2060,15 @@ class AuditorScreen extends ConsumerWidget {
                                   ],
                                 ),
                               ),
+                              // 🚀 FIX: Removed RawScrollbar which causes layout crashes on Web
+                              // Simplified horizontal scroll wrapper for DataTable
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(8),
-                                child: RawScrollbar(
-                                  thumbColor: Colors.grey.shade400,
-                                  radius: const Radius.circular(4),
-                                  thickness: 6,
-                                  thumbVisibility: true,
+                                child: SizedBox(
+                                  width: double.infinity,
                                   child: SingleChildScrollView(
                                     scrollDirection: Axis.horizontal,
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(),
+                                    physics: const BouncingScrollPhysics(),
                                     child: ConstrainedBox(
                                       constraints: const BoxConstraints(
                                         minWidth: 900,
@@ -1165,12 +2077,21 @@ class AuditorScreen extends ConsumerWidget {
                                         columnSpacing: 30,
                                         headingRowColor:
                                             WidgetStateProperty.all(
-                                              Colors.grey.shade50,
+                                              Colors.greenAccent.withOpacity(
+                                                0.1,
+                                              ),
                                             ),
                                         headingTextStyle: const TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          color: Color(0xFF2B3674),
+                                          color: Colors.greenAccent,
+                                          fontFamily: 'monospace',
                                           fontSize: 12,
+                                        ),
+                                        dataTextStyle: TextStyle(
+                                          color: isDark
+                                              ? Colors.white70
+                                              : Colors.black87,
+                                          fontFamily: 'monospace',
                                         ),
                                         columns: const [
                                           DataColumn(
@@ -1254,14 +2175,28 @@ class AuditorScreen extends ConsumerWidget {
                                                   if (states.contains(
                                                     WidgetState.hovered,
                                                   )) {
-                                                    return Colors.blue
-                                                        .withOpacity(0.04);
+                                                    return Colors.greenAccent
+                                                        .withOpacity(0.1);
                                                   }
-                                                  return idx % 2 == 0
-                                                      ? Colors.grey.withOpacity(
-                                                          0.02,
-                                                        )
-                                                      : Colors.white;
+                                                  if (isDark) {
+                                                    return idx % 2 == 0
+                                                        ? const Color.fromARGB(
+                                                            255,
+                                                            33,
+                                                            33,
+                                                            33,
+                                                          )
+                                                        : const Color.fromARGB(
+                                                            255,
+                                                            32,
+                                                            31,
+                                                            31,
+                                                          );
+                                                  } else {
+                                                    return idx % 2 == 0
+                                                        ? Colors.grey.shade50
+                                                        : Colors.white;
+                                                  }
                                                 }),
                                             cells: [
                                               DataCell(
@@ -1269,8 +2204,11 @@ class AuditorScreen extends ConsumerWidget {
                                                   DateFormat(
                                                     'dd MMM, hh:mm a',
                                                   ).format(date),
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
+                                                  style: TextStyle(
+                                                    color: isDark
+                                                        ? Colors.white54
+                                                        : Colors.black87,
+                                                    fontFamily: 'monospace',
                                                     fontWeight: FontWeight.w500,
                                                   ),
                                                 ),
@@ -1343,19 +2281,106 @@ class AuditorScreen extends ConsumerWidget {
                                                 ),
                                               ),
                                               DataCell(
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons.receipt_long,
-                                                    color: Color(0xFF2B3674),
-                                                  ),
-                                                  tooltip:
-                                                      "View E-Invoice & Autopsy",
-                                                  onPressed: () =>
-                                                      _showAutopsyPanel(
-                                                        context,
-                                                        data,
-                                                        entry.value.id,
+                                                Builder(
+                                                  builder: (context) {
+                                                    String btnText = "Pending";
+                                                    Color btnColor =
+                                                        Colors.grey;
+
+                                                    // 🚀 LOGIC FOR EXACT BUTTON STATUSES
+                                                    if (pStatus == 'REFUNDED') {
+                                                      btnText = "Refunded";
+                                                      btnColor =
+                                                          Colors.redAccent;
+                                                    } else if (pStatus ==
+                                                        'PENDING_DELTA_PAYMENT') {
+                                                      btnText = "Fix & Exit";
+                                                      btnColor =
+                                                          Colors.purpleAccent;
+                                                    } else if (pStatus ==
+                                                        'PENDING') {
+                                                      btnText = "Pending";
+                                                      btnColor = Colors.grey;
+                                                    } else if (pStatus ==
+                                                            'PAID' ||
+                                                        pStatus == 'SUCCESS') {
+                                                      if ([
+                                                        'COMPLETED',
+                                                        'EXITED',
+                                                        'APPROVED',
+                                                      ].contains(eStatus)) {
+                                                        btnText = "Clear Exit";
+                                                        btnColor =
+                                                            Colors.greenAccent;
+                                                      } else if (eStatus ==
+                                                          'REJECTED') {
+                                                        btnText = "Fix Reject";
+                                                        btnColor =
+                                                            Colors.redAccent;
+                                                      } else {
+                                                        btnText =
+                                                            "Gate Pass Pending";
+                                                        btnColor =
+                                                            Colors.orangeAccent;
+                                                      }
+                                                    }
+
+                                                    return InkWell(
+                                                      onTap: () =>
+                                                          _showAutopsyPanel(
+                                                            context,
+                                                            data,
+                                                            entry.value.id,
+                                                          ),
+                                                      child: Container(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 12,
+                                                              vertical: 6,
+                                                            ),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors
+                                                              .transparent,
+                                                          border: Border.all(
+                                                            color: btnColor
+                                                                .withOpacity(
+                                                                  0.5,
+                                                                ),
+                                                          ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                20,
+                                                              ),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            Text(
+                                                              btnText,
+                                                              style: TextStyle(
+                                                                color: btnColor,
+                                                                fontSize: 11,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 6,
+                                                            ),
+                                                            const Icon(
+                                                              Icons
+                                                                  .keyboard_arrow_down,
+                                                              color: Colors
+                                                                  .white54,
+                                                              size: 14,
+                                                            ),
+                                                          ],
+                                                        ),
                                                       ),
+                                                    );
+                                                  },
                                                 ),
                                               ),
                                             ],
@@ -1416,16 +2441,19 @@ class AuditorScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildUpiReconciliationCard(double expectedUpi) {
+  Widget _buildUpiReconciliationCard(BuildContext context, double expectedUpi) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.blueAccent.withOpacity(0.2), width: 2),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade300,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.blueAccent.withOpacity(0.05),
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -1436,14 +2464,14 @@ class AuditorScreen extends ConsumerWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.account_balance, color: Colors.blueAccent.shade700),
+              Icon(Icons.account_balance, color: Colors.blueAccent.shade200),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 "Online Payment Collection",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF2B3674),
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
             ],
@@ -1456,11 +2484,11 @@ class AuditorScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "Bank Settlement Expected",
+                      "SETTLEMENT_EXPECTED",
                       style: TextStyle(
-                        color: Colors.grey,
+                        color: Colors.white54,
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        fontFamily: 'monospace',
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -1469,7 +2497,8 @@ class AuditorScreen extends ConsumerWidget {
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
-                        color: Colors.blueAccent,
+                        color: Colors.greenAccent,
+                        fontFamily: 'monospace',
                       ),
                     ),
                   ],
@@ -1508,16 +2537,23 @@ class AuditorScreen extends ConsumerWidget {
   }
 
   Widget _buildDropdownFilter(
+    BuildContext context,
     String label,
     List<String> items,
     String currentValue,
     Function(String) onChanged,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100;
+    final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.05),
-        border: Border.all(color: Colors.blue.withOpacity(0.2)),
+        color: bgColor,
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade300,
+        ),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -1525,19 +2561,20 @@ class AuditorScreen extends ConsumerWidget {
         children: [
           Text(
             "$label: ",
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: isDark ? Colors.white54 : Colors.grey.shade700,
               fontSize: 12,
             ),
           ),
           DropdownButton<String>(
+            dropdownColor: bgColor,
             value: items.contains(currentValue) ? currentValue : items.first,
             underline: const SizedBox(),
-            icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF2B3674)),
-            style: const TextStyle(
+            icon: Icon(Icons.arrow_drop_down, color: textColor),
+            style: TextStyle(
               fontWeight: FontWeight.w900,
-              color: Color(0xFF2B3674),
+              color: textColor,
               fontSize: 12,
             ),
             items: items
@@ -1553,22 +2590,26 @@ class AuditorScreen extends ConsumerWidget {
   }
 
   Widget _buildPremiumCard(
+    BuildContext context,
     String title,
     String value,
     IconData icon,
     Color color, {
     String subtitle = "",
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade100),
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.grey.shade300,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -1592,7 +2633,7 @@ class AuditorScreen extends ConsumerWidget {
                 Text(
                   title,
                   style: TextStyle(
-                    color: Colors.grey.shade600,
+                    color: isDark ? Colors.white70 : Colors.grey.shade600,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1600,10 +2641,10 @@ class AuditorScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF2B3674),
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1611,8 +2652,8 @@ class AuditorScreen extends ConsumerWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: color,
-                      fontSize: 10,
+                      color: color.withOpacity(isDark ? 0.8 : 1.0),
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

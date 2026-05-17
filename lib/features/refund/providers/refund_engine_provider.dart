@@ -21,6 +21,31 @@ class RefundEngineNotifier extends Notifier<AsyncValue<Map<String, dynamic>?>> {
       if (!doc.exists) throw "Order Not Found!";
 
       final data = doc.data()!;
+
+      // 🚀 THE REAL FIX: FAIL-CLOSED ISOLATION (No bypass allowed)
+      final adminData = ref.read(adminRoleProvider).value;
+
+      // Agar security context null hai, turant block karo!
+      if (adminData == null) {
+        throw "SYSTEM HALTED: Admin context missing. Please try again.";
+      }
+
+      final String? tenantId = adminData['tenantId'];
+      final String? branchCode = adminData['branchCode'];
+      final String role = (adminData['role'] ?? '').toString().toLowerCase();
+      final bool isSuperAdmin = role == 'super_admin' || role == 'admin';
+
+      if (!isSuperAdmin) {
+        // Level 1 Lock: STRICT MATCH REQUIRED
+        if (tenantId == null || data['tenantId'] != tenantId) {
+          throw "🚨 ACCESS DENIED: Tenant Breach Blocked!";
+        }
+        // Level 2 Lock: STRICT MATCH REQUIRED
+        if (branchCode == null || data['branchCode'] != branchCode) {
+          throw "🚨 ACCESS DENIED: Store Breach Blocked!";
+        }
+      }
+
       data['id'] = doc.id;
 
       // MOCK FRAUD SCORE
@@ -45,8 +70,10 @@ class RefundEngineNotifier extends Notifier<AsyncValue<Map<String, dynamic>?>> {
       final refundDocId = 'ref_$orderId'; // 🛡️ IDEMPOTENCY KEY
       final refundRef = _db.collection('refunds').doc(refundDocId);
 
-      // 🚀 SAAS INJECTION: Get current tenant ID
-      final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
+      // 🚀 SAAS INJECTION: Get current tenant ID & branchCode
+      final adminData = ref.read(adminRoleProvider).value;
+      final tenantId = adminData?['tenantId'];
+      final branchCode = adminData?['branchCode'];
 
       await _db.runTransaction((transaction) async {
         // 1. Check if refund already exists (IDEMPOTENCY CHECK)
@@ -96,6 +123,7 @@ class RefundEngineNotifier extends Notifier<AsyncValue<Map<String, dynamic>?>> {
           'adminId': adminEmail,
           'timestamp': FieldValue.serverTimestamp(),
           'tenantId': tenantId, // 🚀 SAAS INJECTION
+          'branchCode': branchCode, // 🚀 LEVEL 2 AUDIT ADDED
         });
       });
 

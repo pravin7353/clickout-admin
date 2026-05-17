@@ -39,6 +39,8 @@ class ProductMasterNotifier extends Notifier<bool> {
         final cleanData = {
           'barcode': barcode,
           'name': productData['name'],
+          'itemType':
+              'PRODUCT', // 🚀 FIX: Yaha tag lagana zaroori tha DB me save hone ke liye!
           'price': double.tryParse(productData['price'].toString()) ?? 0.0,
           'unitCost':
               double.tryParse(productData['unitCost']?.toString() ?? '0') ??

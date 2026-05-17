@@ -12,15 +12,21 @@ class AuditVaultScreen extends ConsumerWidget {
     // 🚀 SAAS INJECTION: Get admin context
     final adminData = ref.watch(adminRoleProvider).value;
     final String? tenantId = adminData?['tenantId'];
+    final String? branchCode = adminData?['branchCode'];
     final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
     Query auditQuery = FirebaseFirestore.instance.collection('audit_logs');
 
-    // 🚀 SAAS ISOLATION: Filter logs by company
+    // 🚀 SAAS ISOLATION: Filter logs by company and branch
     if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
       auditQuery = auditQuery.where('tenantId', isEqualTo: tenantId);
     }
-    auditQuery = auditQuery.orderBy('timestamp', descending: true);
+    if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+      auditQuery = auditQuery.where('branchCode', isEqualTo: branchCode);
+    }
+
+    // 🚀 BILL EXPLOSION FIX: Limit logs to avoid OOM & massive read costs
+    auditQuery = auditQuery.orderBy('timestamp', descending: true).limit(150);
 
     return Scaffold(
       backgroundColor: const Color(0xFF000000), // ⬛ 100% PITCH BLACK THEME

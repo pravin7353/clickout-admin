@@ -441,18 +441,24 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                     }
                                   },
                             child: isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
+                                    // 🚀 'const' Hata diya
                                     width: 20,
                                     height: 20,
                                     child: CircularProgressIndicator(
-                                      color: Colors.white,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1B2559),
                                       strokeWidth: 2,
                                     ),
                                   )
-                                : const Text(
+                                : Text(
+                                    // 🚀 'const' Hata diya
                                     "Update Changes",
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: isDark
+                                          ? Colors.white
+                                          : const Color(0xFF1B2559),
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -529,6 +535,8 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
 
     // Theme adaptions
     final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark; // 🚀 YE 1 LINE MISSING THI
     final tableBg = theme.cardColor;
     final textP = theme.textTheme.bodyLarge?.color ?? Colors.black;
 
@@ -550,17 +558,25 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      color: textP,
+                      color: isDark
+                          ? textP
+                          : const Color(
+                              0xFF0B6B60,
+                            ), // 💎 Emerald Text in Light Mode
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     "Total Active Enterprise Staff: ${managerState.totalStaffCount}",
-                    style: const TextStyle(
-                      color: Colors.grey,
+                    style: TextStyle(
+                      color: isDark
+                          ? Colors.grey
+                          : Colors
+                                .orange
+                                .shade800, // 💎 Orange Accent in Light Mode
                       fontSize: 16,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -594,38 +610,61 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                       onPressed: _showCsvDialog,
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      icon: const Icon(
-                        Icons.person_add_alt_1,
-                        color: Colors.white,
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: isDark
+                            ? null
+                            : const LinearGradient(
+                                colors: [Color(0xFF00C853), Color(0xFF0B6B60)],
+                              ), // 💎 Green to Emerald Gradient
+                        color: isDark ? theme.primaryColor : null,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: isDark
+                            ? []
+                            : [
+                                BoxShadow(
+                                  color: const Color(0xFF00C853).withValues(
+                                    alpha: 0.3,
+                                  ), // 💎 Glowing soft shadow
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                       ),
-                      label: const Text(
-                        "Add Personnel",
-                        style: TextStyle(
+                      child: ElevatedButton.icon(
+                        icon: const Icon(
+                          Icons.person_add_alt_1,
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
                         ),
+                        label: const Text(
+                          "Add Personnel",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor:
+                              Colors.transparent, // Let Container gradient show
+                          shadowColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () async {
+                          final success = await showDialog(
+                            context: context,
+                            builder: (ctx) => const OnboardStaffDialog(),
+                          );
+                          if (success == true) {
+                            ref.read(managerProvider.notifier).fetchInitial();
+                          }
+                        },
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: theme.primaryColor,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 16,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () async {
-                        final success = await showDialog(
-                          context: context,
-                          builder: (ctx) => const OnboardStaffDialog(),
-                        );
-                        if (success == true) {
-                          ref.read(managerProvider.notifier).fetchInitial();
-                        }
-                      },
                     ),
                   ],
                 ),
@@ -633,17 +672,19 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
           ),
           const SizedBox(height: 32),
 
-          // 🎛️ FILTER BAR
+          // 🎛️ FILTER BAR (🚀 RESPONSIVE & SEQUENCE STYLE FIX)
           Container(
             margin: const EdgeInsets.only(bottom: 20),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
-              color: theme.primaryColor.withOpacity(0.05),
-              border: Border.all(color: theme.primaryColor.withOpacity(0.2)),
+              color: isDark
+                  ? const Color(0xFF1A221A)
+                  : const Color(0xFFF4F5F7), // 💎 Sequence soft input
+              border: Border.all(color: theme.dividerColor),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text(
                   "Filter by Category: ",
@@ -679,14 +720,18 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
               decoration: BoxDecoration(
                 color: tableBg,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: theme.dividerColor,
+                ), // 💎 Sequence subtle edge
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 16,
+                    color: Colors.black.withValues(
+                      alpha: isDark ? 0.2 : 0.02,
+                    ), // 💎 Sequence ultra-soft shadow
+                    blurRadius: 15,
                     offset: const Offset(0, 4),
                   ),
                 ],
-                border: Border.all(color: theme.dividerColor),
               ),
               child: managerState.indexErrorMsg.isNotEmpty
                   ? Center(
@@ -735,16 +780,20 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                           headingRowHeight: 56,
                                           dataRowMaxHeight: 65,
                                           dataRowMinHeight: 65,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                                theme.brightness ==
-                                                        Brightness.dark
-                                                    ? const Color(0xFF1A221A)
-                                                    : Colors.grey.shade50,
-                                              ),
+                                          headingRowColor: WidgetStateProperty.all(
+                                            isDark
+                                                ? const Color(0xFF1A221A)
+                                                : const Color(
+                                                    0xFFE8F5E9,
+                                                  ), // 💎 Soft Emerald Tint for Header
+                                          ),
                                           headingTextStyle: TextStyle(
-                                            fontWeight: FontWeight.w800,
-                                            color: textP,
+                                            fontWeight: FontWeight.w900,
+                                            color: isDark
+                                                ? textP
+                                                : const Color(
+                                                    0xFF004D40,
+                                                  ), // 💎 Deep Emerald Text
                                             fontSize: 12,
                                             letterSpacing: 1.0,
                                           ),
@@ -1123,20 +1172,33 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
   Future<void> _processCsv() async {
     final text = _csvController.text.trim();
     if (text.isEmpty) return;
-    List<String> lines = text.split('\n');
-    if (lines.length < 2) {
-      setState(() => _errorLogs.add("Error: Minimum 1 data row required."));
+    List<String> lines = text
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (lines.isEmpty) {
+      setState(() => _errorLogs.add("Error: No data found."));
       return;
     }
+
+    // 🚀 SMART HEADER DETECTION: Check if first line contains 'empid' or 'role'
+    int startIndex = 0;
+    if (lines[0].toLowerCase().contains('empid') ||
+        lines[0].toLowerCase().contains('role')) {
+      startIndex = 1; // It's a header row, skip it
+    }
+
     setState(() {
       _isProcessing = true;
-      _totalRows = lines.length - 1;
+      _totalRows = lines.length - startIndex;
       _currentRow = 0;
       _successCount = 0;
       _failCount = 0;
       _errorLogs.clear();
     });
-    for (int i = 1; i < lines.length; i++) {
+
+    for (int i = startIndex; i < lines.length; i++) {
       if (!mounted) break;
       setState(() => _currentRow = i);
       String line = lines[i].trim();
@@ -1145,10 +1207,29 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
       if (columns.length < 6) {
         _failCount++;
         _errorLogs.add(
-          "Row $i: Missing columns. Expected 6, got ${columns.length}",
+          "Row $i: Missing columns. Expected format: empId, name, email, phone, role, branchCode",
         );
         continue;
       }
+
+      String role = columns[4].trim().toUpperCase();
+      String email = columns[2].trim();
+
+      // 🚀 BUG FIX: Email mandatory for MANAGER, optional for GUARD/CASHIER
+      if (role == 'MANAGER' && email.isEmpty) {
+        _failCount++;
+        _errorLogs.add("Row $i: Email is MANDATORY for Managers.");
+        continue;
+      }
+
+      if (role != 'MANAGER' && role != 'CASHIER' && role != 'GUARD') {
+        _failCount++;
+        _errorLogs.add(
+          "Row $i: Invalid role. Must be MANAGER, CASHIER, or GUARD.",
+        );
+        continue;
+      }
+
       // 🚀 SAAS INJECTION: Loop ke bahar ek baar data fetch kar lo
       final adminData = ref.read(adminRoleProvider).value;
       final String? tenantId = adminData?['tenantId'];
@@ -1182,12 +1263,18 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isMobile =
+        MediaQuery.of(context).size.width < 600; // 🚀 RESPONSIVE CHECK
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       backgroundColor: theme.cardColor,
+      insetPadding: EdgeInsets.all(
+        isMobile ? 15 : 24,
+      ), // Avoid touching screen edges
       child: Container(
-        width: 600,
-        padding: const EdgeInsets.all(24),
+        width: isMobile ? double.infinity : 600, // 🚀 DYNAMIC WIDTH
+        padding: EdgeInsets.all(isMobile ? 16 : 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1218,12 +1305,24 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
                 maxLines: 10,
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
+                  hintText:
+                      "e.g.\nEMP001, Manager Ji, manager@clickout.com, 9876543210, MANAGER, JAI_MUM_002\nEMP002, Cashier Babu, , 9876543211, CASHIER, JAI_MUM_002\nEMP003, Guard Bhaiya, , 9876543212, GUARD, JAI_MUM_002",
+                  hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
                   filled: true,
                   fillColor: theme.brightness == Brightness.dark
                       ? const Color(0xFF1A221A)
-                      : Colors.grey.withOpacity(0.1),
+                      : const Color(0xFFF4F5F7), // 💎 Sequence soft input
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: theme.dividerColor),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: theme.primaryColor),
                   ),
                 ),
               ),

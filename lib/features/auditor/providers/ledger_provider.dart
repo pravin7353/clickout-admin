@@ -22,6 +22,7 @@ class LedgerFilters {
 class LedgerNotifier extends ChangeNotifier {
   final String? tenantId;
   final String role;
+  final String? branchCode;
 
   List<QueryDocumentSnapshot> records = [];
   bool isLoading = false;
@@ -30,7 +31,7 @@ class LedgerNotifier extends ChangeNotifier {
 
   final int _limit = 10;
 
-  LedgerNotifier(this.tenantId, this.role) {
+  LedgerNotifier(this.tenantId, this.role, this.branchCode) {
     fetchInitial();
   }
 
@@ -44,9 +45,12 @@ class LedgerNotifier extends ChangeNotifier {
   Query _buildQuery() {
     Query query = FirebaseFirestore.instance.collection('orders');
 
-    // 🚀 SAAS ISOLATION LOGIC
+    // 🚀 SAAS ISOLATION LOGIC (LEVEL 1 & LEVEL 2)
     if (role != 'super_admin' && tenantId != null && tenantId!.isNotEmpty) {
       query = query.where('tenantId', isEqualTo: tenantId);
+    }
+    if (role == 'manager' && branchCode != null && branchCode!.isNotEmpty) {
+      query = query.where('branchCode', isEqualTo: branchCode);
     }
 
     if (currentFilters.mode != 'ALL') {
@@ -113,6 +117,7 @@ final ledgerProvider = ChangeNotifierProvider<LedgerNotifier>((ref) {
   final adminData = ref.watch(adminRoleProvider).value;
   final String? tenantId = adminData?['tenantId'];
   final String role = (adminData?['role'] ?? '').toString().toLowerCase();
+  final String? branchCode = adminData?['branchCode'];
 
-  return LedgerNotifier(tenantId, role);
+  return LedgerNotifier(tenantId, role, branchCode);
 });

@@ -6,10 +6,11 @@ class GuardService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // 🟢 AUTHORIZE EXIT ENGINE (🚀 SAAS INJECTED)
+  // 🟢 AUTHORIZE EXIT ENGINE (🚀 SAAS INJECTED - LEVEL 1 & 2 ISOLATION)
   static Future<Map<String, dynamic>> processValidScan(
     String rawInput,
     String? tenantId,
+    String? branchCode, // 🚀 LEVEL 2 ISOLATION ADDED
   ) async {
     final guardEmail = _auth.currentUser?.email ?? 'UNKNOWN_EMAIL';
     final guardId = _auth.currentUser?.uid ?? 'UNKNOWN_GUARD';
@@ -71,7 +72,8 @@ class GuardService {
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'APPROVED',
         'totalAmount': data['totalAmount'] ?? 0,
-        'tenantId': tenantId, // 🚀 SAAS INJECTION
+        'tenantId': tenantId,
+        'branchCode': branchCode ?? 'UNKNOWN', // 🚀 BRANCH ISOLATION LOCKED
       });
 
       // 3. AUDIT LOG
@@ -85,7 +87,8 @@ class GuardService {
         'severity': 'INFO',
         'targetCollection': 'gate_authorized',
         'targetId': authorizedRef.id,
-        'tenantId': tenantId, // 🚀 SAAS INJECTION
+        'tenantId': tenantId,
+        'branchCode': branchCode ?? 'UNKNOWN', // 🚀 BRANCH ISOLATION LOCKED
       });
 
       await batch.commit();
@@ -93,6 +96,26 @@ class GuardService {
       return {'success': true, 'msg': '✅ CLEAR EXIT: Gate Opened!'};
     } catch (e) {
       return {'success': false, 'msg': 'System Error: ${e.toString()}'};
+    }
+  }
+
+  // 🔴 REJECT GATE PASS (Wapas laya gaya method)
+  static Future<bool> rejectGatePass(String orderId, String? tenantId) async {
+    try {
+      final String guardEmail = _auth.currentUser?.email ?? 'UNKNOWN_EMAIL';
+      final DocumentReference orderRef = _db
+          .collection('orders')
+          .doc(orderId.trim());
+
+      await orderRef.update({
+        'exitStatus': 'REJECTED',
+        'verifiedByGuardId': guardEmail,
+        'verifiedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      print("Failed to reject gate pass: $e");
+      return false;
     }
   }
 

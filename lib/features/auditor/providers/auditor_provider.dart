@@ -37,107 +37,69 @@ class DailyFinancials {
   });
 }
 
-// 🚀 THE FINANCIAL INTELLIGENCE ENGINE
+// 🚀 THE FINANCIAL INTELLIGENCE ENGINE (O(1) SAAS OPTIMIZED)
 final dailyFinancialsProvider = StreamProvider<DailyFinancials>((ref) {
-  // 🚀 SAAS INJECTION: Fetch Current Admin Role & Tenant
   final adminData = ref.watch(adminRoleProvider).value;
   final String? tenantId = adminData?['tenantId'];
+  final String? branchCode = adminData?['branchCode'];
   final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
-  final now = DateTime.now();
-  final startOfDay = DateTime(now.year, now.month, now.day);
-
-  Query query = FirebaseFirestore.instance
-      .collection('orders')
-      .where(
-        'timestamp',
-        isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-      );
-
-  // 🚀 SAAS ISOLATION: Super Admin sees all, Tenant Admin sees only their data
-  if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
-    query = query.where('tenantId', isEqualTo: tenantId);
+  // For Super Admins or invalid states, return empty to prevent crash
+  if (tenantId == null ||
+      tenantId.isEmpty ||
+      role == 'super_admin' ||
+      branchCode == null) {
+    return Stream.value(DailyFinancials());
   }
 
-  return query.snapshots().map((snapshot) {
-    double revTotal = 0, revCash = 0, revUpi = 0;
-    double leakTotal = 0, leakCash = 0, leakUpi = 0;
-    int orders = 0, rejected = 0, pendingCount = 0;
-    int refunds = 0;
-    double refAmount = 0;
-    List<String> alerts = [];
+  final now = DateTime.now();
+  String dateStr =
+      "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+  String statDocId = "${tenantId}_${branchCode}_$dateStr";
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final double amount = (data['totalAmount'] ?? 0).toDouble();
-      final String mode = data['paymentMode'] ?? '';
-      final String pStatus = data['paymentStatus'] ?? '';
-      final String eStatus = data['exitStatus'] ?? '';
+  return FirebaseFirestore.instance
+      .collection('daily_store_stats')
+      .doc(statDocId)
+      .snapshots()
+      .map((snapshot) {
+        if (!snapshot.exists) return DailyFinancials();
 
-      orders++;
+        final data = snapshot.data() as Map<String, dynamic>;
 
-      if (eStatus == 'REJECTED') {
-        rejected++;
-      }
+        double leakTotal = (data['totalLeakage'] ?? 0).toDouble();
+        int rejected = (data['rejectedCount'] ?? 0).toInt();
+        int refunds = (data['refundCount'] ?? 0).toInt();
+        double refAmount = (data['refundAmount'] ?? 0).toDouble();
 
-      bool isRefund = (pStatus == 'REFUNDED');
-      bool isExited = (eStatus == 'EXITED' || eStatus == 'APPROVED');
-      bool isPending =
-          (eStatus == 'PENDING' ||
-          eStatus == 'EXPIRED_BY_SYSTEM' ||
-          eStatus == '');
+        List<String> alerts = [];
+        if (rejected >= 3)
+          alerts.add("CRITICAL: $rejected Guard Rejections detected today!");
+        if (leakTotal > 0)
+          alerts.add(
+            "LEAKAGE ALERT: ₹${leakTotal.toStringAsFixed(0)} stuck at exit verification.",
+          );
+        if (refunds >= 2)
+          alerts.add(
+            "FRAUD SPIKE: $refunds Refunds (₹${refAmount.toStringAsFixed(0)}) triggered today.",
+          );
 
-      if (isRefund) {
-        refunds++;
-        refAmount += amount;
-      } else if (pStatus == 'PAID' || pStatus == 'SUCCESS') {
-        if (isExited) {
-          revTotal += amount;
-          if (mode == 'CASH') {
-            revCash += amount;
-          } else {
-            revUpi += amount;
-          }
-        } else if (isPending) {
-          // 🔴 FINANCIAL LEAKAGE
-          leakTotal += amount;
-          pendingCount++;
-          if (mode == 'CASH') {
-            leakCash += amount;
-          } else {
-            leakUpi += amount;
-          }
-        }
-      }
-    }
-
-    if (rejected >= 3) {
-      alerts.add("CRITICAL: $rejected Guard Rejections detected today!");
-    }
-    if (leakTotal > 0) {
-      alerts.add(
-        "LEAKAGE ALERT: ₹${leakTotal.toStringAsFixed(0)} stuck at exit verification.",
-      );
-    }
-    if (refunds >= 2) {
-      alerts.add(
-        "FRAUD SPIKE: $refunds Refunds (₹${refAmount.toStringAsFixed(0)}) triggered today.",
-      );
-    }
-
-    return DailyFinancials(
-      totalRevenue: revTotal,
-      cashExpected: revCash + leakCash,
-      digitalExpected: revUpi + leakUpi,
-      totalLeakage: leakTotal,
-      cashLeakage: leakCash,
-      digitalLeakage: leakUpi,
-      totalOrders: orders,
-      rejectedCount: rejected,
-      pendingCount: pendingCount,
-      refundCount: refunds,
-      refundAmount: refAmount,
-      activeAlerts: alerts,
-    );
-  });
+        return DailyFinancials(
+          totalRevenue: (data['totalRevenue'] ?? 0).toDouble(),
+          cashExpected:
+              (data['cashRevenue'] ?? 0).toDouble() +
+              (data['cashLeakage'] ?? 0).toDouble(),
+          digitalExpected:
+              (data['upiRevenue'] ?? 0).toDouble() +
+              (data['upiLeakage'] ?? 0).toDouble(),
+          totalLeakage: leakTotal,
+          cashLeakage: (data['cashLeakage'] ?? 0).toDouble(),
+          digitalLeakage: (data['upiLeakage'] ?? 0).toDouble(),
+          totalOrders: (data['totalOrders'] ?? 0).toInt(),
+          rejectedCount: rejected,
+          pendingCount: (data['pendingCount'] ?? 0).toInt(),
+          refundCount: refunds,
+          refundAmount: refAmount,
+          activeAlerts: alerts,
+        );
+      });
 });

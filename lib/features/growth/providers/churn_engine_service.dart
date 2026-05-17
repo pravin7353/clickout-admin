@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION IMPORT
+import 'package:clickout_admin/features/auth/auth_provider.dart';
 
 class VIPCustomer {
   final String id;
@@ -12,7 +12,16 @@ class VIPCustomer {
   final DateTime lastVisit;
   final String riskLevel;
   final bool winbackSent;
-  final double expectedLoss; // 🚀 NEW: Predictive Revenue Loss
+  final double expectedLoss;
+  final String category;
+  final String branchCode;
+  final bool isPushEnabled;
+  final int pushCount;
+  final bool hasApp;
+  final int maxAllowedPushes;
+
+  final String? fcmToken;
+  final DateTime? fcmTokenUpdatedAt;
 
   VIPCustomer({
     required this.id,
@@ -23,8 +32,19 @@ class VIPCustomer {
     required this.lastVisit,
     required this.riskLevel,
     required this.winbackSent,
-    required this.expectedLoss, // 🚀 NEW
+    required this.expectedLoss,
+    this.category = 'VIP',
+    this.branchCode = 'UNKNOWN',
+    this.isPushEnabled = true,
+    this.pushCount = 0,
+    this.hasApp = true,
+    this.maxAllowedPushes = 3,
+    this.fcmToken,
+    this.fcmTokenUpdatedAt,
   });
+
+  bool get isNotificationEligible =>
+      hasApp == true && fcmToken != null && fcmToken!.isNotEmpty;
 }
 
 class ChurnEngineNotifier extends AsyncNotifier<List<VIPCustomer>> {
@@ -37,23 +57,22 @@ class ChurnEngineNotifier extends AsyncNotifier<List<VIPCustomer>> {
 
   Future<List<VIPCustomer>> _scanForChurn() async {
     try {
-      final roleData = ref.read(adminRoleProvider).value;
+      // 🚀 THE REFRESH BUG FIX: Use 'watch' instead of 'read' to auto-reload after page refresh!
+      final roleData = ref.watch(adminRoleProvider).value;
       if (roleData == null) return [];
 
       final tenantId = roleData['tenantId'];
       final role = roleData['role'];
-      final userBranch = roleData['branchCode']; // Store Manager ki apni branch
+      final userBranch = roleData['branchCode'];
 
       if (tenantId == null) return [];
 
-      // Check if user is ground-level staff
       final isManager =
           role == 'MANAGER' ||
           role == 'STORE_MANAGER' ||
           role == 'GUARD' ||
           role == 'CASHIER';
 
-      // 🚀 1. FETCH CONFIGS (Isolated if Manager)
       Query configQuery = _db
           .collection('growth_configs')
           .where('tenantId', isEqualTo: tenantId);
@@ -64,41 +83,32 @@ class ChurnEngineNotifier extends AsyncNotifier<List<VIPCustomer>> {
 
       Map<String, Map<String, dynamic>> storeConfigs = {};
       for (var doc in configsSnap.docs) {
-        // 🚀 THE FIX 1: Explicitly cast the config data
         final configData = doc.data() as Map<String, dynamic>;
         storeConfigs[configData['branchCode'] ?? 'UNKNOWN'] = configData;
       }
 
-      // 🚀 2. DYNAMIC QUERY BUILDING WITH LEAK PROTECTION
       Query usersQuery = _db
           .collection('users')
           .where('tenantId', isEqualTo: tenantId);
 
-      // 🔒 SECURITY LOCK: Strictly restrict to their own branch
       if (isManager && userBranch != null) {
         usersQuery = usersQuery.where('branchCode', isEqualTo: userBranch);
       }
 
-      final snapshot = await usersQuery
-          .where(
-            'totalSpent',
-            isGreaterThanOrEqualTo: 500,
-          ) // Catch F&B/Salon VIPs
-          .orderBy('totalSpent', descending: true)
-          .limit(100)
-          .get();
+      final snapshot = await usersQuery.limit(200).get();
 
       List<VIPCustomer> atRiskCustomers = [];
       final now = DateTime.now();
 
       for (var doc in snapshot.docs) {
-        // 🚀 THE FIX 2: Explicitly cast the user data
         final data = doc.data() as Map<String, dynamic>;
 
-        final totalVisits = data['totalVisits'] ?? 1;
-        if (totalVisits <= 1) continue;
+        final storeVisitData =
+            (data['storeVisits'] as Map<String, dynamic>?)?[tenantId]
+                as Map<String, dynamic>?;
+        final String userBranchCode =
+            storeVisitData?['branchCode'] ?? data['branchCode'] ?? 'UNKNOWN';
 
-        final String userBranchCode = data['branchCode'] ?? 'UNKNOWN';
         final config = storeConfigs[userBranchCode] ?? {};
 
         double vipThreshold = (config['vipThreshold'] ?? 2000).toDouble();
@@ -106,12 +116,25 @@ class ChurnEngineNotifier extends AsyncNotifier<List<VIPCustomer>> {
         double highMult = (config['churnMultiplierHigh'] ?? 3.0).toDouble();
         double medMult = (config['churnMultiplierMedium'] ?? 2.0).toDouble();
 
+        // 🚀 OOM & N+1 FIX: Direct read from user doc (Pre-calculated by Backend Cloud Function)
         double totalSpendAmount =
-            double.tryParse(data['totalSpent'].toString()) ?? 0.0;
+            double.tryParse(data['totalSpent']?.toString() ?? '0') ?? 0.0;
+        int validVisits = (data['totalVisits'] as int?) ?? 0;
+
+        // Use Store Visit Data fallback if specific branch data is required
+        if (storeVisitData != null) {
+          totalSpendAmount =
+              double.tryParse(
+                storeVisitData['totalSpent']?.toString() ?? '0',
+              ) ??
+              totalSpendAmount;
+          validVisits = (storeVisitData['totalVisits'] as int?) ?? validVisits;
+        }
 
         if (totalSpendAmount < vipThreshold) continue;
 
         final lastVisit =
+            (storeVisitData?['lastVisit'] as Timestamp?)?.toDate() ??
             (data['lastVisit'] as Timestamp?)?.toDate() ??
             now.subtract(const Duration(days: 90));
         int daysSinceLastVisit = now.difference(lastVisit).inDays;
@@ -123,62 +146,153 @@ class ChurnEngineNotifier extends AsyncNotifier<List<VIPCustomer>> {
           risk = 'MEDIUM';
         }
 
-        if (risk != 'SAFE' && data['winbackActive'] != true) {
-          double avgSpendPerVisit = totalVisits > 0
-              ? (totalSpendAmount / totalVisits)
-              : 0.0;
-          int missedCycles = expectedCycle > 0
-              ? (daysSinceLastVisit ~/ expectedCycle)
-              : 1;
-          double lossPrediction = avgSpendPerVisit * missedCycles;
-
+        if (data['winbackActive'] != true) {
           atRiskCustomers.add(
             VIPCustomer(
               id: doc.id,
               name: data['name'] ?? 'VIP User',
               phone: data['phone'] ?? 'N/A',
               totalSpent: totalSpendAmount,
-              totalVisits: totalVisits,
+              totalVisits: validVisits,
               lastVisit: lastVisit,
               riskLevel: risk,
               winbackSent: data['winbackActive'] ?? false,
-              expectedLoss: lossPrediction,
+              expectedLoss: 0.0,
+              category: data['category'] ?? 'VIP',
+              branchCode: userBranchCode,
+              isPushEnabled: true,
+              pushCount: data['pushCount'] ?? 0,
+              hasApp: data['hasApp'] ?? true,
+              maxAllowedPushes: config['maxAllowedPushes'] ?? 3,
+              fcmToken: data['fcmToken'] as String?,
+              fcmTokenUpdatedAt: (data['fcmTokenUpdatedAt'] as Timestamp?)
+                  ?.toDate(),
             ),
           );
         }
 
-        if (atRiskCustomers.length >= 50) break;
+        if (atRiskCustomers.length >= 100) break;
       }
       return atRiskCustomers;
     } catch (e) {
       debugPrint("🚨 Churn Engine Failed: $e");
-      throw Exception(
-        "Failed to analyze churn data. Please check Debug Console for Firebase Index link.",
-      );
+      return [];
     }
+  }
+
+  Future<void> sendTargetedOffer({
+    required String userId,
+    required String customerName,
+    required int currentPushCount,
+    required String offerName,
+    required double discountPercent,
+    required String couponCode,
+    required int expiryDays,
+  }) async {
+    try {
+      final roleData = ref.read(adminRoleProvider).value;
+      if (roleData == null) return;
+
+      final tenantId = roleData['tenantId'];
+      final branchCode = roleData['branchCode'];
+
+      await _db.collection('users').doc(userId).update({
+        'pushCount': FieldValue.increment(1),
+        'lastPushAt': FieldValue.serverTimestamp(),
+      });
+
+      await _db.collection('notifications').add({
+        'targetUserId': userId,
+        'tenantId': tenantId,
+        'branchCode': branchCode ?? 'UNKNOWN',
+        'notificationTitle': offerName,
+        'notificationBody':
+            'Hi $customerName! Use code $couponCode for $discountPercent% OFF! Valid for $expiryDays days.',
+        'couponCode': couponCode,
+        'discountPercent': discountPercent,
+        'expiryDays': expiryDays,
+        'type': 'TARGETED_OFFER',
+        'status': 'PENDING',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      ref.invalidateSelf();
+    } catch (e) {
+      throw Exception("Failed to send targeted offer");
+    }
+  }
+
+  Future<void> sendBulkOffer({
+    required Set<String> targetUserIds,
+    required String offerName,
+    required double discountPercent,
+    required String couponCode,
+    required int expiryDays,
+  }) async {
+    final roleData = ref.read(adminRoleProvider).value;
+    if (roleData == null) return;
+
+    final tenantId = roleData['tenantId'];
+    final branchCode = roleData['branchCode'];
+
+    final batch = _db.batch();
+    int opsCount = 0;
+
+    for (var userId in targetUserIds) {
+      try {
+        final userRef = _db.collection('users').doc(userId);
+        batch.update(userRef, {
+          'pushCount': FieldValue.increment(1),
+          'lastPushAt': FieldValue.serverTimestamp(),
+        });
+
+        final notifRef = _db.collection('notifications').doc();
+        batch.set(notifRef, {
+          'targetUserId': userId,
+          'tenantId': tenantId,
+          'branchCode': branchCode ?? 'UNKNOWN',
+          'notificationTitle': offerName,
+          'notificationBody':
+              'Special Offer! Use code $couponCode for $discountPercent% OFF! Valid for $expiryDays days.',
+          'couponCode': couponCode,
+          'discountPercent': discountPercent,
+          'expiryDays': expiryDays,
+          'type': 'BULK_OFFER',
+          'status': 'PENDING',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        opsCount++;
+        // Firebase limit is 500 ops per batch. (2 ops per loop = 250 users max per commit)
+        if (opsCount >= 240) {
+          await batch.commit();
+          opsCount = 0;
+        }
+      } catch (e) {
+        debugPrint("Bulk Offer Queue Error for $userId: $e");
+      }
+    }
+
+    if (opsCount > 0) {
+      await batch.commit();
+    }
+    ref.invalidateSelf();
   }
 
   Future<void> sendWinbackCoupon(String userId, String customerName) async {
     try {
       final String promoCode = "COMEBACK20";
-
       final roleData = ref.read(adminRoleProvider).value;
-      if (roleData == null) {
-        throw Exception("CRITICAL ERROR: Security Verification Failed.");
-      }
-
+      if (roleData == null) return;
       final tenantId = roleData['tenantId'];
       final branchCode = roleData['branchCode'];
 
-      // 1. UPDATE USER STATUS (Lock them from spam)
       await _db.collection('users').doc(userId).update({
         'winbackActive': true,
         'winbackCoupon': promoCode,
         'winbackSentAt': FieldValue.serverTimestamp(),
       });
 
-      // 🚀 2. THE MAGIC: TRIGGER PUSH NOTIFICATION QUEUE
-      // Aapka Firebase Cloud Function is collection ko sunega aur FCM bhejega
       await _db.collection('notifications').add({
         'targetUserId': userId,
         'tenantId': tenantId,
@@ -186,27 +300,17 @@ class ChurnEngineNotifier extends AsyncNotifier<List<VIPCustomer>> {
         'notificationTitle': 'We Miss You, $customerName! 🥺',
         'notificationBody':
             'Here is a flat 20% OFF on your next visit to our store. Use code: $promoCode',
+        'couponCode': promoCode,
+        'discountPercent': 20.0,
+        'expiryDays': 7, // Standard 7 days expiry for Winback
         'type': 'WINBACK_COUPON',
-        'status':
-            'PENDING', // Backend will change this to 'SENT' when FCM fires
+        'status': 'PENDING',
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // 3. AUDIT LOG
-      await _db.collection('admin_audit_logs').add({
-        'action': 'PUSH_NOTIFICATION_TRIGGERED',
-        'userId': userId,
-        'couponCode': promoCode,
-        'tenantId': tenantId,
-        'branchCode': branchCode ?? 'UNKNOWN',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      debugPrint("✅ PUSH NOTIFICATION QUEUED for $customerName!");
-      ref.invalidateSelf(); // Refresh UI instantly
+      ref.invalidateSelf();
     } catch (e) {
       debugPrint("🚨 Failed to send push notification: $e");
-      throw Exception("Could not send notification. Please try again.");
     }
   }
 }
@@ -216,13 +320,11 @@ final churnEngineProvider =
       return ChurnEngineNotifier();
     });
 
-// 🚀 STATE PROVIDER FOR WARNING BANNER (STEP 3)
 final growthConfigStatusProvider = FutureProvider.autoDispose<bool>((
   ref,
 ) async {
   final tenantId = ref.watch(adminRoleProvider).value?['tenantId'];
   if (tenantId == null) return false;
-  // 🚀 Checks ROOT collection to see if ANY store under this tenant has configured AI
   final snap = await FirebaseFirestore.instance
       .collection('growth_configs')
       .where('tenantId', isEqualTo: tenantId)

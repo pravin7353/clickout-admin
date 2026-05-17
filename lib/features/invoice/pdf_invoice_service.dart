@@ -151,8 +151,11 @@ class PdfInvoiceService {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text("Invoice #: $id"),
+                      // 🚀 FIX: Actual Generated Invoice Number Print Hoga
+                      pw.Text("Invoice #: ${data['invoiceNo'] ?? id}"),
                       pw.Text("Date: $dateStr"),
+                      // 🚀 FIX: PDF me Cashier / Manager ka naam
+                      pw.Text("Billed By: ${data['cashierName'] ?? 'Manager'}"),
                     ],
                   ),
                 ],

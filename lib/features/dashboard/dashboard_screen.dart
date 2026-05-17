@@ -43,9 +43,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget build(BuildContext context) {
     final revenueState = ref.watch(revenueEngineProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryTextColor = isDark ? Colors.white : const Color(0xFF2B3674);
-    final sectionTextColor = isDark ? Colors.white70 : Colors.black87;
-    final bgColor = isDark ? const Color(0xFF080B08) : const Color(0xFFF4F7FE);
+    final primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final sectionTextColor = Theme.of(context).textTheme.labelLarge?.color;
+    final bgColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -80,53 +80,59 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  "Command Center Intel 📡",
-                  style: TextStyle(
-                    fontSize: MediaQuery.of(context).size.width < 600 ? 24 : 28,
-                    fontWeight: FontWeight.bold,
-                    color: primaryTextColor,
+                // 💎 SEQUENCE.IO HERO BANNER
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0B6B60), // Sequence Deep Teal
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Total Revenue",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            "₹${metrics.totalRevenue.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Text(
+                              "100.0% ↗",
+                              style: TextStyle(
+                                color: Colors.greenAccent.shade400,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const Text(
-                  "Real-time revenue & gate-pass reconciliation",
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 24),
 
-                Text(
-                  "SECTION A: Revenue Intelligence",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: sectionTextColor,
-                  ),
-                ),
-                const SizedBox(height: 15),
+                // 💎 CLEAN GRIDS (NO SECTION HEADERS)
                 _buildRevenueGrid(metrics),
-                const SizedBox(height: 30),
-
-                Text(
-                  "SECTION B: Order Logistics",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: sectionTextColor,
-                  ),
-                ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 16),
                 _buildOrderGrid(metrics),
-                const SizedBox(height: 30),
-
-                Text(
-                  "SECTION C: Financial Events",
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: sectionTextColor,
-                  ),
-                ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 16),
                 _buildEventsGrid(
                   metrics.refundCount,
                   metrics.refundAmount,
@@ -303,80 +309,76 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     bool isAmt,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+    final cardBg = Theme.of(context).cardColor;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+        border: Border.all(
+          color: Theme.of(context).dividerColor,
+        ), // 💎 Sequence subtle edge
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(isDark ? 0.1 : 0.05),
-            blurRadius: 10,
+            color: Colors.black.withValues(
+              alpha: isDark ? 0.2 : 0.02,
+            ), // 💎 Sequence ultra-soft shadow
+            blurRadius: 15,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
+          Row(
             children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
               Text(
                 title,
                 style: TextStyle(
                   color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
+            ],
+          ),
+          const Spacer(),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
                   isAmt
                       ? "₹${value.toStringAsFixed(0)}"
                       : value.toInt().toString(),
                   style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: textColor, // 🚀 Dynamic Text Color
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
                   ),
                 ),
-              ),
-              if (pct > 0) ...[
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    "${pct.toStringAsFixed(1)}% of Gross",
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+                if (pct > 0) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      "${pct.toStringAsFixed(1)}% ↗",
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: CircleAvatar(
-              backgroundColor: color.withOpacity(0.1),
-              child: Icon(icon, color: color, size: 20),
             ),
           ),
         ],
@@ -392,78 +394,70 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     IconData icon,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+    final cardBg = Theme.of(context).cardColor;
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.5), width: 1.5),
+        border: Border.all(
+          color: Theme.of(context).dividerColor,
+        ), // 💎 Sequence subtle edge
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1),
-            blurRadius: 10,
+            color: Colors.black.withValues(
+              alpha: isDark ? 0.2 : 0.02,
+            ), // 💎 Sequence ultra-soft shadow
+            blurRadius: 15,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          CircleAvatar(
-            radius: 25,
-            backgroundColor: color.withOpacity(0.1),
-            child: Icon(icon, color: color, size: 28),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontSize: 14,
+          const Spacer(),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "$count Orders",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  "Impact: ₹${amt.toStringAsFixed(0)}",
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Text(
-                      "$count Orders",
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF2B3674),
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        "Impact: ₹${amt.toStringAsFixed(0)}",
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -888,12 +882,12 @@ class _ReconciliationTableWidgetState
     });
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMobile =
-        MediaQuery.of(context).size.width <
-        768; // 🚀 Adjusted for Tablets/Mobiles
-    final cardBg = isDark ? const Color(0xFF111811) : Colors.white;
-    final inputBg = isDark ? const Color(0xFF1A221A) : Colors.grey.shade50;
-    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+    final isMobile = MediaQuery.of(context).size.width < 768;
+    final cardBg = Theme.of(context).cardColor;
+    final inputBg = isDark
+        ? const Color(0xFF1A221A)
+        : const Color(0xFFF4F5F7); // 💎 Sequence soft input
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
 
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)
@@ -920,10 +914,12 @@ class _ReconciliationTableWidgetState
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.05),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1185,7 +1181,9 @@ class _ReconciliationTableWidgetState
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontFamily: 'monospace',
-                                  color: isDark ? Colors.white : Colors.black87,
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
                                 ),
                               ),
                             ),

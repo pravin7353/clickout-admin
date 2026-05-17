@@ -5,14 +5,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:file_picker/file_picker.dart';
 
-import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
-import 'package:clickout_admin/core/utils/hierarchy_filter.dart'; // 🚀 THE WALL
+import 'package:clickout_admin/features/auth/auth_provider.dart';
+import 'package:clickout_admin/core/utils/hierarchy_filter.dart';
 
 import 'add_product_dialog.dart';
 import 'edit_product_dialog.dart';
-import '../providers/product_master/product_master_provider.dart'; // Verify this path matches your folder structure
-// 🚀 NEW: Required for Unblocking items
-import 'package:clickout_admin/features/procurement/services/stock_service.dart'; // 🚀 FIX: Correct Absolute Path
+import '../providers/product_master/product_master_provider.dart';
+import 'package:clickout_admin/features/procurement/services/stock_service.dart';
 
 class ProductControlScreen extends ConsumerStatefulWidget {
   const ProductControlScreen({super.key});
@@ -24,7 +23,15 @@ class ProductControlScreen extends ConsumerStatefulWidget {
 
 class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _horizontalScrollController =
+      ScrollController(); // 🚀 SCROLL FIX
   bool _isUploadingCsv = false;
+
+  @override
+  void dispose() {
+    _horizontalScrollController.dispose();
+    super.dispose();
+  }
 
   // 🚀 PAGINATION & FILTER STATE
   List<DocumentSnapshot> _docs = [];
@@ -47,10 +54,14 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     final adminData = ref.read(adminRoleProvider).value;
 
     // 🚀 SAAS ISOLATION: The Wall is Active Here!
-    Query q = HierarchyFilter.apply(
-      FirebaseFirestore.instance.collection('products'),
-      adminData,
-    );
+    Query q =
+        HierarchyFilter.apply(
+          FirebaseFirestore.instance.collection('products'),
+          adminData,
+        ).where(
+          'itemType',
+          isEqualTo: 'PRODUCT',
+        ); // 🚀 BUG FIX: Matched exact DB schema
 
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.trim().toLowerCase();
@@ -87,12 +98,16 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
       _currentPage = 0;
     } catch (e) {
       debugPrint("Fetch Error: $e");
-      // 🚀 FIREBASE INDEX ERROR HANDLER
       if (mounted) {
+        final err = e.toString();
+        final isIndex =
+            err.contains('FAILED_PRECONDITION') || err.contains('index');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              "🚨 FIREBASE INDEX REQUIRED! Please check Chrome Console (F12) for the direct creation link.",
+              isIndex
+                  ? "🚨 INDEX BUILDING: Bhai Firebase index banne me 10-15 min lagte hain! Firebase console me status 'Enabled' hone tak wait karo."
+                  : "🚨 DB ERROR: $err",
             ),
             backgroundColor: const Color(0xFFFE8181),
             duration: const Duration(seconds: 8),
@@ -146,7 +161,6 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
         throw "🚨 CSV is empty or missing data rows!";
       }
 
-      // 🚀 SAAS INJECTION & FRAUD TRACKING
       final adminData = ref.read(adminRoleProvider).value;
       final String? tenantId = adminData?['tenantId'];
       final String branchCode = adminData?['branchCode'] ?? 'HQ';
@@ -161,10 +175,21 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
         List<String> row = line.split(',');
         if (row.isEmpty || row[0].trim().isEmpty) continue;
 
+        // 🚀 SMART DATE NORMALIZATION (Fixes the MM/YYYY vs DD/MM/YYYY issue)
+        String rawDate = row.length > 6 ? row[6].trim() : '';
+        String parsedDate = rawDate.isNotEmpty
+            ? rawDate.replaceAll('-', '/')
+            : '';
+
         // 🚀 SENDING THE RICH PAYLOAD TO BACKEND
         productList.add({
           'barcode': row[0].trim(),
           'name': row.length > 1 ? row[1].trim() : 'Unknown Item',
+          'itemType':
+              'PRODUCT', // 🚀 FIX: Database me type update karega tabhi UI me dikhega
+          'searchKey': row.length > 1
+              ? row[1].trim().toLowerCase()
+              : '', // 🚀 FIX: Search chalne ke liye zaroori
           'price': row.length > 2 ? double.tryParse(row[2].trim()) ?? 0 : 0,
           'weight': row.length > 3 ? row[3].trim() : '0',
           'physicalStock': row.length > 4
@@ -172,19 +197,18 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
               : 0,
           'openingStock': row.length > 4 ? int.tryParse(row[4].trim()) ?? 0 : 0,
           'gst': row.length > 5 ? row[5].trim() : '0',
-          'expiryDate': row.length > 6 && row[6].trim().isNotEmpty
-              ? row[6].trim()
-              : null,
-          'tenantId': tenantId, // 🚀 SAAS INJECTION
-          'branchCode': branchCode, // 🚀 ISOLATION
-          'addedBy': adminName, // 🚀 FRAUD TRACKING
-          'addedByEmail': adminEmail, // 🚀 FRAUD TRACKING
+          'expiryDate': parsedDate.isNotEmpty
+              ? parsedDate
+              : null, // Store as String cleanly
+          'tenantId': tenantId,
+          'branchCode': branchCode,
+          'addedBy': adminName,
+          'addedByEmail': adminEmail,
         });
       }
 
       if (productList.isEmpty) throw "🚨 No valid data found in CSV!";
 
-      // 🚀 CALLING CLOUD FUNCTION TO PREVENT FRONTEND HANG
       final HttpsCallable callable = FirebaseFunctions.instance.httpsCallable(
         'bulkImportProducts',
       );
@@ -199,7 +223,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
             backgroundColor: const Color(0xFF00C853),
           ),
         );
-        _fetchInitialData(); // Refresh UI
+        _fetchInitialData();
       }
     } catch (e) {
       if (mounted) {
@@ -217,7 +241,6 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🚀 FIX: Prevent "Empty Shelf" on hard refresh by listening to role changes
     ref.listen(adminRoleProvider, (previous, next) {
       if (previous?.value == null && next.value != null) {
         _fetchInitialData();
@@ -226,14 +249,25 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
 
     final isMobile = MediaQuery.of(context).size.width < 768;
 
-    // 🎨 STRICT DARK THEME CONSTANTS
-    const Color bgDark = Color(0xFF080B08);
-    const Color cardDark = Color(0xFF111811);
-    const Color accentGreen = Color(0xFF00C853);
-    const Color accentRed = Color(0xFFFE8181);
-    const Color textPrimary = Color(0xFFF0F0F0);
-    const Color textSecondary = Color(0xFF888888);
-    const Color inputBg = Color(0xFF1A221A);
+    // 🎨 DYNAMIC PREMIUM THEME (Emerald Aurora Light + Premium Dark)
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final Color bgDark = theme.scaffoldBackgroundColor;
+    final Color cardDark = theme.cardColor;
+    final Color accentGreen = isDark
+        ? const Color(0xFF00C853)
+        : const Color(0xFF0B6B60);
+    final Color accentRed = const Color(0xFFFE8181);
+    final Color textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
+    final Color textSecondary =
+        theme.textTheme.labelLarge?.color ?? Colors.grey;
+    final Color inputBg = isDark
+        ? const Color(0xFF1A221A)
+        : const Color(0xFFF4F5F7);
+    final Color tableHeaderBg = isDark
+        ? const Color(0xFF1A221A)
+        : const Color(0xFFE8F5E9);
 
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)
@@ -269,7 +303,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       ),
                     ),
                     const SizedBox(height: 5),
-                    const Text(
+                    Text(
                       "Enterprise SKU & Inventory Management",
                       style: TextStyle(color: textSecondary, fontSize: 14),
                     ),
@@ -279,6 +313,50 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   spacing: 15,
                   runSpacing: 10,
                   children: [
+                    // 🚀 NAYA: TEMPLATE BUTTON
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: textPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        side: BorderSide(color: textSecondary.withOpacity(0.3)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: inputBg,
+                            title: Text(
+                              "CSV Format Template",
+                              style: TextStyle(
+                                color: textPrimary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            content: const Text(
+                              "Ensure your CSV has exactly these headers (comma separated):\n\nbarcode, name, price, weight, physicalStock, openingStock, gst, expiryDate\n\nExample:\n8901542001, Example Item, 75, 60ml, 100, 100, 18, 12/2026",
+                              style: TextStyle(color: Colors.grey, height: 1.5),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: const Text("Got it"),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.info_outline, size: 18),
+                      label: const Text(
+                        "View Template",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: inputBg,
@@ -296,7 +374,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       ),
                       onPressed: _isUploadingCsv ? null : _processCsvImport,
                       icon: _isUploadingCsv
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
@@ -304,7 +382,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                 color: accentGreen,
                               ),
                             )
-                          : const Icon(
+                          : Icon(
                               Icons.file_upload_outlined,
                               size: 18,
                               color: accentGreen,
@@ -317,7 +395,9 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentGreen,
-                        foregroundColor: bgDark,
+                        foregroundColor: isDark
+                            ? const Color(0xFF080B08)
+                            : Colors.white,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 16,
@@ -356,7 +436,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   ),
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(color: textPrimary),
+                    style: TextStyle(color: textPrimary),
                     onSubmitted: (val) {
                       _searchQuery = val;
                       _fetchInitialData();
@@ -366,13 +446,10 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       hintStyle: TextStyle(
                         color: textSecondary.withOpacity(0.5),
                       ),
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        color: textSecondary,
-                      ),
+                      prefixIcon: Icon(Icons.search, color: textSecondary),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.clear,
                                 size: 18,
                                 color: accentRed,
@@ -401,8 +478,8 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     child: DropdownButton<String>(
                       dropdownColor: cardDark,
                       value: _sortOption,
-                      icon: const Icon(Icons.sort, color: accentGreen),
-                      style: const TextStyle(
+                      icon: Icon(Icons.sort, color: accentGreen),
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         color: textPrimary,
                         fontSize: 13,
@@ -438,15 +515,22 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
               width: double.infinity,
               decoration: BoxDecoration(
                 color: cardDark,
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: textSecondary.withOpacity(0.15)),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+                    blurRadius: 15,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (_isLoading && _docs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(60),
+                    Padding(
+                      padding: const EdgeInsets.all(60),
                       child: Center(
                         child: CircularProgressIndicator(color: accentGreen),
                       ),
@@ -463,7 +547,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                               color: accentRed.withOpacity(0.3),
                             ),
                             const SizedBox(height: 15),
-                            const Text(
+                            Text(
                               "Empty Shelf",
                               style: TextStyle(
                                 color: accentRed,
@@ -484,211 +568,234 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       ),
                     )
                   else
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Theme(
-                        data: Theme.of(context).copyWith(
-                          dividerColor: textSecondary.withOpacity(0.15),
-                        ),
-                        child: DataTable(
-                          headingRowColor: WidgetStateProperty.all(inputBg),
-                          headingTextStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: textSecondary,
-                            fontSize: 12,
-                            letterSpacing: 0.5,
+                    Scrollbar(
+                      controller: _horizontalScrollController,
+                      thumbVisibility: true,
+                      interactive: true,
+                      thickness: 8,
+                      child: SingleChildScrollView(
+                        controller: _horizontalScrollController,
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Theme(
+                          data: Theme.of(context).copyWith(
+                            dividerColor: textSecondary.withOpacity(0.15),
                           ),
-                          columnSpacing: 40,
-                          dataRowMinHeight: 65,
-                          dataRowMaxHeight: 65,
-                          columns: const [
-                            DataColumn(label: Text("BARCODE")),
-                            DataColumn(label: Text("PRODUCT NAME")),
-                            DataColumn(label: Text("MRP / PRICE")),
-                            DataColumn(label: Text("PHYSICAL STOCK")),
-                            DataColumn(label: Text("STATUS")), // 🚀 NEW COLUMN
-                            DataColumn(label: Text("ACTIONS")),
-                          ],
-                          rows: currentPageDocs.map((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            final int stock = data['physicalStock'] ?? 0;
-                            bool isLowStock = stock <= 10;
-                            final bool isBlocked =
-                                data['isBlocked'] ?? false; // 🚀 CHECK STATUS
+                          child: DataTable(
+                            headingRowHeight: 56,
+                            dataRowMaxHeight: 80,
+                            dataRowMinHeight: 60,
+                            columnSpacing: 25,
+                            headingRowColor: WidgetStateProperty.all(
+                              tableHeaderBg,
+                            ),
+                            headingTextStyle: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: isDark
+                                  ? textSecondary
+                                  : const Color(0xFF004D40),
+                              fontSize: 12,
+                              letterSpacing: 0.5,
+                            ),
+                            columns: const [
+                              DataColumn(label: Text("BARCODE")),
+                              DataColumn(label: Text("PRODUCT NAME")),
+                              DataColumn(label: Text("MRP / PRICE")),
+                              DataColumn(label: Text("PHYSICAL STOCK")),
+                              DataColumn(label: Text("STATUS")),
+                              DataColumn(label: Text("ACTIONS")),
+                            ],
+                            rows: currentPageDocs.map((doc) {
+                              final data = doc.data() as Map<String, dynamic>;
+                              final int stock = data['physicalStock'] ?? 0;
+                              bool isLowStock = stock <= 10;
+                              final bool isBlocked = data['isBlocked'] ?? false;
 
-                            final String displayBarcode =
-                                (data['barcode'] ?? doc.id)
-                                    .toString()
-                                    .split('_')
-                                    .last;
+                              final String displayBarcode =
+                                  (data['barcode'] ?? doc.id)
+                                      .toString()
+                                      .split('_')
+                                      .last;
 
-                            return DataRow(
-                              color: WidgetStateProperty.resolveWith<Color?>((
-                                states,
-                              ) {
-                                if (states.contains(WidgetState.hovered)) {
-                                  return inputBg;
-                                }
-                                return Colors.transparent;
-                              }),
-                              cells: [
-                                DataCell(
-                                  Text(
-                                    displayBarcode,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'monospace',
-                                      color: textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    data['name'] ?? 'N/A',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: textPrimary,
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Text(
-                                    "₹${data['price'] ?? 0}",
-                                    style: const TextStyle(
-                                      color: accentGreen,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isLowStock
-                                          ? accentRed.withOpacity(0.1)
-                                          : accentGreen.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: isLowStock
-                                            ? accentRed.withOpacity(0.3)
-                                            : accentGreen.withOpacity(0.3),
+                              // 🚀 SAFEGUARD DATA FOR EDIT DIALOG
+                              var safeData = Map<String, dynamic>.from(data);
+                              safeData['expiryDate'] = data['expiryDate']
+                                  ?.toString();
+
+                              return DataRow(
+                                color: WidgetStateProperty.resolveWith<Color?>((
+                                  states,
+                                ) {
+                                  if (states.contains(WidgetState.hovered))
+                                    return inputBg;
+                                  return Colors.transparent;
+                                }),
+                                cells: [
+                                  DataCell(
+                                    Text(
+                                      displayBarcode,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontFamily: 'monospace',
+                                        color: textPrimary,
                                       ),
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (isLowStock)
-                                          const Icon(
-                                            Icons.warning_amber_rounded,
-                                            color: accentRed,
-                                            size: 14,
+                                  ),
+                                  DataCell(
+                                    SizedBox(
+                                      width: 200,
+                                      child: Text(
+                                        data['name'] ?? 'N/A',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      "₹${data['price'] ?? 0}",
+                                      style: TextStyle(
+                                        color: accentGreen,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isLowStock
+                                            ? accentRed.withOpacity(0.1)
+                                            : accentGreen.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isLowStock
+                                              ? accentRed.withOpacity(0.3)
+                                              : accentGreen.withOpacity(0.3),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isLowStock)
+                                            Icon(
+                                              Icons.warning_amber_rounded,
+                                              color: accentRed,
+                                              size: 14,
+                                            ),
+                                          if (isLowStock)
+                                            const SizedBox(width: 4),
+                                          Text(
+                                            "$stock Units",
+                                            style: TextStyle(
+                                              color: isLowStock
+                                                  ? accentRed
+                                                  : accentGreen,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                            ),
                                           ),
-                                        if (isLowStock)
-                                          const SizedBox(width: 4),
-                                        Text(
-                                          "$stock Units",
-                                          style: TextStyle(
-                                            color: isLowStock
-                                                ? accentRed
-                                                : accentGreen,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isBlocked
+                                            ? accentRed.withValues(alpha: 0.1)
+                                            : accentGreen.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isBlocked
+                                              ? accentRed.withValues(alpha: 0.3)
+                                              : accentGreen.withValues(
+                                                  alpha: 0.3,
+                                                ),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isBlocked ? "BLOCKED 💀" : "ACTIVE",
+                                        style: TextStyle(
+                                          color: isBlocked
+                                              ? accentRed
+                                              : accentGreen,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Row(
+                                      mainAxisSize:
+                                          MainAxisSize.min, // 🚀 RENDERFLEX FIX
+                                      children: [
+                                        if (isBlocked) // 🚀 SAAS RULE: Blocked item gets Restore Button
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.settings_backup_restore,
+                                              color: Color(0xFFD4580A),
+                                            ),
+                                            tooltip: "Unblock & Restore Stock",
+                                            onPressed: () => _showRestoreDialog(
+                                              context,
+                                              doc.id,
+                                              data['name'] ?? 'Unknown Item',
+                                            ),
+                                          )
+                                        else
+                                          IconButton(
+                                            icon: Icon(
+                                              Icons.edit_note,
+                                              color: accentGreen,
+                                            ),
+                                            tooltip: "Edit Product",
+                                            onPressed: () => showDialog(
+                                              context: context,
+                                              builder: (ctx) =>
+                                                  EditProductDialog(
+                                                    productData: safeData,
+                                                    docId: displayBarcode,
+                                                  ),
+                                            ).then((_) => _fetchInitialData()),
+                                          ),
+                                        IconButton(
+                                          icon: Icon(
+                                            Icons.delete_outline,
+                                            color: accentRed,
+                                          ),
+                                          tooltip: "Delete Product",
+                                          onPressed: () => _confirmDelete(
+                                            context,
+                                            ref,
+                                            displayBarcode,
+                                            data['name'] ?? 'Unknown Item',
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                ),
-                                DataCell(
-                                  // 🚀 NEW STATUS CHIP
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isBlocked
-                                          ? accentRed.withValues(alpha: 0.1)
-                                          : accentGreen.withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: isBlocked
-                                            ? accentRed.withValues(alpha: 0.3)
-                                            : accentGreen.withValues(
-                                                alpha: 0.3,
-                                              ),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      isBlocked ? "BLOCKED 💀" : "ACTIVE",
-                                      style: TextStyle(
-                                        color: isBlocked
-                                            ? accentRed
-                                            : accentGreen,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                DataCell(
-                                  Row(
-                                    children: [
-                                      if (isBlocked) // 🚀 SAAS RULE: Blocked item gets Restore Button
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.settings_backup_restore,
-                                            color: Color(
-                                              0xFFD4580A,
-                                            ), // 🚀 THEME: Primary Orange
-                                          ),
-                                          tooltip: "Unblock & Restore Stock",
-                                          onPressed: () => _showRestoreDialog(
-                                            context,
-                                            doc.id, // 🔥 Full Firestore Doc ID chahiye
-                                            data['name'] ?? 'Unknown Item',
-                                          ),
-                                        )
-                                      else // 🚀 SAAS RULE: Active item gets Edit Button
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.edit_note,
-                                            color: accentGreen,
-                                          ),
-                                          tooltip: "Edit Product",
-                                          onPressed: () => showDialog(
-                                            context: context,
-                                            builder: (ctx) => EditProductDialog(
-                                              productData: data,
-                                              docId: displayBarcode,
-                                            ),
-                                          ).then((_) => _fetchInitialData()),
-                                        ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.delete_outline,
-                                          color: accentRed,
-                                        ),
-                                        tooltip: "Delete Product",
-                                        onPressed: () => _confirmDelete(
-                                          context,
-                                          ref,
-                                          displayBarcode,
-                                          data['name'] ?? 'Unknown Item',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
+                                ],
+                              );
+                            }).toList(),
+                          ), // End of DataTable
+                        ), // End of Theme
+                      ), // End of SingleChildScrollView 🚀
+                    ), // End of Scrollbar 🚀
 
                   Container(
                     padding: const EdgeInsets.all(15),
@@ -702,8 +809,8 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         if (_isLoading)
-                          const Padding(
-                            padding: EdgeInsets.only(right: 15),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 15),
                             child: SizedBox(
                               width: 16,
                               height: 16,
@@ -714,25 +821,19 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                             ),
                           ),
                         IconButton(
-                          icon: const Icon(
-                            Icons.chevron_left,
-                            color: textPrimary,
-                          ),
+                          icon: Icon(Icons.chevron_left, color: textPrimary),
                           onPressed: _currentPage > 0 ? _prevPage : null,
                           disabledColor: textSecondary.withOpacity(0.3),
                         ),
                         Text(
                           "Page ${_currentPage + 1}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             color: textPrimary,
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(
-                            Icons.chevron_right,
-                            color: textPrimary,
-                          ),
+                          icon: Icon(Icons.chevron_right, color: textPrimary),
                           onPressed:
                               _hasMore ||
                                   ((_currentPage + 1) * _rowsPerPage <
@@ -753,10 +854,10 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     );
   }
 
-  // 🚀 NEW: UNBLOCK & RESTORE FLOW (THEMED)
   void _showRestoreDialog(BuildContext context, String fullDocId, String name) {
     final TextEditingController qtyCtrl = TextEditingController();
     bool isRestoring = false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showDialog(
       context: context,
@@ -766,27 +867,22 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
           return Dialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(
-                color: Color(0xFFD4580A),
-                width: 1.5,
-              ), // 🚀 ORANGE THEME
+              side: const BorderSide(color: Color(0xFFD4580A), width: 1.5),
             ),
-            backgroundColor: const Color(0xFF080B08), // Dark BG
+            backgroundColor: Theme.of(context).cardColor,
             elevation: 24,
             child: ConstrainedBox(
-              // 📱 RESPONSIVE: Tablet/Web pe 450px se bada nahi hoga, Mobile pe fit ho jayega
               constraints: const BoxConstraints(maxWidth: 450),
               child: Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF111811), // Card Dark
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // --- HEADER ---
                     Row(
                       children: [
                         Container(
@@ -804,11 +900,11 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                           ),
                         ),
                         const SizedBox(width: 16),
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             "Restore Blocked Item",
                             style: TextStyle(
-                              color: Color(0xFFF0F0F0),
+                              color: isDark ? Colors.white : Colors.black,
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                             ),
@@ -819,40 +915,38 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     const SizedBox(height: 16),
                     Text(
                       "Unblock '$name' by adding new physical stock.",
-                      style: const TextStyle(
-                        color: Color(0xFF888888),
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
 
-                    // --- INPUT ---
                     const Text(
                       "New Physical Stock",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF888888),
+                        color: Colors.grey,
                       ),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: qtyCtrl,
                       keyboardType: TextInputType.number,
-                      style: const TextStyle(
-                        color: Color(0xFFF0F0F0),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                       decoration: InputDecoration(
                         hintText: "Enter units",
-                        hintStyle: TextStyle(color: Colors.grey.shade700),
+                        hintStyle: const TextStyle(color: Colors.grey),
                         prefixIcon: const Icon(
                           Icons.add_box,
                           color: Color(0xFFD4580A),
                           size: 20,
                         ),
                         filled: true,
-                        fillColor: const Color(0xFF1A221A), // Input bg
+                        fillColor: isDark
+                            ? const Color(0xFF1A221A)
+                            : Colors.grey.shade100,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide: BorderSide.none,
@@ -868,7 +962,6 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     ),
                     const SizedBox(height: 30),
 
-                    // --- ACTIONS ---
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -879,7 +972,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                           child: const Text(
                             "Cancel",
                             style: TextStyle(
-                              color: Color(0xFF888888),
+                              color: Colors.grey,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -887,10 +980,8 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(
-                              0xFFD4580A,
-                            ), // 🚀 ORANGE THEME
-                            foregroundColor: const Color(0xFF080B08),
+                            backgroundColor: const Color(0xFFD4580A),
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 14,
@@ -934,7 +1025,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                           ),
                                         ),
                                       );
-                                      _fetchInitialData(); // Refresh table
+                                      _fetchInitialData();
                                     }
                                   } catch (e) {
                                     if (context.mounted) {
@@ -957,7 +1048,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                   width: 16,
                                   height: 16,
                                   child: CircularProgressIndicator(
-                                    color: Color(0xFF080B08),
+                                    color: Colors.white,
                                     strokeWidth: 2,
                                   ),
                                 )
@@ -988,37 +1079,35 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     String barcode,
     String name,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111811),
+        backgroundColor: Theme.of(context).cardColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: Color(0xFFFE8181), width: 1),
         ),
-        title: const Text(
+        title: Text(
           "Delete Product? 🗑️",
           style: TextStyle(
-            color: Color(0xFFF0F0F0),
+            color: isDark ? Colors.white : Colors.black,
             fontWeight: FontWeight.bold,
           ),
         ),
         content: Text(
           "Delete '$name' (Barcode: $barcode)?",
-          style: const TextStyle(color: Color(0xFF888888)),
+          style: const TextStyle(color: Colors.grey),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(color: Color(0xFF888888)),
-            ),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFE8181),
-              foregroundColor: const Color(0xFF080B08),
+              foregroundColor: Colors.white,
             ),
             onPressed: () async {
               Navigator.pop(ctx);

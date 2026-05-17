@@ -23,6 +23,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
   @override
   Widget build(BuildContext context) {
     final refundState = ref.watch(refundEngineProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark; // 🚀 ADDED
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -31,12 +32,12 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 🎩 HEADER
-          const Text(
+          Text(
             "Refund Decision Engine 💸",
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF2B3674),
+              color: isDark ? Colors.white : const Color(0xFF2B3674),
               letterSpacing: 0.5,
             ),
           ),
@@ -56,7 +57,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
             width: double.infinity,
             constraints: const BoxConstraints(maxWidth: 650),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -138,10 +139,12 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 60),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: isDark
+                        ? const Color(0xFF1A221A)
+                        : Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.grey.shade200,
+                      color: isDark ? Colors.white10 : Colors.grey.shade200,
                       style: BorderStyle.solid,
                     ),
                   ),
@@ -201,12 +204,12 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
                     ],
                   ),
                   const SizedBox(height: 30),
-                  const Text(
+                  Text(
                     "Select Refund Tier:",
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2B3674),
+                      color: isDark ? Colors.white : const Color(0xFF2B3674),
                     ),
                   ),
                   const SizedBox(height: 15),
@@ -301,11 +304,12 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
   }
 
   Widget _buildInfoCard(String title, String value, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 200,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: color.withValues(alpha: 0.3)),
         boxShadow: [
@@ -348,13 +352,14 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
     required bool isRecommended,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: 180,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
             color: isRecommended ? color : Colors.grey.withValues(alpha: 0.2),
@@ -567,6 +572,7 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Color themeColor = Colors.blueAccent;
     IconData tierIcon = Icons.account_balance;
     String title = "Bank Source Refund";
@@ -587,7 +593,7 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       elevation: 24,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
       child: Container(
         width: 480,
         padding: const EdgeInsets.all(0),
@@ -653,9 +659,13 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
+                      color: isDark
+                          ? const Color(0xFF1A221A)
+                          : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade200),
+                      border: Border.all(
+                        color: isDark ? Colors.white10 : Colors.grey.shade200,
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -707,7 +717,10 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
-                      style: const TextStyle(
+                      style: TextStyle(
+                        color: isDark
+                            ? Colors.white
+                            : Colors.black87, // 🚀 DARK MODE FIX
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -715,10 +728,16 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                         hintText: "Enter amount up to ₹${widget.maxAmount}",
                         prefixIcon: const Icon(Icons.currency_rupee, size: 18),
                         filled: true,
-                        fillColor: Colors.white,
+                        fillColor: isDark
+                            ? const Color(0xFF1E1E1E)
+                            : Colors.white,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
+                          borderSide: BorderSide(
+                            color: isDark
+                                ? Colors.white10
+                                : Colors.grey.shade300,
+                          ),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -742,6 +761,9 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                   TextField(
                     controller: _reasonCtrl,
                     maxLines: 2,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                    ), // 🚀 DARK MODE FIX
                     decoration: InputDecoration(
                       hintText:
                           "E.g., Customer cancelled at gate, Item out of stock...",
@@ -750,10 +772,14 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                         fontSize: 13,
                       ),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: isDark
+                          ? const Color(0xFF1E1E1E)
+                          : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.grey.shade300),
+                        borderSide: BorderSide(
+                          color: isDark ? Colors.white10 : Colors.grey.shade300,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -792,11 +818,15 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(20),
                 ),
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? Colors.white10 : Colors.grey.shade200,
+                  ),
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -860,6 +890,7 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
     bool isSub = false,
     Color? color,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -874,7 +905,11 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
         Text(
           value,
           style: TextStyle(
-            color: color ?? (isHighlight ? Colors.black : Colors.grey.shade700),
+            color:
+                color ??
+                (isHighlight
+                    ? (isDark ? Colors.white : Colors.black)
+                    : Colors.grey.shade500),
             fontSize: isHighlight ? 16 : 12,
             fontWeight: isHighlight ? FontWeight.w900 : FontWeight.bold,
             fontFamily: isSub ? 'monospace' : null,

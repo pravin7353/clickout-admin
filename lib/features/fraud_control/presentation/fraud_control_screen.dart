@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:clickout_admin/features/auth/auth_provider.dart';
 
 import '../providers/fraud_provider.dart';
 import 'leakage_kanban_widget.dart';
@@ -10,6 +11,7 @@ class FraudControlScreen extends ConsumerWidget {
 
   void _toggleSuspension(
     BuildContext context,
+    WidgetRef ref,
     String staffId,
     String currentStatus,
     String displayName,
@@ -20,6 +22,22 @@ class FraudControlScreen extends ConsumerWidget {
     FirebaseFirestore.instance.collection('employees').doc(staffId).set({
       'status': newStatus,
     }, SetOptions(merge: true));
+
+    // 🚀 THE BLACK BOX (Audit Trail)
+    final adminData = ref.read(adminRoleProvider).value;
+    FirebaseFirestore.instance.collection('audit_logs').add({
+      'actionType': isSuspended ? 'RESTORE_STAFF' : 'SUSPEND_STAFF',
+      'targetCollection': 'employees',
+      'targetId': staffId,
+      'details': isSuspended
+          ? 'Restored access for $displayName'
+          : 'Suspended access for $displayName due to fraud suspicion.',
+      'severity': isSuspended ? 'INFO' : 'CRITICAL',
+      'actorEmail': adminData?['email'] ?? 'System Manager',
+      'tenantId': adminData?['tenantId'] ?? 'UNKNOWN',
+      'branchCode': adminData?['branchCode'] ?? 'UNKNOWN',
+      'timestamp': FieldValue.serverTimestamp(),
+    });
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -50,6 +68,10 @@ class FraudControlScreen extends ConsumerWidget {
     final suspectsState = ref.watch(suspectStaffProvider);
     final highRiskOrdersState = ref.watch(highRiskOrdersProvider);
 
+    // 🎨 THEME INJECTION
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
       physics: const BouncingScrollPhysics(),
@@ -71,45 +93,48 @@ class FraudControlScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Fraud Control & Radar",
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2B3674),
+              // 🚀 FIX: Wrap Column in Expanded so text doesn't push out of the screen
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Fraud Control & Radar",
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
-                  ),
-                  Text(
-                    "Live employee monitoring & leakage tracking",
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                  ),
-                ],
+                    const Text(
+                      "Live employee monitoring & leakage tracking",
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
           const SizedBox(height: 32),
 
-          const Text(
+          Text(
             "Live Leakage Radar",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2B3674),
+              color: textColor,
             ),
           ),
           const SizedBox(height: 16),
           const SizedBox(height: 400, child: LeakageKanbanBoard()),
           const SizedBox(height: 32),
 
-          const Text(
+          Text(
             "Suspect Watchlist (Low Trust Score)",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2B3674),
+              color: textColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -126,11 +151,16 @@ class FraudControlScreen extends ConsumerWidget {
               return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  // 🚀 RESPONSIVE FIX: Mobile/Split-screen pe 1 column, Desktop pe 3
+                  crossAxisCount: MediaQuery.of(context).size.width < 900
+                      ? 1
+                      : 3,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 1.8,
+                  childAspectRatio: MediaQuery.of(context).size.width < 900
+                      ? 3.0
+                      : 1.8,
                 ),
                 itemCount: suspects.length,
                 itemBuilder: (context, index) {
@@ -158,19 +188,27 @@ class FraudControlScreen extends ConsumerWidget {
                       data['status']?.toString().toUpperCase() ?? 'ACTIVE';
                   bool isSuspended = currentStatus == 'SUSPENDED';
 
+                  final cardBg = isDark
+                      ? const Color(0xFF1E1E1E)
+                      : Colors.white;
+                  final suspendedBg = isDark
+                      ? const Color(0xFF2A2A2A)
+                      : Colors.grey.shade100;
+                  final primaryText = isDark ? Colors.white : Colors.black87;
+
                   return Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isSuspended ? Colors.grey.shade100 : Colors.white,
+                      color: isSuspended ? suspendedBg : cardBg,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSuspended
-                            ? Colors.grey.shade400
-                            : Colors.red.withOpacity(0.3),
+                            ? Colors.grey.shade600
+                            : Colors.red.withOpacity(0.5),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.red.withOpacity(0.05),
+                          color: Colors.black.withOpacity(0.1),
                           blurRadius: 10,
                         ),
                       ],
@@ -189,7 +227,7 @@ class FraudControlScreen extends ConsumerWidget {
                                   fontSize: 16,
                                   color: isSuspended
                                       ? Colors.grey
-                                      : Colors.black87,
+                                      : primaryText,
                                   decoration: isSuspended
                                       ? TextDecoration.lineThrough
                                       : null,
@@ -201,8 +239,8 @@ class FraudControlScreen extends ConsumerWidget {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: isSuspended
-                                    ? Colors.grey.shade300
-                                    : Colors.red.shade50,
+                                    ? Colors.grey.withOpacity(0.2)
+                                    : Colors.red.withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
@@ -267,6 +305,7 @@ class FraudControlScreen extends ConsumerWidget {
                             ),
                             onPressed: () => _toggleSuspension(
                               context,
+                              ref,
                               doc.id,
                               currentStatus,
                               displayTitle,
@@ -282,12 +321,12 @@ class FraudControlScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 32),
 
-          const Text(
+          Text(
             "High Risk Transactions",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2B3674),
+              color: textColor,
             ),
           ),
           const SizedBox(height: 16),
@@ -305,7 +344,9 @@ class FraudControlScreen extends ConsumerWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: orders.length,
-                separatorBuilder: (context, index) => const Divider(),
+                separatorBuilder: (context, index) => Divider(
+                  color: isDark ? Colors.white10 : Colors.grey.shade300,
+                ),
                 itemBuilder: (context, index) {
                   final doc = orders[index];
                   final data = doc.data() as Map<String, dynamic>;
@@ -316,16 +357,23 @@ class FraudControlScreen extends ConsumerWidget {
                     ),
                     title: Text(
                       "Order: ${doc.id.substring(0, 8).toUpperCase()}",
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
                     ),
                     subtitle: Text(
                       "Status: ${data['exitStatus'] ?? 'UNKNOWN'}",
+                      style: TextStyle(
+                        color: isDark ? Colors.white54 : Colors.grey,
+                      ),
                     ),
                     trailing: Text(
                       "₹${data['totalAmount'] ?? '0'}",
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: textColor,
                       ),
                     ),
                   );
@@ -351,11 +399,16 @@ class FraudControlScreen extends ConsumerWidget {
         children: [
           const Icon(Icons.verified_user, color: Colors.green),
           const SizedBox(width: 12),
-          Text(
-            msg,
-            style: const TextStyle(
-              color: Colors.green,
-              fontWeight: FontWeight.bold,
+          // 🚀 FIX: Wrap Text in Expanded to prevent RenderFlex crash on small screens
+          Expanded(
+            child: Text(
+              msg,
+              style: const TextStyle(
+                color: Colors.green,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
         ],

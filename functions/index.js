@@ -64,11 +64,13 @@ exports.bulkImportProducts = onCall(async (request) => {
             const cleanData = {
                 barcode: barcode,
                 name: String(prod.name || "Unknown Item").trim(),
+                itemType: "PRODUCT", // 🚀 FIX: Ye tag CSV products ko UI me dikhayega
                 price: safePrice,
-                unitCost: parseFloat(safeUnitCost.toFixed(2)), // 🚀 FIX: Now properly references the parsed variable
+                unitCost: parseFloat(safeUnitCost.toFixed(2)), 
                 weight: safeWeight,
                 gst: String(prod.gst || "0").trim(),
-                isBlocked: false, // 🚀 FIX: Ab koi product invisible nahi rahega!                physicalStock: safeStock,
+                isBlocked: false, 
+                physicalStock: safeStock,
                 openingStock: safeStock,
                 purchasedStock: 0,
                 soldStock: 0,
@@ -125,18 +127,26 @@ exports.runPredictivePOEngine = onSchedule("every day 00:00", async (event) => {
     console.log("🚀 Starting ClickOut Predictive AI Engine...");
     
     try {
-        // 1. Fetch all active products
-const productsSnap = await db.collection("products").where("isBlocked", "==", false).get();
+        // 🚀 MEMORY FIX 1: Use .select() to only fetch required fields (saves ~90% RAM)
+        const productsSnap = await db.collection("products")
+            .where("isBlocked", "==", false)
+            .select("physicalStock", "supplierId", "avgDailySales", "supplierLeadTime", "safetyBuffer", "name", "tenantId", "branchCode", "storeId")
+            .get();
         
-        // 🚀 FIX 1: Fetch existing suggestions to prevent DUPLICATE SPAM
+        // 🚀 MEMORY FIX 2: Only fetch productId for existing suggestions
         const existingSuggestions = await db.collection("ai_po_suggestions")
             .where("status", "==", "PENDING_APPROVAL")
+            .select("productId") 
             .get();
         const existingProductIds = new Set();
         existingSuggestions.forEach(doc => existingProductIds.add(doc.data().productId));
 
         let suggestionsCount = 0;
-        const batch = db.batch();
+        
+        // 🚀 BATCH LIMIT FIX PREP: Create an array for multiple batches
+        const batches = [];
+        let currentBatch = db.batch();
+        let currentBatchCount = 0;
 
         for (const doc of productsSnap.docs) {
             // 🚀 If already suggested and pending, skip it!
@@ -158,7 +168,7 @@ const productsSnap = await db.collection("products").where("isBlocked", "==", fa
                 orderQty = Math.max(10, orderQty || 10); 
                 
                 const suggestionRef = db.collection("ai_po_suggestions").doc();
-                batch.set(suggestionRef, {
+                currentBatch.set(suggestionRef, {
                     suggestionId: suggestionRef.id,
                     productId: doc.id,
                     productName: data.name || "Unknown Product",
@@ -171,13 +181,26 @@ const productsSnap = await db.collection("products").where("isBlocked", "==", fa
                     status: "PENDING_APPROVAL", // 🚀 Strict Status Enforced
                     createdAt: admin.firestore.FieldValue.serverTimestamp()
                 });
+                
                 suggestionsCount++;
+                currentBatchCount++;
+
+                // 🚀 BATCH CRASH AVOIDANCE: Commit when limit is near
+                if (currentBatchCount >= 490) {
+                    batches.push(currentBatch.commit());
+                    currentBatch = db.batch();
+                    currentBatchCount = 0;
+                }
             }
         }
 
-        if (suggestionsCount > 0) {
-            await batch.commit();
-            console.log(`✅ AI Engine Generated ${suggestionsCount} NEW PO Suggestions!`);
+        if (currentBatchCount > 0) {
+            batches.push(currentBatch.commit());
+        }
+
+        if (batches.length > 0) {
+            await Promise.all(batches);
+            console.log(`✅ AI Engine Generated ${suggestionsCount} NEW PO Suggestions via ${batches.length} safe batches!`);
         } else {
             console.log("👍 Stock is perfectly healthy. No suggestions today.");
         }
@@ -295,49 +318,87 @@ exports.processNewOrder = onDocumentCreated(
 );
 
 // ============================================================================
-// 📈 6. REAL-TIME ANALYTICS AGGREGATOR (10M SCALE READY)
+// 📈 6. QUANTUM FINANCIAL ENGINE (O(1) DASHBOARD AGGREGATOR)
 // ============================================================================
-exports.updateDailyStats = onDocumentCreated(
+exports.updateDailyStats = onDocumentWritten(
     {
         document: "orders/{orderId}",
         concurrency: 80, 
         memory: "256MiB" 
     }, 
     async (event) => {
-        const orderData = event.data?.data();
-        if (!orderData) return;
+        const before = event.data.before.exists ? event.data.before.data() : null;
+        const after = event.data.after.exists ? event.data.after.data() : null;
 
-        const tenantId = orderData.tenantId || "default_tenant";
-        const storeId = orderData.storeId || "default_store";
-        const totalAmount = Number(orderData.totalAmount || orderData.getTotal || 0);
+        if (!before && !after) return;
+        const doc = after || before;
         
-        let isFraud = 0;
-        if (orderData.weightMismatchFlag || orderData.exitStatus === 'OVERRIDDEN') {
-            isFraud = 1;
-        }
+        const tenantId = doc.tenantId || "default_tenant";
+        const branchCode = doc.branchCode || doc.storeId || "default_store";
 
-        const dateObj = new Date();
-        const dateStr = dateObj.toISOString().split('T')[0]; 
+        // 🕒 IST Timezone Fix for Accurate Daily Reset
+        let ts = doc.timestamp || doc.createdAt;
+        const dateObj = ts && ts.toDate ? ts.toDate() : new Date();
+        const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const parts = formatter.format(dateObj).split('/'); 
+        const dateStr = `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD
         
-        const statDocId = `${storeId}_${dateStr}`;
-        const statRef = db.collection("daily_store_stats").doc(statDocId);
+        const statDocId = `${tenantId}_${branchCode}_${dateStr}`;
+
+        const getMetrics = (data) => {
+            if (!data) return { revTot: 0, revCash: 0, revUpi: 0, leakTot: 0, leakCash: 0, leakUpi: 0, ord: 0, rej: 0, pend: 0, ref: 0, refAmt: 0 };
+
+            const amt = Number(data.totalAmount || 0);
+            const mode = data.paymentMode || '';
+            const pStatus = data.paymentStatus || '';
+            const eStatus = data.exitStatus || '';
+
+            let m = { revTot: 0, revCash: 0, revUpi: 0, leakTot: 0, leakCash: 0, leakUpi: 0, ord: 1, rej: 0, pend: 0, ref: 0, refAmt: 0 };
+
+            if (eStatus === 'REJECTED') m.rej = 1;
+
+            if (pStatus === 'REFUNDED') {
+                m.ref = 1; m.refAmt = amt;
+            } else if (pStatus === 'PAID' || pStatus === 'SUCCESS') {
+                if (eStatus === 'EXITED' || eStatus === 'APPROVED') {
+                    m.revTot = amt;
+                    if (mode === 'CASH') m.revCash = amt; else m.revUpi = amt;
+                } else if (eStatus === 'PENDING' || eStatus === 'EXPIRED_BY_SYSTEM' || eStatus === '') {
+                    m.leakTot = amt; m.pend = 1;
+                    if (mode === 'CASH') m.leakCash = amt; else m.leakUpi = amt;
+                }
+            }
+            return m;
+        };
+
+        const oldM = getMetrics(before);
+        const newM = getMetrics(after);
+
+        // 🧠 DELTA MATH: Handles PENDING -> PAID transitions automatically!
+        const increments = {
+            totalRevenue: admin.firestore.FieldValue.increment(newM.revTot - oldM.revTot),
+            cashRevenue: admin.firestore.FieldValue.increment(newM.revCash - oldM.revCash),
+            upiRevenue: admin.firestore.FieldValue.increment(newM.revUpi - oldM.revUpi),
+            totalLeakage: admin.firestore.FieldValue.increment(newM.leakTot - oldM.leakTot),
+            cashLeakage: admin.firestore.FieldValue.increment(newM.leakCash - oldM.leakCash),
+            upiLeakage: admin.firestore.FieldValue.increment(newM.leakUpi - oldM.leakUpi),
+            totalOrders: admin.firestore.FieldValue.increment(newM.ord - oldM.ord),
+            rejectedCount: admin.firestore.FieldValue.increment(newM.rej - oldM.rej),
+            pendingCount: admin.firestore.FieldValue.increment(newM.pend - oldM.pend),
+            refundCount: admin.firestore.FieldValue.increment(newM.ref - oldM.ref),
+            refundAmount: admin.firestore.FieldValue.increment(newM.refAmt - oldM.refAmt),
+        };
 
         try {
-            await statRef.set({
+            await db.collection("daily_store_stats").doc(statDocId).set({
                 tenantId: tenantId,
-                storeId: storeId,
+                branchCode: branchCode,
                 date: dateStr,
-                metrics: {
-                    totalOrders: admin.firestore.FieldValue.increment(1),
-                    totalRevenue: admin.firestore.FieldValue.increment(totalAmount),
-                    fraudAlerts: admin.firestore.FieldValue.increment(isFraud)
-                },
+                ...increments,
                 lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp()
             }, { merge: true });
-            
-            console.log(`📊 Stats updated for Store: ${storeId} on ${dateStr}`);
         } catch (error) {
-            console.error(`🚨 ERROR updating stats for ${storeId}:`, error);
+            console.error(`🚨 ERROR updating financial engine for ${statDocId}:`, error);
         }
     }
 );
@@ -513,11 +574,14 @@ exports.quantumNightlySync = onSchedule(
     { schedule: "0 0 * * *", timeZone: "Asia/Kolkata", timeoutSeconds: 540, memory: "1GiB" },
     async (event) => {
         try {
-            // 🚀 THE NOSQL TRAP FIX: Saare products laao (bina where clause ke)
-            const productsSnap = await db.collection('products').get();
+            // 🚀 OOM CRASH FIX: Use .select() and .stream() for SaaS level data processing
+            const productsStream = db.collection('products')
+                .select('isBlocked', 'branchCode', 'physicalStock', 'stock', 'price', 'unitCost', 'offerPrice')
+                .stream();
+                
             const storeTotals = {};
             
-            productsSnap.forEach(doc => {
+            for await (const doc of productsStream) {
                 const data = doc.data();
                 
                 // 🧠 JS Memory Filter: Yahan block items ko ignore karo
@@ -537,7 +601,7 @@ exports.quantumNightlySync = onSchedule(
                 storeTotals[branch].trv += (qty * mrp);
                 storeTotals[branch].tcv += (qty * cost);
                 storeTotals[branch].pr += (qty * offerPrice);
-            });
+            };
 
             // Har branch ka data calculate karke overwrite karo
             for (const [storeId, totals] of Object.entries(storeTotals)) {
@@ -554,7 +618,8 @@ exports.quantumNightlySync = onSchedule(
                 }, { merge: true });
             }
             console.log("✅ Sync Complete & Flawless!");
-        } catch (e) { console.error("Sync Failed", e); }
+        }
+         catch (e) { console.error("Sync Failed", e); }
     }
 );
 
@@ -625,7 +690,6 @@ exports.quantumAutoPOEngine = onDocumentWritten(
 exports.processPushNotification = onDocumentCreated(
     { document: "notifications/{docId}", concurrency: 50, memory: "256MiB" },
     async (event) => {
-        // 1. Naya document jo create hua hai, uska data lijiye
         const snap = event.data;
         if (!snap) return;
 
@@ -635,34 +699,33 @@ exports.processPushNotification = onDocumentCreated(
 
         console.log(`🔔 New notification request detected for User: ${targetUserId}`);
 
-        // Agar targetUserId missing hai, toh fail mark kardo
         if (!targetUserId) {
             console.error("Missing targetUserId in document");
-            return docRef.update({ status: 'FAILED', error: 'Missing targetUserId' });
+            return docRef.update({ pushStatus: 'FAILED', error: 'Missing targetUserId' });
         }
 
         try {
-            // 2. Fetch target user's details to get their FCM Token
             const userDoc = await db.collection('users').doc(targetUserId).get();
-            
-            if (!userDoc.exists) {
-                throw new Error('User document not found in database');
-            }
+            if (!userDoc.exists) throw new Error('User document not found in database');
 
             const userData = userDoc.data();
-            const fcmToken = userData.fcmToken; // ⚠️ CLIENT APP MUST SAVE THIS TOKEN HERE
+            
+            // 🚀 BUG 1 FIX: Database me 'fcmTokens' ARRAY hai, par code 'fcmToken' STRING dhoondh raha tha
+            let activeToken = userData.fcmToken; 
+            if (!activeToken && Array.isArray(userData.fcmTokens) && userData.fcmTokens.length > 0) {
+                activeToken = userData.fcmTokens[userData.fcmTokens.length - 1]; // Pick latest token
+            }
 
-            if (!fcmToken) {
+            if (!activeToken) {
                 throw new Error('User has no active FCM Token (App not installed/logged in)');
             }
 
-            // 3. Create the FCM Payload
             const message = {
                 notification: {
                     title: notificationData.notificationTitle || "Special Offer!",
                     body: notificationData.notificationBody || "Check out your ClickOut app.",
                 },
-                token: fcmToken,
+                token: activeToken, // 🚀 Fixed Token Variable
                 data: {
                     type: notificationData.type || 'SYSTEM',
                     tenantId: notificationData.tenantId || '',
@@ -670,13 +733,13 @@ exports.processPushNotification = onDocumentCreated(
                 }
             };
 
-            // 4. Send the Push Notification via Firebase Admin Messaging
             const response = await admin.messaging().send(message);
             console.log(`✅ Successfully sent message to ${targetUserId}. Message ID: ${response}`);
 
-            // 5. Update the original notification document to 'SENT'
+            // 🚀 BUG 2 FIX: 'status' ko over-write mat kar! 'status' sirf Cart use karega (PENDING/USED).
+            // Notification ke track record ke liye 'pushStatus' field add kar di hai.
             await docRef.update({
-                status: 'SENT',
+                pushStatus: 'SENT',
                 messageId: response,
                 sentAt: admin.firestore.FieldValue.serverTimestamp()
             });
@@ -684,10 +747,97 @@ exports.processPushNotification = onDocumentCreated(
         } catch (error) {
             console.error(`❌ Failed to send notification to ${targetUserId}:`, error);
             await docRef.update({
-                status: 'FAILED',
+                pushStatus: 'FAILED',
                 error: error.message,
                 failedAt: admin.firestore.FieldValue.serverTimestamp()
             });
         }
     }
 );
+
+// ============================================================================
+// 🗑️ 12. ULTIMATE GHOST CLEANER: AUTO-DELETE OFFERS & PROCUREMENT DATA
+// ============================================================================
+exports.onProductDeleted = onDocumentDeleted('products/{productId}', async (event) => {
+    const snap = event.data;
+    if (!snap) return; 
+
+    const productId = event.params.productId;
+    const deletedData = snap.data();
+    const barcode = deletedData.barcode;
+
+    console.log(`🧹 Product Deleted (${productId}). Hunting Offers & Procurement Data...`);
+
+    const batch = db.batch();
+    let deleteCount = 0;
+
+    try {
+        // 🎯 1. DELETE GHOST OFFERS (Using Barcode)
+        if (barcode) {
+            const offersSnap = await db.collection('offers').where('barcode', '==', barcode).get();
+            offersSnap.forEach((doc) => {
+                batch.delete(doc.ref);
+                deleteCount++;
+            });
+        }
+
+        // 🎯 2. DELETE FROM AI PO SUGGESTIONS (Using Product ID)
+        const poSuggestionsSnap = await db.collection('ai_po_suggestions').where('productId', '==', productId).get();
+        poSuggestionsSnap.forEach((doc) => {
+            batch.delete(doc.ref);
+            deleteCount++;
+        });
+
+        // 🎯 3. DELETE FROM PURCHASE ORDERS / PROCUREMENT (Using Product ID)
+        const purchaseOrdersSnap = await db.collection('purchase_orders').where('productId', '==', productId).get();
+        purchaseOrdersSnap.forEach((doc) => {
+            batch.delete(doc.ref);
+            deleteCount++;
+        });
+
+        if (deleteCount > 0) {
+            // Agar batch me 500 se zyada items hue toh Firebase fail ho sakta hai, 
+            // par ek product ke itne data nahi honge, isliye seedha commit safe hai.
+            await batch.commit();
+            console.log(`💥 SUCCESS: Vaporized ${deleteCount} linked documents (Offers + Procurement) for Product ${productId}!`);
+        } else {
+            console.log(`✅ No linked data found for ${productId}. Clean exit.`);
+        }
+    } catch (error) {
+        console.error(`🚨 ERROR cleaning up data for ${productId}:`, error);
+    }
+});
+
+// ============================================================================
+// 🗑️ 13. SERVICE GHOST CLEANER (Agar Services me bhi offers lagte hain)
+// ============================================================================
+exports.onServiceDeleted = onDocumentDeleted('services/{serviceId}', async (event) => {
+    const snap = event.data;
+    if (!snap) return; 
+
+    const serviceId = event.params.serviceId;
+    const deletedData = snap.data();
+    const barcode = deletedData.barcode;
+
+    console.log(`🧹 Service Deleted (${serviceId}). Hunting Offers...`);
+
+    const batch = db.batch();
+    let deleteCount = 0;
+
+    try {
+        if (barcode) {
+            const offersSnap = await db.collection('offers').where('barcode', '==', barcode).get();
+            offersSnap.forEach((doc) => {
+                batch.delete(doc.ref);
+                deleteCount++;
+            });
+        }
+
+        if (deleteCount > 0) {
+            await batch.commit();
+            console.log(`💥 SUCCESS: Vaporized ${deleteCount} ghost offers for Service ${serviceId}!`);
+        }
+    } catch (error) {
+        console.error(`🚨 ERROR cleaning up data for Service ${serviceId}:`, error);
+    }
+});

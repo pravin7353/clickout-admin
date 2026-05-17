@@ -17,8 +17,11 @@ import '../../features/cashier/cashier_screen.dart';
 import '../../features/fraud_control/presentation/fraud_control_screen.dart';
 import '../../features/risk/presentation/qr_reactivation_screen.dart';
 import '../../features/refund/refund_decision_screen.dart';
-import '../../features/growth/churn_dashboard_screen.dart';
+import '../../features/growth/growth_radar_screen.dart'; // 🚀 NAYA IMPORT (Linked to New UI)
+import '../../features/growth/campaign_manager_screen.dart'; // 🚀 NAYA IMPORT
 import '../../features/inventory/presentation/product_control_screen.dart';
+import '../../features/service/service_control_screen.dart'; // 🚀 NAYA: Service Control Import
+import '../../features/idt/screens/idt_deposits_screen.dart'; // 🚀 NAYA: IDT Deposits
 import '../../features/tenant_admin/screens/org_structure_screen.dart';
 import '../../features/tenant_admin/screens/tenant_onboarding_screen.dart';
 import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart';
@@ -100,6 +103,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             '/procurement',
             '/growth',
             '/inventory',
+            '/service-control',
+            '/idt-deposits',
             '/guard',
             '/cashier',
           ];
@@ -204,11 +209,25 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/growth',
-            builder: (context, state) => const ChurnDashboardScreen(),
+            builder: (context, state) =>
+                const GrowthRadarScreen(), // 🚀 LINKED TO NEW SCREEN
+          ),
+          // 🚀 NAYA ROUTE: Campaign Manager Screen
+          GoRoute(
+            path: '/campaign-manager',
+            builder: (context, state) => const CampaignManagerScreen(),
           ),
           GoRoute(
             path: '/inventory',
             builder: (context, state) => const ProductControlScreen(),
+          ),
+          GoRoute(
+            path: '/idt-deposits',
+            builder: (context, state) => const IdtDepositsScreen(),
+          ),
+          GoRoute(
+            path: '/service-control',
+            builder: (context, state) => const ServiceControlScreen(),
           ),
           GoRoute(
             path: '/org-structure',

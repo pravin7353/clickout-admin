@@ -138,6 +138,28 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
 
     Map<String, dynamic> payloadData = {'value1': v1, 'value2': v2};
 
+    // 🚀 THE MASTER FIX: Sync keys with what OfferEngineService actually expects!
+    if (_selectedType == 'PERCENTAGE') {
+      payloadData['discountPercent'] = v1;
+    } else if (_selectedType == 'FLAT_AMOUNT') {
+      payloadData['discountAmount'] = v1;
+    } else if (_selectedType == 'BUY_X_GET_Y' ||
+        _selectedType == 'BUY_X_GET_Y_CROSS') {
+      payloadData['buyQty'] = v1.toInt();
+      payloadData['freeQty'] = v2.toInt();
+    } else if (_selectedType == 'TIERED_QTY') {
+      payloadData['minQty'] = v1.toInt();
+      payloadData['discountPercent'] = v2;
+    } else if (_selectedType == 'BUNDLE_PRICE') {
+      payloadData['bundleQty'] = v1.toInt();
+      payloadData['bundlePrice'] = v2;
+    } else if (_selectedType == 'FLASH_SALE') {
+      payloadData['discountPercent'] = v1;
+      payloadData['durationHours'] = v2.toInt();
+    } else if (_selectedType == 'CROSS_PRODUCT') {
+      payloadData['discountPercent'] = v1;
+    }
+
     // 🚀 Cross-Product Validation: Target Product Required!
     if (_selectedType == 'CROSS_PRODUCT' ||
         _selectedType == 'BUY_X_GET_Y_CROSS') {

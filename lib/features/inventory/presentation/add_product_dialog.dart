@@ -116,6 +116,11 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
       final productData = {
         'barcode': _barcodeCtrl.text.trim(),
         'name': _nameCtrl.text.trim(),
+        'itemType':
+            'PRODUCT', // 🚀 FIX: Iske bina naya product UI hide kar dega
+        'searchKey': _nameCtrl.text
+            .trim()
+            .toLowerCase(), // 🚀 FIX: Search ke liye zaroori
         'price': _priceCtrl.text.trim(),
         'unitCost': _unitCostCtrl.text.trim(),
         'weight': _weightCtrl.text.trim(),
@@ -123,7 +128,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
         'gst': _selectedGst,
         'expiryDate': _selectedDate,
       };
-
       await ref.read(productMasterProvider.notifier).addNewProduct(productData);
 
       if (mounted) {

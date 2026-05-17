@@ -18,9 +18,14 @@ final suspectStaffProvider = StreamProvider<List<QueryDocumentSnapshot>>((ref) {
       .collection('employees')
       .where('trustScore', isLessThan: 80);
 
-  // 🚀 SAAS ISOLATION
+  final String? branchCode = adminData?['branchCode'];
+
+  // 🚀 SAAS ISOLATION (Level 1 & 2)
   if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
     query = query.where('tenantId', isEqualTo: tenantId);
+  }
+  if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+    query = query.where('branchCode', isEqualTo: branchCode);
   }
 
   return query
@@ -77,40 +82,52 @@ class PendingOrder {
 }
 
 final pendingOrdersStreamProvider = StreamProvider<List<PendingOrder>>((ref) {
-  return FirebaseFirestore.instance
+  final adminData = ref.watch(adminRoleProvider).value;
+  final String? tenantId = adminData?['tenantId'];
+  final String? branchCode = adminData?['branchCode'];
+  final String role = (adminData?['role'] ?? '').toString().toLowerCase();
+
+  Query query = FirebaseFirestore.instance
       .collection('orders')
       .where('paymentStatus', isEqualTo: 'PAID')
-      .where('exitStatus', whereIn: ['PENDING', 'READY_FOR_EXIT'])
-      .snapshots()
-      .map((snapshot) {
-        final now = DateTime.now();
-        List<PendingOrder> pendingList = [];
+      .where('exitStatus', whereIn: ['PENDING', 'READY_FOR_EXIT']);
 
-        for (var doc in snapshot.docs) {
-          final data = doc.data();
-          DateTime paidTime = now;
+  // 🚀 SAAS ISOLATION (Level 1 & 2): Stops global read explosion
+  if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
+    query = query.where('tenantId', isEqualTo: tenantId);
+  }
+  if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+    query = query.where('branchCode', isEqualTo: branchCode);
+  }
 
-          if (data['timestamp'] != null) {
-            paidTime = (data['timestamp'] as Timestamp).toDate();
-          } else if (data['paidAt'] != null) {
-            paidTime = (data['paidAt'] as Timestamp).toDate();
-          }
+  return query.snapshots().map((snapshot) {
+    final now = DateTime.now();
+    List<PendingOrder> pendingList = [];
 
-          double amount =
-              double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0;
-          DateTime? expiresAt = (data['qrExpiresAt'] as Timestamp?)?.toDate();
-          bool isExpired =
-              expiresAt != null && DateTime.now().isAfter(expiresAt);
+    for (var doc in snapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      DateTime paidTime = now;
 
-          if (!isExpired) {
-            pendingList.add(
-              PendingOrder(orderId: doc.id, amount: amount, paidAt: paidTime),
-            );
-          }
-        }
-        pendingList.sort((a, b) => a.paidAt.compareTo(b.paidAt));
-        return pendingList;
-      });
+      if (data['timestamp'] != null) {
+        paidTime = (data['timestamp'] as Timestamp).toDate();
+      } else if (data['paidAt'] != null) {
+        paidTime = (data['paidAt'] as Timestamp).toDate();
+      }
+
+      double amount =
+          double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0;
+      DateTime? expiresAt = (data['qrExpiresAt'] as Timestamp?)?.toDate();
+      bool isExpired = expiresAt != null && DateTime.now().isAfter(expiresAt);
+
+      if (!isExpired) {
+        pendingList.add(
+          PendingOrder(orderId: doc.id, amount: amount, paidAt: paidTime),
+        );
+      }
+    }
+    pendingList.sort((a, b) => a.paidAt.compareTo(b.paidAt));
+    return pendingList;
+  });
 });
 
 class LeakageBuckets {

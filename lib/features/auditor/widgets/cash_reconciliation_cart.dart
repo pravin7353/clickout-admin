@@ -23,6 +23,9 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputBg = isDark ? const Color(0xFF1A221A) : const Color(0xFFF4F5F7);
+    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
     Color varianceColor = Colors.green;
     String varianceText = "Perfect Match ✅";
 
@@ -39,26 +42,33 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: Theme.of(context).dividerColor),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 16),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.account_balance, color: Color(0xFF2B3674)),
-              SizedBox(width: 10),
+              Icon(
+                Icons.account_balance_wallet,
+                color: Theme.of(context).primaryColor,
+              ), // 💎 Emerald Green Accent
+              const SizedBox(width: 10),
               Text(
                 "Cash Drawer Reconciliation",
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2B3674),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: textColor,
                 ),
               ),
             ],
@@ -70,7 +80,8 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
                 child: _buildInfoTile(
                   "System Expected",
                   "₹${widget.expectedCash.toStringAsFixed(0)}",
-                  Colors.blueAccent,
+                  Colors
+                      .blueAccent, // This gets overridden inside _buildInfoTile
                 ),
               ),
               const SizedBox(width: 20),
@@ -78,13 +89,27 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
                 child: TextField(
                   controller: _countedCashCtrl,
                   keyboardType: TextInputType.number,
+                  style: TextStyle(color: textColor),
                   decoration: InputDecoration(
                     labelText: "Actual Counted Cash",
+                    labelStyle: TextStyle(
+                      color: Theme.of(context).textTheme.labelLarge?.color,
+                    ),
                     prefixText: "₹ ",
+                    prefixStyle: TextStyle(color: textColor),
                     filled: true,
-                    fillColor: Colors.grey.shade50,
-                    border: OutlineInputBorder(
+                    fillColor: inputBg,
+                    enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).dividerColor,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: Theme.of(context).primaryColor,
+                      ),
                     ),
                   ),
                   onChanged: (v) => _calculateVariance(),
@@ -93,13 +118,17 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
             ],
           ),
           if (_isCalculated) ...[
-            const Divider(height: 30),
+            Divider(height: 30, color: Theme.of(context).dividerColor),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   "Audit Status:",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: textColor,
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -128,12 +157,15 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
   }
 
   Widget _buildInfoTile(String title, String value, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inputBg = isDark ? const Color(0xFF1A221A) : const Color(0xFFF4F5F7);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.05),
+        color: inputBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,16 +173,16 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
           Text(
             title,
             style: TextStyle(
-              color: Colors.grey.shade700,
-              fontWeight: FontWeight.bold,
+              color: Theme.of(context).textTheme.labelLarge?.color,
               fontSize: 12,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 5),
           Text(
             value,
             style: TextStyle(
-              color: color,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
               fontWeight: FontWeight.w900,
               fontSize: 24,
             ),

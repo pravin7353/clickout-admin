@@ -1,15 +1,23 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/auth_provider.dart';
+import '../../features/invoice/invoice_rules_dialog.dart';
+import '../../core/store/providers/store_provider.dart';
+import '../../features/tenant_admin/screens/edit_store_profile_dialog.dart';
+//import '../../features/tenant_admin/screens/edit_tenant_profile_dialog.dart';
+import '../../features/manager/widgets/store_entry_qr_card.dart'; // 🚀 NAYA
+import '../../core/providers/theme_provider.dart';
 
 const double mobileBreakpoint = 768;
 const double tabletBreakpoint = 1024;
 
 // --- EXACT THEME SPEC ENFORCEMENT ---
-const Color bgDarkTheme = Color(0xFF080B08); // 🚀 Background
-const Color cardDarkTheme = Color(0xFF111811); // 🚀 Card/Sidebar
-const Color accentGreenTheme = Color(0xFF00C853); // 🚀 Accent
+// (We now use Theme.of(context) dynamically, but keeping this for fallback/reference)
+const Color bgDarkTheme = Color(0xFF080B08);
+const Color cardDarkTheme = Color(0xFF111811);
+const Color accentGreenTheme = Color(0xFF00C853);
 
 // --- SECTION COLORS ---
 const globalCommandColor = Color(0xFF7F77DD);
@@ -34,6 +42,15 @@ class AdminShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final adminData = ref.watch(adminRoleProvider).value;
+    final activeStore = ref.watch(activeStoreProvider); // 🚀 Watch Store State
+
+    // 🚀 SMART CLEAR: Jaise hi user wapas HQ (Tenant Dashboard) par aaye, Store lock hata do!
+    if (currentPath == '/' && activeStore != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(activeStoreProvider.notifier).clearStore();
+      });
+    }
+
     final adminName = adminData?['name'] ?? 'Loading...';
     final rawRole = (adminData?['role'] ?? 'Admin').toString().toUpperCase();
     final adminRoleUI = rawRole.replaceAll('_', ' ');
@@ -45,10 +62,12 @@ class AdminShell extends ConsumerWidget {
 
     // 🎨 STRICT THEME ENFORCEMENT
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgMain = isDark ? bgDarkTheme : const Color(0xFFF4F6F8);
-    final bgSidebar = isDark ? cardDarkTheme : Colors.white;
-    final textPrimary = isDark ? Colors.white : Colors.black;
-    final textSecondary = Colors.grey;
+    final bgMain = Theme.of(context).scaffoldBackgroundColor;
+    final bgSidebar = Theme.of(context).cardColor;
+    final textPrimary =
+        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
+    final textSecondary =
+        Theme.of(context).textTheme.labelLarge?.color ?? Colors.grey;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -63,7 +82,11 @@ class AdminShell extends ConsumerWidget {
               : null,
           drawer: isMobile
               ? Drawer(
-                  backgroundColor: bgSidebar,
+                  backgroundColor: isDark
+                      ? bgSidebar
+                      : const Color(
+                          0xFF004D40,
+                        ), // 💎 Solid Emerald for Light Mobile Drawer
                   child: _buildSidebarContent(
                     true,
                     context,
@@ -76,8 +99,9 @@ class AdminShell extends ConsumerWidget {
                     isManager,
                     ref,
                     bgSidebar,
-                    textPrimary,
-                    textSecondary,
+                    Colors
+                        .white, // 💎 Forced White Text for Dark/Emerald Sidebar
+                    Colors.white70, // 💎 Forced White Secondary
                   ),
                 )
               : null,
@@ -88,11 +112,19 @@ class AdminShell extends ConsumerWidget {
                   duration: const Duration(milliseconds: 300),
                   width: isDesktop ? 260 : 80,
                   decoration: BoxDecoration(
-                    color: bgSidebar,
+                    color: isDark ? bgSidebar : null,
+                    gradient: isDark
+                        ? null
+                        : const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF004D40),
+                              Color(0xFF0B6B60),
+                            ], // 💎 Vibrant Emerald Gradient Sidebar
+                          ),
                     border: Border(
-                      right: BorderSide(
-                        color: isDark ? Colors.white10 : Colors.grey.shade200,
-                      ),
+                      right: BorderSide(color: Theme.of(context).dividerColor),
                     ),
                   ),
                   child: _buildSidebarContent(
@@ -107,8 +139,8 @@ class AdminShell extends ConsumerWidget {
                     isManager,
                     ref,
                     bgSidebar,
-                    textPrimary,
-                    textSecondary,
+                    Colors.white, // 💎 Forced White Text
+                    Colors.white70, // 💎 Forced White Secondary
                   ),
                 ),
               Expanded(
@@ -119,8 +151,8 @@ class AdminShell extends ConsumerWidget {
                         context,
                         adminName,
                         adminRoleUI,
-                        rawRole, //
-                        adminData?['tenantId']?.toString() ?? '', //
+                        rawRole,
+                        adminData?['tenantId']?.toString() ?? '',
                         adminData?['branchCode']?.toString() ?? '',
                         roleColor,
                         ref,
@@ -128,6 +160,7 @@ class AdminShell extends ConsumerWidget {
                         textPrimary,
                         textSecondary,
                         isDark,
+                        activeStore,
                       ),
 
                     _buildCriticalAlertsStrip(),
@@ -212,6 +245,7 @@ class AdminShell extends ConsumerWidget {
     Color textPrimary,
     Color textSecondary,
     bool isDark,
+    ActiveStoreState? activeStore, // 🚀 NAYA: Store state accepted
   ) {
     return Container(
       height: 70,
@@ -219,21 +253,59 @@ class AdminShell extends ConsumerWidget {
       decoration: BoxDecoration(
         color: bgTopBar,
         border: Border(
-          bottom: BorderSide(
-            color: isDark ? Colors.white10 : Colors.grey.shade200,
-          ),
+          bottom: BorderSide(color: Theme.of(context).dividerColor),
         ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            "Command Center",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: textPrimary,
-            ),
+          Row(
+            children: [
+              Text(
+                "Command Center",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
+              ),
+              // 🚀 THE BADGE: Jab bhi user kisi store ke andar hoga, ye chamkega!
+              if (activeStore != null) ...[
+                const SizedBox(width: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accentGreenTheme.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: accentGreenTheme.withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on,
+                        color: accentGreenTheme,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        activeStore.storeName,
+                        style: const TextStyle(
+                          color: accentGreenTheme,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
           Row(
             children: [
@@ -242,7 +314,11 @@ class AdminShell extends ConsumerWidget {
                   isDark ? Icons.light_mode : Icons.dark_mode,
                   color: accentGreenTheme,
                 ),
-                onPressed: () {},
+                onPressed: () {
+                  ref.read(themeProvider.notifier).state = isDark
+                      ? ThemeMode.light
+                      : ThemeMode.dark;
+                },
               ),
               const SizedBox(width: 5),
               IconButton(
@@ -256,9 +332,29 @@ class AdminShell extends ConsumerWidget {
                     ref.read(authControllerProvider.notifier).logout(),
               ),
               const SizedBox(width: 10),
-              CircleAvatar(
-                backgroundColor: roleColor,
-                child: const Icon(Icons.person, color: Colors.white, size: 18),
+              // 🚀 PREMIUM GLASSMORPHIC PROFILE OVERLAY
+              GestureDetector(
+                onTap: () {
+                  _showGlassProfileMenu(
+                    context: context,
+                    name: name,
+                    roleUI: roleUI,
+                    rawRole: rawRole,
+                    tenantId: tenantId,
+                    roleColor: roleColor,
+                    isDark: isDark,
+                    activeStore: activeStore, // 🚀 ADDED
+                    adminData: ref.read(adminRoleProvider).value, // 🚀 ADDED
+                  );
+                },
+                child: CircleAvatar(
+                  backgroundColor: roleColor,
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
               Column(
@@ -375,6 +471,10 @@ class AdminShell extends ConsumerWidget {
         ? Colors.white10
         : Colors.grey.shade200;
 
+    // 🚀 THE MAGIC TRICK: Check if a store is active (Manager hamesha dekhega)
+    final activeStore = ref.watch(activeStoreProvider);
+    final bool showStoreMenus = isManager || activeStore != null;
+
     return Column(
       children: [
         const SizedBox(height: 20),
@@ -431,6 +531,15 @@ class AdminShell extends ConsumerWidget {
                   '/register-client',
                   globalCommandColor,
                 ),
+                // 🚀 SUPER ADMIN EXCLUSIVE: Campaign Manager
+                _buildNavItem(
+                  context,
+                  Icons.campaign_rounded,
+                  "Campaign Manager",
+                  isExpanded,
+                  '/campaign-manager',
+                  globalCommandColor,
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Divider(color: dividerColor, height: 1),
@@ -459,13 +568,16 @@ class AdminShell extends ConsumerWidget {
                           Icons.dashboard_customize,
                           "Tenant Dashboard",
                           isExpanded,
-                          isTenantAdmin
-                              ? '/'
-                              : currentPath, // Fix: Tenant Admin default is /
+                          isTenantAdmin ? '/' : currentPath,
                           tenantHqColor,
+                          onCustomTap: () {
+                            // 🚀 INSTANT CLEAR: Jaise hi button dabega, store data clear aur menu turant hide!
+                            ref.read(activeStoreProvider.notifier).clearStore();
+                            context.go(isTenantAdmin ? '/' : currentPath);
+                          },
                         ),
+
                         // 🚀 TEMPORARILY DISABLED: Org Structure hidden for now.
-                        /*
                         _buildNavItem(
                           context,
                           Icons.account_tree,
@@ -474,7 +586,7 @@ class AdminShell extends ConsumerWidget {
                           '/org-structure',
                           tenantHqColor,
                         ),
-                        */
+
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Divider(color: dividerColor, height: 1),
@@ -486,151 +598,173 @@ class AdminShell extends ConsumerWidget {
                 },
               ),
 
-              // ==========================================
-              // 🏪 3. OPERATIONS
-              // ==========================================
-              if (isExpanded)
-                _buildSectionHeader(
-                  "OPERATIONS",
+              // 🚀 MAGIC WRAPPER: Ye condition check karegi tabhi menus dikhenge
+              if (showStoreMenus) ...[
+                // ==========================================
+                // 🏪 3. OPERATIONS
+                // ==========================================
+                if (isExpanded)
+                  _buildSectionHeader(
+                    "OPERATIONS",
+                    operationsColor,
+                    showViewOnly: isSuperAdmin,
+                  ),
+                _buildNavItem(
+                  context,
+                  Icons.dashboard,
+                  "Dashboard",
+                  isExpanded,
+                  '/dashboard',
                   operationsColor,
-                  showViewOnly: isSuperAdmin,
+                  isReadOnly: isSuperAdmin,
                 ),
-              // 🚀 Super Admin ko bhi Dashboard dikhega (View Only mode mein)
-              _buildNavItem(
-                context,
-                Icons.dashboard,
-                "Dashboard",
-                isExpanded,
-                '/dashboard',
-                operationsColor,
-                isReadOnly: isSuperAdmin,
-              ),
+                _buildNavItem(
+                  context,
+                  Icons.people_alt,
+                  "Super Manager",
+                  isExpanded,
+                  '/manager',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.inventory,
+                  "Product Control",
+                  isExpanded,
+                  '/inventory',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                // ✂️ NAYA: SERVICE CONTROL MENU
+                _buildNavItem(
+                  context,
+                  Icons.design_services, // Scissor / Service wala icon
+                  "Service Control",
+                  isExpanded,
+                  '/service-control',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                // 📦 NAYA: IDT DEPOSITS MENU
+                _buildNavItem(
+                  context,
+                  Icons.move_to_inbox,
+                  "IDT Deposits",
+                  isExpanded,
+                  '/idt-deposits',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                // 🛒 NAYA: ASSISTED CHECKOUT (POS)
+                _buildNavItem(
+                  context,
+                  Icons.point_of_sale_rounded,
+                  "Assisted Checkout",
+                  isExpanded,
+                  '/cashier',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.inventory_2,
+                  "Procurement",
+                  isExpanded,
+                  '/procurement',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.trending_up,
+                  "Growth Radar",
+                  isExpanded,
+                  '/growth',
+                  operationsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
 
-              _buildNavItem(
-                context,
-                Icons.people_alt,
-                "Super Manager",
-                isExpanded,
-                '/manager',
-                operationsColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.inventory,
-                "Product Control",
-                isExpanded,
-                '/inventory',
-                operationsColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.inventory_2,
-                "Procurement",
-                isExpanded,
-                '/procurement',
-                operationsColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.trending_up,
-                "Growth Radar",
-                isExpanded,
-                '/growth',
-                operationsColor,
-                isReadOnly: isSuperAdmin,
-              ),
-
-              // ==========================================
-              // 👮 4. STAFF & AUDIT
-              // ==========================================
-              if (isExpanded)
-                _buildSectionHeader(
-                  "STAFF & AUDIT",
+                // ==========================================
+                // 👮 4. STAFF & AUDIT
+                // ==========================================
+                if (isExpanded)
+                  _buildSectionHeader(
+                    "STAFF & AUDIT",
+                    staffAuditColor,
+                    showViewOnly: isSuperAdmin,
+                  ),
+                _buildNavItem(
+                  context,
+                  Icons.account_balance_wallet,
+                  "Super Auditor",
+                  isExpanded,
+                  '/auditor',
                   staffAuditColor,
-                  showViewOnly: isSuperAdmin,
+                  isReadOnly: isSuperAdmin,
                 ),
-              _buildNavItem(
-                context,
-                Icons.account_balance_wallet,
-                "Super Auditor",
-                isExpanded,
-                '/auditor',
-                staffAuditColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.gpp_good,
-                "Super Guard",
-                isExpanded,
-                '/guard',
-                staffAuditColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.point_of_sale,
-                "Cashier Terminals",
-                isExpanded,
-                '/cashier',
-                staffAuditColor,
-                isReadOnly: isSuperAdmin,
-              ),
+                _buildNavItem(
+                  context,
+                  Icons.gpp_good,
+                  "Super Guard",
+                  isExpanded,
+                  '/guard',
+                  staffAuditColor,
+                  isReadOnly: isSuperAdmin,
+                ),
 
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Divider(color: dividerColor, height: 1),
-              ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(color: dividerColor, height: 1),
+                ),
 
-              // ==========================================
-              // 🚨 5. FINANCE & RISK
-              // ==========================================
-              if (isExpanded)
-                _buildSectionHeader(
-                  "FINANCE & RISK",
+                // ==========================================
+                // 🚨 5. FINANCE & RISK
+                // ==========================================
+                if (isExpanded)
+                  _buildSectionHeader(
+                    "FINANCE & RISK",
+                    financeRiskColor,
+                    showViewOnly: isSuperAdmin,
+                  ),
+                _buildNavItem(
+                  context,
+                  Icons.warning_amber_rounded,
+                  "Risk Engine",
+                  isExpanded,
+                  '/risk',
                   financeRiskColor,
-                  showViewOnly: isSuperAdmin,
+                  isReadOnly: isSuperAdmin,
                 ),
-              _buildNavItem(
-                context,
-                Icons.warning_amber_rounded,
-                "Risk Engine",
-                isExpanded,
-                '/risk',
-                financeRiskColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.gpp_bad_rounded,
-                "Fraud Control",
-                isExpanded,
-                '/fraud',
-                financeRiskColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.qr_code_scanner,
-                "QR Bailout",
-                isExpanded,
-                '/qr-reactivation',
-                financeRiskColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              _buildNavItem(
-                context,
-                Icons.currency_exchange,
-                "Refund Engine",
-                isExpanded,
-                '/refunds',
-                financeRiskColor,
-                isReadOnly: isSuperAdmin,
-              ),
-              const SizedBox(height: 20),
+                _buildNavItem(
+                  context,
+                  Icons.gpp_bad_rounded,
+                  "Fraud Control",
+                  isExpanded,
+                  '/fraud',
+                  financeRiskColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.qr_code_scanner,
+                  "QR Bailout",
+                  isExpanded,
+                  '/qr-reactivation',
+                  financeRiskColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                _buildNavItem(
+                  context,
+                  Icons.currency_exchange,
+                  "Refund Engine",
+                  isExpanded,
+                  '/refunds',
+                  financeRiskColor,
+                  isReadOnly: isSuperAdmin,
+                ),
+                const SizedBox(height: 20),
+              ], // 🚀 WRAPPER CLOSED HERE
             ],
           ),
         ),
@@ -646,10 +780,16 @@ class AdminShell extends ConsumerWidget {
     String route,
     Color sectionColor, {
     bool isReadOnly = false,
+    VoidCallback? onCustomTap,
   }) {
     bool isActive = false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    // 🛡️ SMART HIGHLIGHT LOGIC
+    // 💎 Dynamic inactive color (White70 for Emerald Light Mode, Grey for Dark Mode)
+    final inactiveColor = isDark ? const Color(0xFF888888) : Colors.white70;
+    // 💎 Boost active section color visibility in Light Emerald mode
+    final activeColor = isDark ? sectionColor : Colors.white;
+
     if (route == '/') {
       isActive = currentPath == '/';
     } else {
@@ -659,7 +799,7 @@ class AdminShell extends ConsumerWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () => context.go(route),
+        onTap: onCustomTap ?? () => context.go(route),
         child: Container(
           padding: EdgeInsets.symmetric(
             vertical: 15,
@@ -667,11 +807,11 @@ class AdminShell extends ConsumerWidget {
           ),
           decoration: BoxDecoration(
             color: isActive
-                ? sectionColor.withOpacity(0.1)
+                ? activeColor.withOpacity(0.15)
                 : Colors.transparent,
             border: Border(
               left: BorderSide(
-                color: isActive ? sectionColor : Colors.transparent,
+                color: isActive ? activeColor : Colors.transparent,
                 width: 3,
               ),
             ),
@@ -684,7 +824,7 @@ class AdminShell extends ConsumerWidget {
             children: [
               Icon(
                 icon,
-                color: isActive ? sectionColor : const Color(0xFF666666),
+                color: isActive ? activeColor : inactiveColor,
                 size: 24,
               ),
               if (isExpanded) const SizedBox(width: 15),
@@ -693,22 +833,20 @@ class AdminShell extends ConsumerWidget {
                   child: Text(
                     title,
                     style: TextStyle(
-                      color: isActive ? sectionColor : Colors.grey,
+                      color: isActive ? activeColor : inactiveColor,
                       fontSize: 14,
-                      fontWeight: isActive
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               if (isExpanded && isReadOnly)
-                const Tooltip(
+                Tooltip(
                   message: 'View-only access',
                   child: Icon(
                     Icons.lock_outline,
                     size: 14,
-                    color: Color(0xFF666666),
+                    color: inactiveColor,
                   ),
                 ),
             ],
@@ -717,4 +855,243 @@ class AdminShell extends ConsumerWidget {
       ),
     );
   }
+
+  // 💎 GLASSMORPHIC PROFILE MENU ENGINE
+  void _showGlassProfileMenu({
+    required BuildContext context,
+    required String name,
+    required String roleUI,
+    required String rawRole,
+    required String tenantId,
+    required Color roleColor,
+    required bool isDark,
+    ActiveStoreState? activeStore, // 🚀 ADDED
+    Map<String, dynamic>? adminData, // 🚀 ADDED
+  }) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "ProfileMenu",
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (ctx, anim1, anim2) {
+        return Stack(
+          children: [
+            Positioned(
+              top: 70,
+              right: 30,
+              child: Material(
+                color: Colors.transparent,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: Container(
+                      width: 260,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).cardColor.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircleAvatar(
+                            radius: 30,
+                            backgroundColor: roleColor.withOpacity(0.2),
+                            child: Icon(
+                              Icons.person,
+                              size: 30,
+                              color: roleColor,
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          Text(
+                            name,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyLarge?.color,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            roleUI,
+                            style: TextStyle(
+                              color: roleColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Divider(
+                            color: Theme.of(context).dividerColor,
+                            height: 1,
+                          ),
+                          const SizedBox(height: 10),
+                          // 🚀 MANAGER LOCK: Ye options sirf tab dikhenge jab role MANAGER hoga
+                          if (rawRole == 'MANAGER') ...[
+                            ListTile(
+                              leading: Icon(
+                                Icons.edit_note,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                              title: Text(
+                                "Edit Profile",
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => EditStoreProfileDialog(
+                                    branchCode:
+                                        activeStore?.branchCode ??
+                                        adminData?['branchCode'],
+                                  ),
+                                );
+                              },
+                            ),
+                            ListTile(
+                              leading: Icon(
+                                Icons.receipt_long,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                              title: Text(
+                                "Invoice Rules",
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => const InvoiceRulesDialog(),
+                                );
+                              },
+                            ),
+                            // 🚀 NAYA MENU BUTTON: Campaign Manager
+                            ListTile(
+                              leading: Icon(
+                                Icons.campaign_rounded,
+                                color: isDark
+                                    ? const Color(0xFF00C853)
+                                    : Colors.green,
+                              ),
+                              title: Text(
+                                "Campaign Manager",
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              onTap: () {
+                                // Agar screen choti (mobile) hai toh drawer band karo
+                                if (MediaQuery.of(context).size.width < 1024) {
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+                                }
+                                context.go(
+                                  '/campaign-manager',
+                                ); // Route par jao
+                              },
+                            ),
+
+                            // 🚀 NAYA MENU BUTTON: Campaign Manager
+                            ListTile(
+                              leading: Icon(
+                                Icons.campaign_rounded,
+                                color: isDark
+                                    ? const Color(0xFF00C853)
+                                    : Colors.green,
+                              ),
+                              title: Text(
+                                "Campaign Manager",
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              onTap: () {
+                                // Agar screen choti (mobile) hai toh drawer band karo
+                                if (MediaQuery.of(context).size.width < 1024) {
+                                  if (Navigator.canPop(context)) {
+                                    Navigator.pop(context);
+                                  }
+                                }
+                                context.go(
+                                  '/campaign-manager',
+                                ); // Route par jao
+                              },
+                            ),
+
+                            ListTile(
+                              leading: Icon(
+                                Icons.qr_code_2,
+                                color: Theme.of(context).iconTheme.color,
+                              ),
+                              title: Text(
+                                "Store Entry QR",
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              contentPadding: EdgeInsets.zero,
+                              onTap: () {
+                                Navigator.pop(ctx); // Close the menu
+                                showDialog(
+                                  context: context,
+                                  builder: (_) =>
+                                      const StoreEntryQRCard(), // 🚀 NAYA: Opens QR Dialog
+                                );
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
+
+//

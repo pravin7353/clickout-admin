@@ -39,9 +39,14 @@ final timeAnalyticsProvider = StreamProvider<List<HourlyData>>((ref) {
         isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
       );
 
+  final String? branchCode = adminData?['branchCode'];
+
   // 🚀 SAAS ISOLATION: Super Admin sees all, Tenant Admin sees only their data
   if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
     query = query.where('tenantId', isEqualTo: tenantId);
+  }
+  if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+    query = query.where('branchCode', isEqualTo: branchCode);
   }
 
   return query.snapshots().map((snapshot) {
