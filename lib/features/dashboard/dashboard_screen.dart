@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../manpower_ai/presentation/manpower_widget.dart';
 import '../revenue_engine/providers/revenue_provider.dart';
+import '../auth/auth_provider.dart'; // 🚀 SAAS INJECTION IMPORT
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -44,7 +45,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final revenueState = ref.watch(revenueEngineProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final sectionTextColor = Theme.of(context).textTheme.labelLarge?.color;
     final bgColor = Theme.of(context).scaffoldBackgroundColor;
 
     return Scaffold(
@@ -765,9 +765,30 @@ class _ReconciliationTableWidgetState
     _fetchInitialData();
   }
 
-  // 🧠 2. THE QUERY FIX: Looking for actual backend strings!
+  // 🧠 2. THE QUERY FIX: Looking for actual backend strings + SAAS ISOLATION + DAILY RESET!
   Query _buildQuery({bool isCount = false}) {
+    final adminData = ref.read(adminRoleProvider).value;
+    final String tenantId = adminData?['tenantId'] ?? '';
+    final String branchCode = adminData?['branchCode'] ?? '';
+    final String role = (adminData?['role'] ?? '').toString().toLowerCase();
+
     Query q = FirebaseFirestore.instance.collection('orders');
+
+    // 🚀 SAAS ISOLATION: Sirf apni dukaan ka data!
+    if (role != 'super_admin' && tenantId.isNotEmpty) {
+      q = q.where('tenantId', isEqualTo: tenantId);
+    }
+    if (role == 'manager' && branchCode.isNotEmpty) {
+      q = q.where('branchCode', isEqualTo: branchCode);
+    }
+
+    // 🚀 DAILY RESET: Raat 12 baje sab fresh (Lifelong data Auditor Screen me rahega)
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    q = q.where(
+      'timestamp',
+      isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+    );
 
     if (_searchQuery.isNotEmpty) {
       q = q.where('orderId', isEqualTo: _searchQuery.trim());
@@ -805,6 +826,7 @@ class _ReconciliationTableWidgetState
       _indexErrorMsg = '';
     });
     try {
+      // 🚀 Unused variables removed. _buildQuery ab khud data fetch karta hai.
       if (_searchQuery.isEmpty) {
         final countSnap = await _buildQuery(isCount: true).count().get();
         _totalRecords = countSnap.count ?? 0;
@@ -830,6 +852,7 @@ class _ReconciliationTableWidgetState
     if (!_hasMore || _isLoading) return;
     setState(() => _isLoading = true);
     try {
+      // 🚀 Unused variables removed.
       final snap = await _buildQuery().startAfterDocument(_docs.last).get();
       _docs.addAll(snap.docs);
       _hasMore = snap.docs.length == _rowsPerPage;

@@ -27,6 +27,7 @@ import '../../features/tenant_admin/screens/tenant_onboarding_screen.dart';
 import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart';
 import '../../features/tenant_admin/screens/client_registration_screen.dart';
 import '../../features/super_admin/screens/super_admin_screen.dart';
+import '../../features/onboarding/screens/retail_simulator_screen.dart'; // 🚀 NAYA IMPORT: Retail Simulator
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey =
@@ -246,6 +247,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/register-client',
             builder: (context, state) => const ClientRegistrationScreen(),
+          ),
+          // 🚀 RETAIL SIMULATOR ONBOARDING ROUTE
+          GoRoute(
+            path: '/simulator',
+            builder: (context, state) =>
+                const RetailSimulatorScreen(), // Ensure to import this file at the top!
           ),
           GoRoute(
             path: '/dashboard',

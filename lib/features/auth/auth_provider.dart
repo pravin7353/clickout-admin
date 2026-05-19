@@ -33,8 +33,9 @@ class AuthController extends Notifier<bool> {
   @override
   bool build() => false;
 
-  Future<void> setupAdminSession() async {
+  Future<bool> setupAdminSession() async {
     state = true;
+    bool isFirstTimeLogin = false; // 🚀 Added Tracker
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null || currentUser.email == null) {
@@ -52,6 +53,7 @@ class AuthController extends Notifier<bool> {
       Map<String, dynamic> data;
 
       if (querySnapshot.docs.isEmpty) {
+        isFirstTimeLogin = true; // 🚀 Flag as First Time User
         // 🚀 ENTERPRISE PROVISIONING ENGINE: Perfect Schema Generator
         final String rawName = currentUser.email!.split('@')[0].toUpperCase();
         final String prefix = rawName.length >= 3
@@ -144,6 +146,8 @@ class AuthController extends Notifier<bool> {
         'deviceInfo': kIsWeb ? 'Web Browser' : 'Unknown',
         'suspiciousLoginFlag': false,
       });
+
+      return isFirstTimeLogin; // 🚀 Return the flag
     } catch (e) {
       throw e.toString();
     } finally {

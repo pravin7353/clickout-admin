@@ -315,9 +315,8 @@ class AdminShell extends ConsumerWidget {
                   color: accentGreenTheme,
                 ),
                 onPressed: () {
-                  ref.read(themeProvider.notifier).state = isDark
-                      ? ThemeMode.light
-                      : ThemeMode.dark;
+                  // 🚀 Ye naya function theme change bhi karega aur LocalStorage me hamesha ke liye SAVE bhi karega!
+                  ref.read(themeProvider.notifier).toggleTheme();
                 },
               ),
               const SizedBox(width: 5),
@@ -856,7 +855,7 @@ class AdminShell extends ConsumerWidget {
     );
   }
 
-  // 💎 GLASSMORPHIC PROFILE MENU ENGINE
+  // 💎 PROFESSIONAL LINKEDIN-STYLE PROFILE MENU
   void _showGlassProfileMenu({
     required BuildContext context,
     required String name,
@@ -865,8 +864,8 @@ class AdminShell extends ConsumerWidget {
     required String tenantId,
     required Color roleColor,
     required bool isDark,
-    ActiveStoreState? activeStore, // 🚀 ADDED
-    Map<String, dynamic>? adminData, // 🚀 ADDED
+    ActiveStoreState? activeStore,
+    Map<String, dynamic>? adminData,
   }) {
     showGeneralDialog(
       context: context,
@@ -874,6 +873,12 @@ class AdminShell extends ConsumerWidget {
       barrierLabel: "ProfileMenu",
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (ctx, anim1, anim2) {
+        // 🚀 LINKEDIN STYLE DESIGN TOKENS
+        final bgColor = isDark ? const Color(0xFF1E1E2D) : Colors.white;
+        final borderColor = isDark ? Colors.white10 : Colors.grey.shade200;
+        final iconColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+        final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+
         return Stack(
           children: [
             Positioned(
@@ -881,208 +886,139 @@ class AdminShell extends ConsumerWidget {
               right: 30,
               child: Material(
                 color: Colors.transparent,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(
-                      width: 260,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).cardColor.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Theme.of(context).dividerColor,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                child: Container(
+                  width: 280,
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: roleColor.withOpacity(0.2),
-                            child: Icon(
-                              Icons.person,
-                              size: 30,
-                              color: roleColor,
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ── HEADER SECTION ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 24,
+                          horizontal: 20,
+                        ),
+                        child: Column(
+                          children: [
+                            CircleAvatar(
+                              radius: 36,
+                              backgroundColor: roleColor.withOpacity(0.1),
+                              child: Icon(
+                                Icons.person,
+                                size: 36,
+                                color: roleColor,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 15),
-                          Text(
-                            name,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyLarge?.color,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                            const SizedBox(height: 16),
+                            Text(
+                              name,
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.3,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                          Text(
-                            roleUI,
-                            style: TextStyle(
-                              color: roleColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          Divider(
-                            color: Theme.of(context).dividerColor,
-                            height: 1,
-                          ),
-                          const SizedBox(height: 10),
-                          // 🚀 MANAGER LOCK: Ye options sirf tab dikhenge jab role MANAGER hoga
-                          if (rawRole == 'MANAGER') ...[
-                            ListTile(
-                              leading: Icon(
-                                Icons.edit_note,
-                                color: Theme.of(context).iconTheme.color,
+                            const SizedBox(height: 4),
+                            Text(
+                              roleUI,
+                              style: TextStyle(
+                                color: roleColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.5,
                               ),
-                              title: Text(
-                                "Edit Profile",
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => EditStoreProfileDialog(
-                                    branchCode:
-                                        activeStore?.branchCode ??
-                                        adminData?['branchCode'],
-                                  ),
-                                );
-                              },
-                            ),
-                            ListTile(
-                              leading: Icon(
-                                Icons.receipt_long,
-                                color: Theme.of(context).iconTheme.color,
-                              ),
-                              title: Text(
-                                "Invoice Rules",
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () {
-                                Navigator.pop(ctx);
-                                showDialog(
-                                  context: context,
-                                  builder: (_) => const InvoiceRulesDialog(),
-                                );
-                              },
-                            ),
-                            // 🚀 NAYA MENU BUTTON: Campaign Manager
-                            ListTile(
-                              leading: Icon(
-                                Icons.campaign_rounded,
-                                color: isDark
-                                    ? const Color(0xFF00C853)
-                                    : Colors.green,
-                              ),
-                              title: Text(
-                                "Campaign Manager",
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () {
-                                // Agar screen choti (mobile) hai toh drawer band karo
-                                if (MediaQuery.of(context).size.width < 1024) {
-                                  if (Navigator.canPop(context)) {
-                                    Navigator.pop(context);
-                                  }
-                                }
-                                context.go(
-                                  '/campaign-manager',
-                                ); // Route par jao
-                              },
-                            ),
-
-                            // 🚀 NAYA MENU BUTTON: Campaign Manager
-                            ListTile(
-                              leading: Icon(
-                                Icons.campaign_rounded,
-                                color: isDark
-                                    ? const Color(0xFF00C853)
-                                    : Colors.green,
-                              ),
-                              title: Text(
-                                "Campaign Manager",
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () {
-                                // Agar screen choti (mobile) hai toh drawer band karo
-                                if (MediaQuery.of(context).size.width < 1024) {
-                                  if (Navigator.canPop(context)) {
-                                    Navigator.pop(context);
-                                  }
-                                }
-                                context.go(
-                                  '/campaign-manager',
-                                ); // Route par jao
-                              },
-                            ),
-
-                            ListTile(
-                              leading: Icon(
-                                Icons.qr_code_2,
-                                color: Theme.of(context).iconTheme.color,
-                              ),
-                              title: Text(
-                                "Store Entry QR",
-                                style: TextStyle(
-                                  color: Theme.of(
-                                    context,
-                                  ).textTheme.bodyLarge?.color,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              contentPadding: EdgeInsets.zero,
-                              onTap: () {
-                                Navigator.pop(ctx); // Close the menu
-                                showDialog(
-                                  context: context,
-                                  builder: (_) =>
-                                      const StoreEntryQRCard(), // 🚀 NAYA: Opens QR Dialog
-                                );
-                              },
                             ),
                           ],
-                        ],
+                        ),
                       ),
-                    ),
+
+                      Divider(color: borderColor, height: 1, thickness: 1),
+
+                      // ── MENU ITEMS ──
+                      if (rawRole == 'MANAGER') ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            children: [
+                              _buildMenuTile(
+                                icon: Icons.edit_note,
+                                title: "Edit Profile",
+                                iconColor: iconColor,
+                                textColor: textColor,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => EditStoreProfileDialog(
+                                      branchCode:
+                                          activeStore?.branchCode ??
+                                          adminData?['branchCode'],
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildMenuTile(
+                                icon: Icons.receipt_long,
+                                title: "Invoice Rules",
+                                iconColor: iconColor,
+                                textColor: textColor,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => const InvoiceRulesDialog(),
+                                  );
+                                },
+                              ),
+                              _buildMenuTile(
+                                icon: Icons.campaign_rounded,
+                                title: "Campaign Manager",
+                                iconColor: iconColor,
+                                textColor: textColor,
+                                onTap: () {
+                                  if (MediaQuery.of(context).size.width <
+                                      1024) {
+                                    if (Navigator.canPop(context))
+                                      Navigator.pop(context);
+                                  } else {
+                                    Navigator.pop(
+                                      ctx,
+                                    ); // Close desktop dropdown
+                                  }
+                                  context.go('/campaign-manager');
+                                },
+                              ),
+                              _buildMenuTile(
+                                icon: Icons.qr_code_2,
+                                title: "Store Entry QR",
+                                iconColor: iconColor,
+                                textColor: textColor,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => const StoreEntryQRCard(),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ),
@@ -1092,6 +1028,34 @@ class AdminShell extends ConsumerWidget {
       },
     );
   }
-}
 
-//
+  // 💎 SLIM & PROFESSIONAL MENU TILE WIDGET
+  Widget _buildMenuTile({
+    required IconData icon,
+    required String title,
+    required Color iconColor,
+    required Color? textColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 22),
+            const SizedBox(width: 16),
+            Text(
+              title,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

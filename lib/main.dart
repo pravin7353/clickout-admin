@@ -43,7 +43,7 @@ class ClickOutAdminApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(goRouterProvider);
-    final themeMode = ref.watch(themeProvider); // 👈 Theme Watcher
+    final themeMode = ref.watch(themeProvider).currentTheme; // 🚀 NAYA FIX
 
     return MaterialApp.router(
       title: 'ClickOut Command Center',

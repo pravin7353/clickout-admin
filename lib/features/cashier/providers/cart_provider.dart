@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -85,19 +84,25 @@ class PosCartNotifier extends Notifier<PosCartState> {
 
   // 🎁 2. OFFER ENGINE SYNC
   Future<void> _fetchOffers() async {
-    // 🚀 FIX: 'await .future' ensures tenantId is ready before fetching offers!
     final adminData = await ref.read(adminRoleProvider.future);
     final tenantId = adminData?['tenantId'] ?? '';
     if (tenantId.isEmpty) return;
 
-    final snap = await FirebaseFirestore.instance
+    // 🚀 NAYA FIX: Ek baar get() karne ki jagah ab ye real-time Snapshots sunega.
+    // Jaise hi tu Procurement se offer badlega, POS instantly cart update kar dega!
+    // Tera core calculation logic 100% UNTOUCHED hai.
+    FirebaseFirestore.instance
         .collection('products')
         .where('tenantId', isEqualTo: tenantId)
         .where('clearanceActive', isEqualTo: true)
-        .get();
-
-    _activeOffers = snap.docs.map((d) => d.data()).toList();
-    _applyOffers(state.rawItems);
+        .snapshots()
+        .listen((snap) {
+          _activeOffers = snap.docs.map((d) => d.data()).toList();
+          // Agar cart me pehle se item hai, toh background me naya offer laga dega
+          if (state.rawItems.isNotEmpty) {
+            _applyOffers(Map<String, CartItem>.from(state.rawItems));
+          }
+        });
   }
 
   void _applyOffers(Map<String, CartItem> items) {

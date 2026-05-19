@@ -135,11 +135,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await UnifiedAuthService.verifyMagicLink(url, fallbackEmail: email);
-      await ref.read(authControllerProvider.notifier).setupAdminSession();
+      final isFirstTime = await ref
+          .read(authControllerProvider.notifier)
+          .setupAdminSession();
 
-      // 🚀 SECURE ROUTING: Seedha Command Center bhejo. Koi purana screen nahi khulega.
+      // 🚀 SECURE ROUTING: Smart Interception
       if (mounted) {
-        context.go('/dashboard');
+        if (isFirstTime) {
+          context.go('/simulator'); // 🚀 New Users get the AI Coach
+        } else {
+          context.go(
+            '/dashboard',
+          ); // Existing Users go straight to Command Center
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -191,7 +199,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       await UnifiedAuthService.devBypassLogin();
-      await ref.read(authControllerProvider.notifier).setupAdminSession();
+      final isFirstTime = await ref
+          .read(authControllerProvider.notifier)
+          .setupAdminSession();
+      if (mounted) {
+        if (isFirstTime) {
+          context.go('/simulator');
+        } else {
+          context.go('/dashboard');
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

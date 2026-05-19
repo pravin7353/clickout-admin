@@ -11,12 +11,11 @@ class IdtDepositNotifier extends ChangeNotifier {
 
   List<Map<String, dynamic>> records = [];
   bool isLoading = false;
-  bool isFetchingMore = false; // 🚀 NAYA: Pagination
-  bool hasMore = true; // 🚀 NAYA: Pagination
-  DocumentSnapshot? _lastDoc; // 🚀 NAYA: Pagination
+  bool isFetchingMore = false;
+  bool hasMore = true;
+  DocumentSnapshot? _lastDoc;
   String errorMsg = '';
-
-  bool _isDisposed = false; // 🚀 NAYA: Safety Lock
+  bool _isDisposed = false;
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -26,19 +25,16 @@ class IdtDepositNotifier extends ChangeNotifier {
 
   @override
   void dispose() {
-    _isDisposed = true; // 🚀 Jab screen band hogi, ye lock on ho jayega
+    _isDisposed = true;
     super.dispose();
   }
 
   void _safeNotify() {
-    if (!_isDisposed) {
-      notifyListeners();
-    }
+    if (!_isDisposed) notifyListeners();
   }
 
   Future<void> fetchInitial() async {
     if (_isDisposed) return;
-
     isLoading = true;
     errorMsg = '';
     _safeNotify();
@@ -46,34 +42,22 @@ class IdtDepositNotifier extends ChangeNotifier {
     try {
       Query q = _db
           .collection('idt_deposits')
-          .where(
-            'status',
-            isEqualTo: 'VERIFIED',
-          ) // 🚀 NAYA: Processed wale hamesha ke liye GAYAB!
+          .where('status', isEqualTo: 'VERIFIED')
           .orderBy('timestamp', descending: true)
           .limit(20);
-
-      // 🚀 SAAS ISOLATION
-      if (role != 'super_admin' && tenantId != null && tenantId!.isNotEmpty) {
+      if (role != 'super_admin' && tenantId != null && tenantId!.isNotEmpty)
         q = q.where('tenantId', isEqualTo: tenantId);
-      }
-
-      // 🚀 UNIVERSAL BRANCH LOCK
       if (branchCode != null &&
           branchCode!.isNotEmpty &&
           branchCode != 'HQ' &&
-          branchCode != 'ALL') {
+          branchCode != 'ALL')
         q = q.where('branchCode', isEqualTo: branchCode);
-      }
 
       final snap = await q.get();
-
       records.clear();
       if (snap.docs.isNotEmpty) {
         _lastDoc = snap.docs.last;
-        hasMore =
-            snap.docs.length ==
-            20; // 🚀 BUG FIX: Limit 20 ki hai toh check bhi 20 ka hoga!
+        hasMore = snap.docs.length == 20;
         for (var doc in snap.docs) {
           final data = doc.data() as Map<String, dynamic>;
           data['docId'] = doc.id;
@@ -83,26 +67,14 @@ class IdtDepositNotifier extends ChangeNotifier {
         hasMore = false;
       }
     } catch (e) {
-      debugPrint(
-        "🔥 ASLI FIREBASE ERROR: $e",
-      ); // 🚀 Konsol me link yahan dikhega
-
-      if (e.toString().contains('index') ||
-          e.toString().contains('FAILED_PRECONDITION')) {
-        errorMsg = "🚨 Firebase Index Required! Check Debug Console.";
-      } else {
-        errorMsg = "Error: $e";
-      }
+      errorMsg = "Error: $e";
     }
-
     isLoading = false;
     _safeNotify();
   }
 
-  // 🚀 NAYA: LOAD MORE FUNCTION (Pagination Engine)
   Future<void> fetchMore() async {
     if (_isDisposed || isFetchingMore || !hasMore || _lastDoc == null) return;
-
     isFetchingMore = true;
     _safeNotify();
 
@@ -113,23 +85,18 @@ class IdtDepositNotifier extends ChangeNotifier {
           .orderBy('timestamp', descending: true)
           .startAfterDocument(_lastDoc!)
           .limit(20);
-
-      if (role != 'super_admin' && tenantId != null && tenantId!.isNotEmpty) {
+      if (role != 'super_admin' && tenantId != null && tenantId!.isNotEmpty)
         q = q.where('tenantId', isEqualTo: tenantId);
-      }
       if (branchCode != null &&
           branchCode!.isNotEmpty &&
           branchCode != 'HQ' &&
-          branchCode != 'ALL') {
+          branchCode != 'ALL')
         q = q.where('branchCode', isEqualTo: branchCode);
-      }
 
       final snap = await q.get();
       if (snap.docs.isNotEmpty) {
         _lastDoc = snap.docs.last;
-        hasMore =
-            snap.docs.length ==
-            20; // 🚀 BUG FIX: Limit 20 ki hai toh check bhi 20 ka hoga!
+        hasMore = snap.docs.length == 20;
         for (var doc in snap.docs) {
           final data = doc.data() as Map<String, dynamic>;
           data['docId'] = doc.id;
@@ -141,114 +108,209 @@ class IdtDepositNotifier extends ChangeNotifier {
     } catch (e) {
       debugPrint("Pagination Error: $e");
     }
-
     isFetchingMore = false;
     _safeNotify();
   }
 
-  // 🚀 THE GLOBAL FLAT BATCH PROCESSOR (New Engine)
-  Future<void> markMultipleAsProcessed(
-    List<Map<String, dynamic>> flatItems,
-  ) async {
-    if (flatItems.isEmpty) return;
+  // 🚀 FETCH PRODUCT FOR SCANNER UI
+  Future<Map<String, dynamic>?> getProduct(String barcode) async {
+    final docSnap = await _db
+        .collection('products')
+        .doc('${tenantId}_${branchCode}_$barcode')
+        .get();
+    if (docSnap.exists) return docSnap.data();
+    return null;
+  }
 
+  // 🚀 DELETE DB ITEMS
+  Future<void> deleteItems(List<Map<String, dynamic>> itemsToDelete) async {
     try {
       final batch = _db.batch();
-
-      // 1. Group items back to their original deposits
       Map<String, List<Map<String, dynamic>>> grouped = {};
-      for (var item in flatItems) {
+
+      for (var item in itemsToDelete) {
         final docId = item['_docId'];
-        if (docId == null) continue;
-
+        if (docId == null) continue; // Skip local items
         if (!grouped.containsKey(docId)) grouped[docId] = [];
-
-        // Remove tracking keys before saving to DB
-        final cleanItem = Map<String, dynamic>.from(item);
-        cleanItem.remove('_docId');
-        cleanItem.remove('_originalIndex');
-        grouped[docId]!.add(cleanItem);
+        grouped[docId]!.add(item);
       }
 
-      // 2. Process each group
       for (var docId in grouped.keys) {
-        final updatedItems = grouped[docId]!;
+        final record = records.firstWhere((r) => r['docId'] == docId);
+        List<dynamic> existingItems = List.from(record['items']);
+        final itemsToRemove = grouped[docId]!;
+
+        // Remove items based on barcode
+        for (var rm in itemsToRemove) {
+          existingItems.removeWhere((ex) => ex['barcode'] == rm['barcode']);
+        }
+
+        if (existingItems.isEmpty) {
+          batch.delete(
+            _db.collection('idt_deposits').doc(docId),
+          ); // Delete entire document if empty
+        } else {
+          batch.update(_db.collection('idt_deposits').doc(docId), {
+            'items': existingItems,
+          });
+        }
+      }
+      await batch.commit();
+      await fetchInitial();
+    } catch (e) {
+      throw "Failed to delete: $e";
+    }
+  }
+
+  // 🚀 THE GLOBAL FLAT BATCH PROCESSOR (Updated for Master Roster Schema)
+  Future<void> markMultipleAsProcessed(
+    List<Map<String, dynamic>> itemsToProcess,
+  ) async {
+    if (itemsToProcess.isEmpty) return;
+    try {
+      final batch = _db.batch();
+      Map<String, List<Map<String, dynamic>>> groupedDb = {};
+      List<Map<String, dynamic>> localItems = [];
+
+      // 1. Separate Local (Scanned) and DB items
+      for (var item in itemsToProcess) {
+        if (item['isLocal'] == true) {
+          localItems.add(item);
+        } else {
+          final docId = item['_docId'];
+          if (docId != null) {
+            if (!groupedDb.containsKey(docId)) groupedDb[docId] = [];
+            final cleanItem = Map<String, dynamic>.from(item);
+            cleanItem.remove('_docId');
+            cleanItem.remove('_originalIndex');
+            groupedDb[docId]!.add(cleanItem);
+          }
+        }
+      }
+
+      // 2. Process DB Items
+      for (var docId in groupedDb.keys) {
+        final updatedItems = groupedDb[docId]!;
         final record = records.firstWhere((r) => r['docId'] == docId);
         final docTenantId = record['tenantId'];
         final docBranchCode = record['branchCode'];
 
         for (var item in updatedItems) {
-          final barcode = item['barcode'];
-          final int qty =
-              int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
-
-          final productRef = _db
-              .collection('products')
-              .doc('${docTenantId}_${docBranchCode}_$barcode');
-          final docSnap = await productRef.get();
-
-          if (docSnap.exists) {
-            batch.update(productRef, {
-              'physicalStock': FieldValue.increment(qty),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          } else {
-            batch.set(productRef, {
-              'barcode': barcode,
-              'name': item['name'] ?? 'UNKNOWN ITEM',
-              'branchCode': docBranchCode,
-              'tenantId': docTenantId,
-              'price': double.tryParse(item['price']?.toString() ?? '0') ?? 0,
-              'unitCost':
-                  double.tryParse(item['unitCost']?.toString() ?? '0') ?? 0,
-              'hsn': item['hsn'] ?? '',
-              'gst': item['gst'] ?? '',
-              'weight': item['weight'] ?? '',
-              'expiryDate': item['expiryDate'] ?? '',
-              'physicalStock': qty,
-              'openingStock': qty,
-              'damagedStock': 0,
-              'expiredStock': 0,
-              'soldStock': 0,
-              'purchasedStock': 0,
-              'reservedStock': 0,
-              'itemType': 'PRODUCT',
-              'applyPerUnit': true,
-              'searchKey': (item['name'] ?? 'UNKNOWN ITEM')
-                  .toString()
-                  .toLowerCase(),
-              'createdAt': FieldValue.serverTimestamp(),
-              'updatedAt': FieldValue.serverTimestamp(),
-            });
-          }
+          await _updateOrSetProduct(
+            batch,
+            docTenantId,
+            docBranchCode,
+            item,
+          ); // 🚀 AWAIT ADDED
         }
-
-        final depositRef = _db.collection('idt_deposits').doc(docId);
-        batch.update(depositRef, {
+        batch.update(_db.collection('idt_deposits').doc(docId), {
           'status': 'PROCESSED',
-          'items': updatedItems, // Naye forms ki value Firebase me save!
+          'items': updatedItems,
           'processedAt': FieldValue.serverTimestamp(),
         });
       }
 
-      // 3. 🚀 COMMIT BATCH
+      // 3. Process Local Scanned Items (Directly go live)
+      if (localItems.isNotEmpty) {
+        List<Map<String, dynamic>> cleanLocalItems = [];
+        for (var item in localItems) {
+          await _updateOrSetProduct(
+            batch,
+            tenantId,
+            branchCode,
+            item,
+          ); // 🚀 AWAIT ADDED
+          final cleanItem = Map<String, dynamic>.from(item);
+          cleanItem.remove('_localId');
+          cleanItem.remove('isLocal');
+          cleanItem.remove('_originalIndex');
+          cleanLocalItems.add(cleanItem);
+        }
+        final depositRef = _db.collection('idt_deposits').doc();
+        batch.set(depositRef, {
+          'tenantId': tenantId,
+          'branchCode': branchCode,
+          'status': 'PROCESSED',
+          'source': 'ADMIN_DIRECT_SCAN',
+          'items': cleanLocalItems,
+          'timestamp': FieldValue.serverTimestamp(),
+          'processedAt': FieldValue.serverTimestamp(),
+        });
+      }
+
       await batch.commit();
       await fetchInitial();
     } catch (e) {
       throw Exception("Failed to Go Live: $e");
     }
   }
+
+  // 🚀 PRODUCT MASTER SYNC LOGIC (EXACT AIR MAX SCHEMA)
+  Future<void> _updateOrSetProduct(
+    WriteBatch batch,
+    String? tId,
+    String? bCode,
+    Map<String, dynamic> item,
+  ) async {
+    final barcode = item['barcode'];
+    final int qty = int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+    final productRef = _db
+        .collection('products')
+        .doc('${tId}_${bCode}_$barcode');
+
+    // 🚀 NAYA FIX: Pehle check karenge ki product purana hai ya naya
+    final docSnap = await productRef.get();
+
+    if (docSnap.exists) {
+      // ♻️ EXISTING ITEM: Sirf stock aur rate badhao
+      batch.update(productRef, {
+        'physicalStock': FieldValue.increment(qty),
+        'price': double.tryParse(item['price']?.toString() ?? '0') ?? 0,
+        'unitCost': double.tryParse(item['unitCost']?.toString() ?? '0') ?? 0,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      // 🌟 NEW ITEM: EXACT MASTER ROSTER SCHEMA!
+      batch.set(productRef, {
+        'addedBy': 'IDT Terminal',
+        'addedByEmail': 'idt@clickout.com',
+        'barcode': barcode,
+        'branchCode': bCode,
+        'tenantId': tId,
+        'createdAt':
+            FieldValue.serverTimestamp(), // 🚀 CRITICAL FIX: Iske bina list me show nahi hota tha!
+        'updatedAt': FieldValue.serverTimestamp(),
+        'name': item['name'] ?? 'UNKNOWN ITEM',
+        'searchKey': (item['name'] ?? 'UNKNOWN ITEM').toString().toLowerCase(),
+        'isActive': true,
+        'isPublished': true,
+        'itemType': 'PRODUCT',
+        'price': double.tryParse(item['price']?.toString() ?? '0') ?? 0,
+        'unitCost': double.tryParse(item['unitCost']?.toString() ?? '0') ?? 0,
+        'gst': item['gst'] ?? '',
+        'hsn': item['hsn'] ?? '',
+        'expiryDate': item['expiryDate'] ?? '',
+        'weight': item['weight'] ?? '',
+
+        // Master Roster Default Stock Tracking Fields
+        'openingStock': qty,
+        'physicalStock': qty,
+        'damagedStock': 0,
+        'expiredStock': 0,
+        'purchasedStock': 0,
+        'reservedStock': 0,
+        'soldStock': 0,
+      });
+    }
+  }
 }
 
-// 🚀 The Riverpod hook for UI
 final idtDepositProvider = ChangeNotifierProvider<IdtDepositNotifier>((ref) {
   final adminData = ref.watch(adminRoleProvider).value;
   final activeStore = ref.watch(activeStoreProvider);
-
   final String? tenantId = activeStore?.tenantId ?? adminData?['tenantId'];
   final String role = (adminData?['role'] ?? '').toString().toLowerCase();
   final String? branchCode =
       activeStore?.branchCode ?? adminData?['branchCode'];
-
   return IdtDepositNotifier(tenantId, role, branchCode);
 });

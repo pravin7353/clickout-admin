@@ -3,10 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'widgets/pos_scanner_dialog.dart'; // 👈 Naya Scanner Import
+import 'package:go_router/go_router.dart';
+import 'widgets/pos_scanner_dialog.dart';
 
 import '../auth/auth_provider.dart';
-import 'widgets/add_custom_product.dart';
 import 'services/pos_order_service.dart';
 
 // 🚨 BHAILOG DHYAN DE: Local Paths for Admin
@@ -55,8 +55,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   bool _isBilling = false;
   final TextEditingController _searchCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
-  final FocusNode _searchFocus = FocusNode(); // 🚀 FOCUS NODE (Locks Cursor)
-  final FocusNode _phoneFocus = FocusNode(); // 🚀 PHONE FOCUS
+  final FocusNode _searchFocus = FocusNode();
+  final FocusNode _phoneFocus = FocusNode();
 
   @override
   void dispose() {
@@ -67,7 +67,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     super.dispose();
   }
 
-  // 🚀 FIXED: Brand Colors (Same as Customer App)
   final Color _redBrand = const Color(0xFFE53E3E);
   final Color _greenBrand = const Color(0xFF16A34A);
 
@@ -101,14 +100,12 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   }
 
   void _onSearch(String query) {
-    // 🚀 FIX: Barcode ke aage-peeche ke saare invisible spaces aur kachra uda dega
     final q = query.toLowerCase().replaceAll(RegExp(r'\s+'), '');
     if (q.isEmpty) {
       setState(() => _searchResults = []);
       return;
     }
 
-    // 🚀 FAST SCAN BYPASS: Scanner types instantly, directly match & add!
     final exactMatch = _inventory.where((item) {
       final dbBarcode = (item['barcode'] ?? '')
           .toString()
@@ -120,7 +117,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     if (exactMatch.isNotEmpty) {
       _handleBarcodeScan(exactMatch.first['barcode']);
       _searchCtrl.clear();
-      _searchFocus.requestFocus(); // 🚀 KEEP CURSOR LOCKED AFTER SCAN
+      _searchFocus.requestFocus();
       return;
     }
 
@@ -134,7 +131,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     setState(() => _searchResults = results);
   }
 
-  // 🚀 FAST SCAN LOGIC: Custom Product Popup for Unknown Barcodes
   Future<void> _handleBarcodeScan(String barcode) async {
     final cleanInput = barcode.toLowerCase().replaceAll(RegExp(r'\s+'), '');
     final items = _inventory.where((item) {
@@ -165,46 +161,63 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         }
       }
     } else {
-      // ❌ UNKNOWN BARCODE: Auto-trigger Custom Product Dialog
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Invalid Product! Kindly add custom product."),
-            backgroundColor: Colors.orange,
-          ),
-        );
         showDialog(
           context: context,
-          builder: (_) => AddCustomProductWidget(
-            onAdd: (name, price, qty, gst, isService) {
-              _addItem({
-                'barcode': barcode, // 🚀 Scanned barcode khud assign ho jayega
-                'name': name,
-                'price': price,
-                'gstRate': gst,
-              });
-              Navigator.pop(context);
-            },
+          builder: (ctx) => AlertDialog(
+            backgroundColor: Theme.of(context).cardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 28,
+                ),
+                SizedBox(width: 10),
+                Text(
+                  "Product Not Found",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: const Text(
+              "This barcode is not available in the system.\nKindly add this product to the inventory using the IDT Deposit module.",
+              style: TextStyle(fontSize: 15),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(
+                  "Dismiss",
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.push('/idt-deposits');
+                },
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text(
+                  "Go to IDT Deposit",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
           ),
         );
       }
     }
-  }
-
-  // 🚀 FIX: Ab saare items direct naye Provider Engine me jayenge (No Local State required)
-  Future<void> _addItem(Map<String, dynamic> data) async {
-    HapticFeedback.lightImpact();
-    try {
-      await ref.read(posCartProvider.notifier).addItem(data, 1);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-        );
-      }
-    }
-    _searchCtrl.clear();
-    setState(() => _searchResults = []);
   }
 
   Future<void> _generateInvoice() async {
@@ -239,19 +252,16 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             : null,
       );
 
-      ref
-          .read(posCartProvider.notifier)
-          .clearCart(); // 🚀 Clear DB & Local safely
+      ref.read(posCartProvider.notifier).clearCart();
       setState(() {
         _phoneCtrl.clear();
       });
 
-      // 🚀 THERMAL PRINT OPTION: Bill banne ke baad direct Print Dialog
       if (mounted) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         showDialog(
           context: context,
-          barrierDismissible: false, // Bahar click karke band nahi hoga
+          barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             backgroundColor: isDark ? const Color(0xFF09090B) : Colors.white,
             shape: RoundedRectangleBorder(
@@ -298,7 +308,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 ),
                 onPressed: () {
                   Navigator.pop(ctx);
-                  // 🚀 Yahan hum apna Printer package call karenge
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text("Sending to Thermal Printer..."),
@@ -330,11 +339,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     if (_isInitializing)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
-    // 🚀 1. WATCH NEW RIVERPOD ENGINE
     final cartState = ref.watch(posCartProvider);
     final cartNotifier = ref.read(posCartProvider.notifier);
 
-    // 🚀 2. PREMIUM PITCH BLACK THEME (Apple / Stripe Aesthetic)
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
@@ -344,374 +351,358 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
     final text2Col = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF6B7280);
     final divCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
 
-    // 🚀 FIX: 50% Exact UI Split for comfortable reading
-    final double rightPanelWidth = MediaQuery.of(context).size.width * 0.50;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 850;
+    final rightPanelWidth = screenWidth * 0.50;
+
+    // ── LEFT PANEL WIDGET ──
+    Widget leftContent = Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Assisted Checkout",
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: text1Col,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          TextField(
+            controller: _searchCtrl,
+            focusNode: _searchFocus,
+            autofocus: true,
+            onChanged: _onSearch,
+            onSubmitted: (value) async {
+              if (value.trim().isNotEmpty) {
+                await _handleBarcodeScan(value.trim());
+                _searchCtrl.clear();
+              }
+              _searchFocus.requestFocus();
+            },
+            style: TextStyle(color: text1Col),
+            decoration: InputDecoration(
+              hintText: "Type (e.g. 'inject') or open scanner...",
+              hintStyle: TextStyle(color: text2Col),
+              prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
+              suffixIcon: IconButton(
+                icon: const Icon(
+                  Icons.qr_code_scanner,
+                  color: Colors.blueAccent,
+                  size: 28,
+                ),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) =>
+                        PosScannerDialog(onScan: _handleBarcodeScan),
+                  );
+                },
+              ),
+              filled: true,
+              fillColor: cardCol,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          Expanded(
+            child: _searchCtrl.text.isEmpty
+                ? Center(
+                    child: Text(
+                      "Start scanning or typing to add items.",
+                      style: TextStyle(color: text2Col),
+                    ),
+                  )
+                : _searchResults.isEmpty
+                ? _buildCustomItemState(cardCol, text1Col)
+                : ListView.builder(
+                    itemCount: _searchResults.length,
+                    itemBuilder: (ctx, i) => _buildCatalogTile(
+                      _searchResults[i],
+                      cardCol,
+                      divCol,
+                      text1Col,
+                      text2Col,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+
+    // ── RIGHT PANEL WIDGET (🚀 FIX: Pura Scrollable Cart + Footer Ek Saath) ──
+    Widget rightContent = ListView(
+      padding: EdgeInsets.zero,
+      physics: const BouncingScrollPhysics(),
+      children: [
+        // 1. HEADER
+        Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "Current Cart",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: text1Col,
+                ),
+              ),
+              if (!cartState.isEmpty)
+                TextButton(
+                  onPressed: () async {
+                    bool confirm =
+                        await showDialog(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            backgroundColor: cardCol,
+                            title: Text(
+                              "Clear Cart?",
+                              style: TextStyle(color: text1Col),
+                            ),
+                            content: Text(
+                              "Are you sure you want to remove all items?",
+                              style: TextStyle(color: text2Col),
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx, false),
+                                child: const Text("Cancel"),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _redBrand,
+                                  foregroundColor: Colors.white,
+                                ),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text("Clear All"),
+                              ),
+                            ],
+                          ),
+                        ) ??
+                        false;
+                    if (confirm) cartNotifier.clearCart();
+                  },
+                  child: Text("Clear All", style: TextStyle(color: _redBrand)),
+                ),
+            ],
+          ),
+        ),
+        Divider(height: 1, color: divCol),
+
+        // 2. CART ITEMS
+        if (cartState.isEmpty)
+          Container(
+            height: 250,
+            alignment: Alignment.center,
+            child: Text("Cart is empty", style: TextStyle(color: text2Col)),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: buildCartGroups(cartState.items).map((group) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildPosCartItemCard(
+                    group,
+                    cartNotifier,
+                    isDark,
+                    cardCol,
+                    bgCol,
+                    text1Col,
+                    text2Col,
+                    divCol,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+        // 3. CHECKOUT FOOTER (Scrolls naturally at the end)
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            border: Border(top: BorderSide(color: divCol)),
+          ),
+          child: Column(
+            children: [
+              TextField(
+                controller: _phoneCtrl,
+                focusNode: _phoneFocus,
+                keyboardType: TextInputType.phone,
+                style: TextStyle(color: text1Col),
+                decoration: InputDecoration(
+                  labelText: "Customer Phone (Optional)",
+                  labelStyle: TextStyle(color: text2Col),
+                  prefixIcon: Icon(Icons.phone, size: 18, color: text2Col),
+                  filled: true,
+                  fillColor: cardCol,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Discount Applied",
+                    style: TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    "- ₹${cartState.calcResult?.totalAppliedDiscount.toStringAsFixed(2) ?? '0.00'}",
+                    style: const TextStyle(
+                      color: Color(0xFF16A34A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "GRAND TOTAL",
+                    style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: text1Col,
+                    ),
+                  ),
+                  Text(
+                    "₹${cartState.calcResult?.newGrandTotal.toStringAsFixed(2) ?? '0.00'}",
+                    style: GoogleFonts.dmSans(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 26,
+                      color: isDark
+                          ? Colors.blueAccent
+                          : const Color(0xFF2B3674),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              Row(
+                children: ['CASH', 'UPI', 'CARD'].map((mode) {
+                  bool isSel = _paymentMode == mode;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _paymentMode = mode),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isSel ? const Color(0xFF2B3674) : cardCol,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isSel ? Colors.transparent : divCol,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          mode,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: isSel ? Colors.white : text2Col,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _greenBrand,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _isBilling ? null : _generateInvoice,
+                  icon: _isBilling
+                      ? const SizedBox.shrink()
+                      : const Icon(Icons.receipt_long),
+                  label: _isBilling
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "CREATE BILL",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
 
     return Scaffold(
       backgroundColor: bgCol,
-      // 🚀 THE SMART POS LOCK: Screen pe kahin bhi click hoga toh cursor wapas scanner box me lock ho jayega
       body: Listener(
         onPointerDown: (_) {
           Future.delayed(const Duration(milliseconds: 100), () {
-            // Agar cashier intentionally customer ka phone number type kar raha hai, tab focus mat cheeno
             if (mounted && !_phoneFocus.hasFocus) {
               _searchFocus.requestFocus();
             }
           });
         },
         behavior: HitTestBehavior.translucent,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ─── LEFT: OMNI-SEARCH CATALOG ───
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "Assisted Checkout",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        color: text1Col,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    TextField(
-                      controller: _searchCtrl,
-                      focusNode: _searchFocus, // 🚀 ATTACH FOCUS NODE
-                      autofocus: true,
-                      onChanged: _onSearch,
-                      onSubmitted: (value) async {
-                        if (value.trim().isNotEmpty) {
-                          await _handleBarcodeScan(value.trim());
-                          _searchCtrl.clear();
-                        }
-                        _searchFocus
-                            .requestFocus(); // 🚀 RELOCK CURSOR AFTER ENTER
-                      },
-                      style: TextStyle(color: text1Col),
-                      decoration: InputDecoration(
-                        hintText: "Type (e.g. 'inject') or open scanner...",
-                        hintStyle: TextStyle(color: text2Col),
-                        prefixIcon: const Icon(
-                          Icons.search,
-                          color: Colors.blueAccent,
-                        ),
-                        // 🚀 NAYA SCANNER BUTTON
-                        suffixIcon: IconButton(
-                          icon: const Icon(
-                            Icons.qr_code_scanner,
-                            color: Colors.blueAccent,
-                            size: 28,
-                          ),
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) =>
-                                  PosScannerDialog(onScan: _handleBarcodeScan),
-                            );
-                          },
-                        ),
-                        filled: true,
-                        fillColor: cardCol,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    Expanded(
-                      child: _searchCtrl.text.isEmpty
-                          ? Center(
-                              child: Text(
-                                "Start scanning or typing to add items.",
-                                style: TextStyle(color: text2Col),
-                              ),
-                            )
-                          : _searchResults.isEmpty
-                          ? _buildCustomItemState(cardCol, text1Col)
-                          : ListView.builder(
-                              itemCount: _searchResults.length,
-                              itemBuilder: (ctx, i) => _buildCatalogTile(
-                                _searchResults[i],
-                                cardCol,
-                                divCol,
-                                text1Col,
-                                text2Col,
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // ─── RIGHT: SMART CART PANEL ───
-            Container(
-              width: rightPanelWidth,
-              decoration: BoxDecoration(
-                color: cardCol,
-                border: Border(left: BorderSide(color: divCol)),
-              ),
-              child: Column(
+        child: isMobile
+            ? Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "Current Cart",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: text1Col,
-                          ),
-                        ),
-                        if (!cartState.isEmpty)
-                          TextButton(
-                            onPressed: () async {
-                              // 🚀 CONFIRMATION ALERT
-                              bool confirm =
-                                  await showDialog(
-                                    context: context,
-                                    builder: (ctx) => AlertDialog(
-                                      backgroundColor: cardCol,
-                                      title: Text(
-                                        "Clear Cart?",
-                                        style: TextStyle(color: text1Col),
-                                      ),
-                                      content: Text(
-                                        "Are you sure you want to remove all items?",
-                                        style: TextStyle(color: text2Col),
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(ctx, false),
-                                          child: const Text("Cancel"),
-                                        ),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: _redBrand,
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          onPressed: () =>
-                                              Navigator.pop(ctx, true),
-                                          child: const Text("Clear All"),
-                                        ),
-                                      ],
-                                    ),
-                                  ) ??
-                                  false;
-                              if (confirm) cartNotifier.clearCart();
-                            },
-                            child: Text(
-                              "Clear All",
-                              style: TextStyle(color: _redBrand),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  Divider(height: 1, color: divCol),
-
+                  Expanded(flex: 1, child: leftContent),
+                  Container(height: 2, color: divCol),
                   Expanded(
-                    child: cartState.isEmpty
-                        ? Center(
-                            child: Text(
-                              "Cart is empty",
-                              style: TextStyle(color: text2Col),
-                            ),
-                          )
-                        : ListView(
-                            padding: const EdgeInsets.all(16),
-                            children: buildCartGroups(cartState.items).map((
-                              group,
-                            ) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildPosCartItemCard(
-                                  group,
-                                  cartNotifier,
-                                  isDark,
-                                  cardCol,
-                                  bgCol,
-                                  text1Col,
-                                  text2Col,
-                                  divCol,
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                    flex: 1,
+                    child: Container(color: cardCol, child: rightContent),
                   ),
-
-                  // ─── CHECKOUT FOOTER ───
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: leftContent),
                   Container(
-                    padding: const EdgeInsets.all(24),
+                    width: rightPanelWidth,
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF0F172A)
-                          : const Color(0xFFF8FAFC),
-                      border: Border(top: BorderSide(color: divCol)),
+                      color: cardCol,
+                      border: Border(left: BorderSide(color: divCol)),
                     ),
-                    child: Column(
-                      children: [
-                        TextField(
-                          controller: _phoneCtrl,
-                          focusNode: _phoneFocus, // 🚀 PHONE NODE ATTACHED
-                          keyboardType: TextInputType.phone,
-                          style: TextStyle(color: text1Col),
-                          decoration: InputDecoration(
-                            labelText: "Customer Phone (Optional)",
-                            labelStyle: TextStyle(color: text2Col),
-                            prefixIcon: Icon(
-                              Icons.phone,
-                              size: 18,
-                              color: text2Col,
-                            ),
-                            filled: true,
-                            fillColor: cardCol,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "Discount Applied",
-                              style: TextStyle(
-                                color: const Color(0xFF16A34A),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              "- ₹${cartState.calcResult?.totalAppliedDiscount.toStringAsFixed(2) ?? '0.00'}",
-                              style: TextStyle(
-                                color: const Color(0xFF16A34A),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ), // 🚀 FIX: Linked to new Provider State
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "GRAND TOTAL",
-                              style: GoogleFonts.dmSans(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: text1Col,
-                              ),
-                            ),
-                            Text(
-                              "₹${cartState.calcResult?.newGrandTotal.toStringAsFixed(2) ?? '0.00'}",
-                              style: GoogleFonts.dmSans(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 26,
-                                color: isDark
-                                    ? Colors.blueAccent
-                                    : const Color(0xFF2B3674),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        Row(
-                          children: ['CASH', 'UPI', 'CARD'].map((mode) {
-                            bool isSel = _paymentMode == mode;
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () =>
-                                    setState(() => _paymentMode = mode),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSel
-                                        ? const Color(0xFF2B3674)
-                                        : cardCol,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isSel
-                                          ? Colors.transparent
-                                          : divCol,
-                                    ),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    mode,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: isSel ? Colors.white : text2Col,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 16),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: _greenBrand,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            onPressed: _isBilling ? null : _generateInvoice,
-                            icon: _isBilling
-                                ? const SizedBox.shrink()
-                                : const Icon(Icons.receipt_long),
-                            label: _isBilling
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white,
-                                  )
-                                : const Text(
-                                    "CREATE BILL",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 16,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: rightContent,
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
 
-  // ── 🚀 INLINE CART ITEM UI (ULTRA THIN 1-LINE LAYOUT) ──
   Widget _buildPosCartItemCard(
     CartGroup group,
     PosCartNotifier cartNotifier,
@@ -757,7 +748,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. SMALL ICON
               Container(
                 width: 30,
                 height: 30,
@@ -775,7 +765,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               ),
               const SizedBox(width: 8),
 
-              // 2. NAME & UNIT PRICE (Expanded)
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -790,7 +779,8 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (hasOffer &&
                             group.baseItem != null &&
@@ -818,101 +808,103 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         ),
                       ],
                     ),
+
+                    if (hasOffer &&
+                        group.baseItem != null &&
+                        group.baseItem!.flashExpiry > 0)
+                      _buildCountdownTimer(group.baseItem!.flashExpiry),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
 
-              // 3. STEPPER
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildBtn(
-                    Icons.remove_rounded,
-                    () => cartNotifier.decrement(group.baseKey),
-                    bgCol,
-                    divCol,
-                    text1Col,
-                    opacity: totalQty <= 1 ? 0.3 : 1.0,
-                  ),
-                  SizedBox(
-                    width: 26,
-                    child: Text(
-                      "$totalQty",
-                      textAlign: TextAlign.center,
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildBtn(
+                      Icons.remove_rounded,
+                      () => cartNotifier.decrement(group.baseKey),
+                      bgCol,
+                      divCol,
+                      text1Col,
+                      opacity: totalQty <= 1 ? 0.3 : 1.0,
+                    ),
+                    SizedBox(
+                      width: 26,
+                      child: Text(
+                        "$totalQty",
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: text1Col,
+                        ),
+                      ),
+                    ),
+                    _buildBtn(
+                      Icons.add_rounded,
+                      () async {
+                        try {
+                          final invItem = _inventory.firstWhere(
+                            (i) => (i['barcode'] ?? '') == group.baseKey,
+                            orElse: () => <String, dynamic>{},
+                          );
+                          if (invItem.isNotEmpty) {
+                            bool isService =
+                                (invItem['itemType'] ?? '')
+                                    .toString()
+                                    .toUpperCase() ==
+                                'SERVICE';
+                            int pStock = invItem['physicalStock'] ?? 0;
+                            if (!isService && totalQty + 1 > pStock)
+                              throw "Stock limit reached! Only $pStock available.";
+                          }
+                          await cartNotifier.increment(group.baseKey);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(e.toString()),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                      bgCol,
+                      divCol,
+                      text1Col,
+                      isAdd: true,
+                    ),
+                    const SizedBox(width: 10),
+
+                    Text(
+                      "₹${((group.baseItem?.totalPrice ?? 0) + (group.overflowItem?.totalPrice ?? 0)).toStringAsFixed(0)}",
                       style: GoogleFonts.dmSans(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: text1Col,
                       ),
                     ),
-                  ),
-                  _buildBtn(
-                    Icons.add_rounded,
-                    () async {
-                      try {
-                        // 🚀 0-LAG INSTANT STOCK CHECK (Internet nahi, direct RAM se check karega)
-                        final invItem = _inventory.firstWhere(
-                          (i) => (i['barcode'] ?? '') == group.baseKey,
-                          orElse: () => <String, dynamic>{},
-                        );
+                    const SizedBox(width: 6),
 
-                        if (invItem.isNotEmpty) {
-                          bool isService =
-                              (invItem['itemType'] ?? '')
-                                  .toString()
-                                  .toUpperCase() ==
-                              'SERVICE';
-                          int pStock = invItem['physicalStock'] ?? 0;
-
-                          // 🛑 STRICT LIMIT BLOCK
-                          if (!isService && totalQty + 1 > pStock) {
-                            throw "Stock limit reached! Only $pStock available.";
-                          }
-                        }
-
-                        await cartNotifier.increment(group.baseKey);
-                      } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(e.toString()),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    },
-                    bgCol,
-                    divCol,
-                    text1Col,
-                    isAdd: true,
-                  ),
-                ],
-              ),
-              const SizedBox(width: 10),
-
-              // 4. TOTAL PRICE (Clean & Slim Font)
-              Text(
-                "₹${((group.baseItem?.totalPrice ?? 0) + (group.overflowItem?.totalPrice ?? 0)).toStringAsFixed(0)}",
-                style: GoogleFonts.dmSans(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: text1Col,
+                    IconButton(
+                      onPressed: () => cartNotifier.removeItem(group.baseKey),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      color: const Color(0xFFE53E3E),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 6),
-
-              // 5. DELETE BUTTON
-              IconButton(
-                onPressed: () => cartNotifier.removeItem(group.baseKey),
-                icon: const Icon(Icons.delete_outline, size: 18),
-                color: const Color(0xFFE53E3E),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
               ),
             ],
           ),
 
-          // ── OFFERS BANNER (Slim) ──
           if (group.baseItem != null &&
               group.baseItem!.offerHint.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -1093,43 +1085,94 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
   Widget _buildCustomItemState(Color cardCol, Color text1Col) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off_rounded, size: 60, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            "No exact match found.",
-            style: TextStyle(fontWeight: FontWeight.bold, color: text1Col),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
-              foregroundColor: Colors.white,
+      child: SingleChildScrollView(
+        // 🛡️ NAYA FIX: Keyboard/Mobile Screen Overflow Blocker
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 60,
+              color: Colors.orange.shade400,
             ),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (_) => AddCustomProductWidget(
-                  onAdd: (name, price, qty, gst, isService) {
-                    _addItem({
-                      'barcode':
-                          "MANUAL_${DateTime.now().millisecondsSinceEpoch}",
-                      'name': name,
-                      'price': price,
-                      'gstRate': gst,
-                    });
-                    Navigator.pop(context);
-                  },
+            const SizedBox(height: 16),
+            Text(
+              "Product not available in the system.",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: text1Col,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "Kindly add this product to the inventory first.",
+              style: TextStyle(color: Colors.grey.shade600),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
                 ),
-              );
-            },
-            icon: const Icon(Icons.add),
-            label: const Text("Add Custom Item"),
-          ),
-        ],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                context.push('/idt-deposits');
+              },
+              icon: const Icon(Icons.add_box_outlined),
+              label: const Text(
+                "Go to IDT Deposit",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildCountdownTimer(int expiryMs) {
+    return StreamBuilder(
+      stream: Stream.periodic(const Duration(seconds: 1)).asBroadcastStream(),
+      builder: (context, snapshot) {
+        final diff = expiryMs - DateTime.now().millisecondsSinceEpoch;
+        if (diff <= 0) return const SizedBox.shrink();
+        int h = (diff ~/ 3600000);
+        int m = ((diff ~/ 60000) % 60);
+        int s = ((diff ~/ 1000) % 60);
+        return Container(
+          margin: const EdgeInsets.only(top: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.red.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.timer_outlined, color: Colors.red, size: 14),
+              const SizedBox(width: 6),
+              Text(
+                "Ends in ${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}",
+                style: GoogleFonts.dmSans(
+                  fontSize: 12,
+                  color: Colors.red,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -124,7 +124,8 @@ exports.bulkImportProducts = onCall(async (request) => {
 // 🤖 2. PREDICTIVE AUTO-PO ENGINE (GEN 2 - FIXED DUPLICATES & SMART MATH)
 // ============================================================================
 exports.runPredictivePOEngine = onSchedule("every day 00:00", async (event) => {
-    console.log("🚀 Starting ClickOut Predictive AI Engine...");
+    console.log("🚀 ClickOut Predictive AI Engine is currently PAUSED by Admin.");
+    return; // 🚀 NAYA FIX: Ye engine ko yahin block kar dega bina aage ka code chalaye
     
     try {
         // 🚀 MEMORY FIX 1: Use .select() to only fetch required fields (saves ~90% RAM)
@@ -630,6 +631,8 @@ exports.quantumNightlySync = onSchedule(
 exports.quantumAutoPOEngine = onDocumentWritten(
     { document: "products/{productId}", concurrency: 50, memory: "256MiB" },
     async (event) => {
+        console.log("🚀 Quantum Auto-PO Engine is currently PAUSED by Admin.");
+        return; // 🚀 NAYA FIX: Ye turant exit kar jayega, PO draft nahi hoga
         const after = event.data.after.exists ? event.data.after.data() : null;
         if (!after || after.isBlocked) return;
 

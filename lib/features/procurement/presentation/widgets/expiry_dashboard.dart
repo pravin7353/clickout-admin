@@ -134,17 +134,17 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   }
 
   Future<void> _analyzeRecentTransactions() async {
+    // 🚀 CACHE REDUCED TO 15 SECONDS FOR REAL-TIME REFLECTION
     if (_lastCacheTime != null &&
-        DateTime.now().difference(_lastCacheTime!).inMinutes < 5) {
+        DateTime.now().difference(_lastCacheTime!).inSeconds < 15) {
       return;
     }
 
     setState(() => _isSorting = true);
     try {
       final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-
-      // 🚀 SAAS INJECTION: Secure Trending Sales Query
       final adminData = ref.read(adminRoleProvider).value;
+
       Query ordersQuery = HierarchyFilter.apply(
         FirebaseFirestore.instance.collection('orders'),
         adminData,
@@ -159,17 +159,32 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
 
       Map<String, int> salesCount = {};
       for (var doc in ordersSnap.docs) {
-        // 🚀 BUG FIX: Added 'as Map<String, dynamic>' to fix the bracket [] error
         final data = doc.data() as Map<String, dynamic>;
-        if (data['paymentStatus'] == 'PAID' ||
-            data['paymentStatus'] == 'SUCCESS') {
+
+        // 🚀 FIX: Catching all POS and App successful order statuses
+        final pStatus = data['paymentStatus']?.toString().toUpperCase() ?? '';
+        final status = data['status']?.toString().toUpperCase() ?? '';
+
+        if (pStatus == 'PAID' ||
+            pStatus == 'SUCCESS' ||
+            status == 'COMPLETED' ||
+            status == 'DELIVERED') {
           final items = data['items'] as List<dynamic>? ?? [];
           for (var item in items) {
-            String prodId = item['productId'] ?? '';
-            int qty = item['quantity'] ?? item['orderQty'] ?? 1;
-            if (prodId.isNotEmpty) {
+            String prodId = item['productId']?.toString() ?? '';
+            String barcode = item['barcode']?.toString() ?? '';
+            int qty =
+                int.tryParse(
+                  item['quantity']?.toString() ??
+                      item['orderQty']?.toString() ??
+                      '1',
+                ) ??
+                1;
+
+            if (prodId.isNotEmpty)
               salesCount[prodId] = (salesCount[prodId] ?? 0) + qty;
-            }
+            if (barcode.isNotEmpty)
+              salesCount[barcode] = (salesCount[barcode] ?? 0) + qty;
           }
         }
       }
@@ -197,8 +212,11 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
       final dataA = a.data() as Map<String, dynamic>;
       final dataB = b.data() as Map<String, dynamic>;
 
-      int salesA = _salesDataCache[a.id] ?? 0;
-      int salesB = _salesDataCache[b.id] ?? 0;
+      final barcodeA = dataA['barcode']?.toString() ?? '';
+      final barcodeB = dataB['barcode']?.toString() ?? '';
+
+      int salesA = _salesDataCache[a.id] ?? _salesDataCache[barcodeA] ?? 0;
+      int salesB = _salesDataCache[b.id] ?? _salesDataCache[barcodeB] ?? 0;
 
       int stA = dataA['physicalStock'] ?? dataA['stock'] ?? 0;
       int stB = dataB['physicalStock'] ?? dataB['stock'] ?? 0;
@@ -693,7 +711,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                       ),
                                                     ),
                                                     Text(
-                                                      "7-Day Sales: ${_salesDataCache[productId] ?? 0}",
+                                                      "7-Day Sales: ${_salesDataCache[productId] ?? _salesDataCache[data['barcode']?.toString()] ?? 0}",
                                                       style: TextStyle(
                                                         fontSize: 11,
                                                         color: accentOrange,

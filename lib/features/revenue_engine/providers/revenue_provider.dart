@@ -98,6 +98,7 @@ class RevenueEngineNotifier extends AsyncNotifier<RevenueMetrics> {
       // ✅ BUG FIXED: Changed ref.read to ref.watch
       final adminData = ref.watch(adminRoleProvider).value;
       final String? tenantId = adminData?['tenantId'];
+      final String? branchCode = adminData?['branchCode']; // 🚀 FETCH BRANCH
       final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
       Query query = _db
@@ -107,9 +108,12 @@ class RevenueEngineNotifier extends AsyncNotifier<RevenueMetrics> {
             isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
           );
 
-      // 🚀 SAAS ISOLATION
+      // 🚀 SAAS ISOLATION: Tenant AND Branch Separation
       if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
         query = query.where('tenantId', isEqualTo: tenantId);
+      }
+      if (role == 'manager' && branchCode != null && branchCode.isNotEmpty) {
+        query = query.where('branchCode', isEqualTo: branchCode);
       }
 
       final todayOrders = await query.get();
