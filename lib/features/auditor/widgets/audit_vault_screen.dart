@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION IMPORT
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 
 class AuditVaultScreen extends ConsumerWidget {
   const AuditVaultScreen({super.key});
@@ -58,14 +59,25 @@ class AuditVaultScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "Audit Vault",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1.5,
-                ),
+              Row(
+                children: const [
+                  Text(
+                    "Audit Vault",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  InfoButton(
+                    title: "Audit Vault",
+                    en: "Every critical system action is permanently recorded here — deletions, approvals, overrides. Use this to investigate fraud or disputes.",
+                    hi: "System ka koi bhi bada action yahan permanently save hota hai — delete, approve, override sab. Fraud ya dispute mein yahan se proof milega.",
+                    iconColor: Colors.white38,
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
               const Text(

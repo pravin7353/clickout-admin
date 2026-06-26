@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,22 +8,27 @@ import '../../features/tenant_admin/screens/edit_store_profile_dialog.dart';
 //import '../../features/tenant_admin/screens/edit_tenant_profile_dialog.dart';
 import '../../features/manager/widgets/store_entry_qr_card.dart'; // 🚀 NAYA
 import '../../core/providers/theme_provider.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/providers/access_control_provider.dart';
+import '../../core/subscription/widgets/trial_countdown_badge.dart';
+import '../../core/subscription/widgets/usage_limit_banner.dart';
+import '../../core/subscription/widgets/upgrade_popup.dart';
 
 const double mobileBreakpoint = 768;
 const double tabletBreakpoint = 1024;
 
 // --- EXACT THEME SPEC ENFORCEMENT ---
 // (We now use Theme.of(context) dynamically, but keeping this for fallback/reference)
-const Color bgDarkTheme = Color(0xFF080B08);
-const Color cardDarkTheme = Color(0xFF111811);
-const Color accentGreenTheme = Color(0xFF00C853);
+const Color bgDarkTheme = AppColors.darkBg;
+const Color cardDarkTheme = AppColors.darkCard;
+const Color accentGreenTheme = AppColors.accent;
 
 // --- SECTION COLORS ---
-const globalCommandColor = Color(0xFF7F77DD);
-const tenantHqColor = accentGreenTheme;
-const operationsColor = Color(0xFF378ADD);
-const staffAuditColor = Color(0xFFEF9F27);
-const financeRiskColor = Color(0xFFE24B4A);
+const globalCommandColor = AppColors.globalCmd;
+const tenantHqColor = AppColors.tenantHq;
+const operationsColor = AppColors.operations;
+const staffAuditColor = AppColors.staffAudit;
+const financeRiskColor = AppColors.financeRisk;
 
 class AdminShell extends ConsumerWidget {
   final Widget child;
@@ -82,11 +86,7 @@ class AdminShell extends ConsumerWidget {
               : null,
           drawer: isMobile
               ? Drawer(
-                  backgroundColor: isDark
-                      ? bgSidebar
-                      : const Color(
-                          0xFF004D40,
-                        ), // 💎 Solid Emerald for Light Mobile Drawer
+                  backgroundColor: Theme.of(context).cardColor,
                   child: _buildSidebarContent(
                     true,
                     context,
@@ -99,9 +99,8 @@ class AdminShell extends ConsumerWidget {
                     isManager,
                     ref,
                     bgSidebar,
-                    Colors
-                        .white, // 💎 Forced White Text for Dark/Emerald Sidebar
-                    Colors.white70, // 💎 Forced White Secondary
+                    textPrimary,
+                    textSecondary,
                   ),
                 )
               : null,
@@ -112,17 +111,7 @@ class AdminShell extends ConsumerWidget {
                   duration: const Duration(milliseconds: 300),
                   width: isDesktop ? 260 : 80,
                   decoration: BoxDecoration(
-                    color: isDark ? bgSidebar : null,
-                    gradient: isDark
-                        ? null
-                        : const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF004D40),
-                              Color(0xFF0B6B60),
-                            ], // 💎 Vibrant Emerald Gradient Sidebar
-                          ),
+                    color: Theme.of(context).cardColor,
                     border: Border(
                       right: BorderSide(color: Theme.of(context).dividerColor),
                     ),
@@ -139,46 +128,236 @@ class AdminShell extends ConsumerWidget {
                     isManager,
                     ref,
                     bgSidebar,
-                    Colors.white, // 💎 Forced White Text
-                    Colors.white70, // 💎 Forced White Secondary
+                    textPrimary,
+                    textSecondary,
                   ),
                 ),
               Expanded(
-                child: Column(
-                  children: [
-                    if (!isMobile)
-                      _buildTopNavBar(
-                        context,
-                        adminName,
-                        adminRoleUI,
-                        rawRole,
-                        adminData?['tenantId']?.toString() ?? '',
-                        adminData?['branchCode']?.toString() ?? '',
-                        roleColor,
-                        ref,
-                        bgSidebar,
-                        textPrimary,
-                        textSecondary,
-                        isDark,
-                        activeStore,
-                      ),
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final isExpired = ref.watch(isSubscriptionExpiredProvider);
+                    return Stack(
+                      children: [
+                        Column(
+                          children: [
+                            if (!isMobile)
+                              _buildTopNavBar(
+                                context,
+                                adminName,
+                                adminRoleUI,
+                                rawRole,
+                                adminData?['tenantId']?.toString() ?? '',
+                                adminData?['branchCode']?.toString() ?? '',
+                                roleColor,
+                                ref,
+                                bgSidebar,
+                                textPrimary,
+                                textSecondary,
+                                isDark,
+                                activeStore,
+                              ),
 
-                    _buildCriticalAlertsStrip(),
+                            _buildCriticalAlertsStrip(),
 
-                    Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        color: bgMain,
-                        child: child,
-                      ),
-                    ),
-                  ],
+                            Expanded(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                color: bgMain,
+                                child: Column(
+                                  children: [
+                                    const UsageLimitBanner(),
+                                    Expanded(child: child),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        // 🔒 SUBSCRIPTION EXPIRED OVERLAY
+                        if (isExpired)
+                          Positioned.fill(
+                            child: Stack(
+                              children: [
+                                Container(
+                                  color: Colors.black.withOpacity(0.75),
+                                ),
+                                // Lock card
+                                Center(
+                                  child: Container(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 32,
+                                    ),
+                                    padding: const EdgeInsets.all(36),
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 480,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF111811),
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: Colors.amber.withOpacity(0.4),
+                                        width: 1.5,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.5),
+                                          blurRadius: 60,
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 72,
+                                          height: 72,
+                                          decoration: BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Colors.amber.withOpacity(
+                                              0.1,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.amber.withOpacity(
+                                                0.4,
+                                              ),
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.lock_clock,
+                                            color: Colors.amber,
+                                            size: 32,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        const Text(
+                                          'Trial Expired',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Your free trial has ended. Upgrade to continue using ClickOut.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white54,
+                                            fontSize: 14,
+                                            height: 1.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withOpacity(
+                                              0.04,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              _expiredRow(
+                                                'Growth Radar & Churn Intelligence',
+                                              ),
+                                              _expiredRow(
+                                                'Fraud Detection & Risk Engine',
+                                              ),
+                                              _expiredRow(
+                                                'Refund Engine & Smart Auditor',
+                                              ),
+                                              _expiredRow(
+                                                'Procurement & Vendor Intelligence',
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              showUpgradePopup(
+                                                context: context,
+                                                route: '/growth',
+                                              );
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(
+                                                0xFF00C853,
+                                              ),
+                                              foregroundColor: Colors.black,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 16,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'Upgrade Now',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextButton(
+                                          onPressed: () => ref
+                                              .read(
+                                                authControllerProvider.notifier,
+                                              )
+                                              .logout(),
+                                          child: const Text(
+                                            'Sign out',
+                                            style: TextStyle(
+                                              color: Colors.white38,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _expiredRow(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Color(0xFF00C853),
+            size: 16,
+          ),
+          const SizedBox(width: 10),
+          Text(
+            text,
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+        ],
+      ),
     );
   }
 
@@ -320,10 +499,7 @@ class AdminShell extends ConsumerWidget {
                 },
               ),
               const SizedBox(width: 5),
-              IconButton(
-                icon: Icon(Icons.notifications_none, color: textSecondary),
-                onPressed: () {},
-              ),
+              const TrialCountdownBadge(),
               const SizedBox(width: 10),
               IconButton(
                 icon: const Icon(Icons.logout, color: Colors.redAccent),
@@ -368,13 +544,56 @@ class AdminShell extends ConsumerWidget {
                       fontSize: 14,
                     ),
                   ),
-                  Text(
-                    roleUI,
-                    style: TextStyle(
-                      color: roleColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        roleUI,
+                        style: TextStyle(
+                          color: roleColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Consumer(
+                        builder: (context, ref, _) {
+                          final plan = ref
+                              .watch(currentPlanProvider)
+                              .toUpperCase();
+                          final planColor = plan == 'TRIAL'
+                              ? Colors.amber
+                              : plan == 'MINI'
+                              ? Colors.blueGrey
+                              : plan == 'PRO'
+                              ? Colors.blueAccent
+                              : plan == 'GROWTH'
+                              ? const Color(0xFF00C853)
+                              : Colors.purpleAccent;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: planColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: planColor.withOpacity(0.5),
+                              ),
+                            ),
+                            child: Text(
+                              plan,
+                              style: TextStyle(
+                                color: planColor,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   if (rawRole == 'TENANT_ADMIN' && tenantId.isNotEmpty)
                     Text(
@@ -470,9 +689,16 @@ class AdminShell extends ConsumerWidget {
         ? Colors.white10
         : Colors.grey.shade200;
 
-    // 🚀 THE MAGIC TRICK: Check if a store is active (Manager hamesha dekhega)
+    // 🚀 UPDATED MAGIC TRICK: Tenant Admin in store context OR Manager sees menus
     final activeStore = ref.watch(activeStoreProvider);
-    final bool showStoreMenus = isManager || activeStore != null;
+    final bool showStoreMenus =
+        isManager || (isTenantAdmin && activeStore != null);
+
+    // 🔒 Subscription lock (SUPER_ADMIN ko kabhi lock nahi hoga)
+    final bool isProLocked =
+        !isSuperAdmin && !ref.watch(isRouteAllowedProvider('/manager'));
+    final bool isGrowthLocked =
+        !isSuperAdmin && !ref.watch(isRouteAllowedProvider('/guard'));
 
     return Column(
       children: [
@@ -570,22 +796,28 @@ class AdminShell extends ConsumerWidget {
                           isTenantAdmin ? '/' : currentPath,
                           tenantHqColor,
                           onCustomTap: () {
-                            // 🚀 INSTANT CLEAR: Jaise hi button dabega, store data clear aur menu turant hide!
                             ref.read(activeStoreProvider.notifier).clearStore();
                             context.go(isTenantAdmin ? '/' : currentPath);
                           },
                         ),
+                        _buildNavItem(
+                          context,
+                          Icons.analytics_outlined,
+                          "Usage",
+                          isExpanded,
+                          '/usage',
+                          tenantHqColor,
+                        ),
 
                         // 🚀 TEMPORARILY DISABLED: Org Structure hidden for now.
-                        _buildNavItem(
+                        /*_buildNavItem(
                           context,
                           Icons.account_tree,
                           "Org Structure",
                           isExpanded,
                           '/org-structure',
                           tenantHqColor,
-                        ),
-
+                        ),*/
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Divider(color: dividerColor, height: 1),
@@ -625,6 +857,7 @@ class AdminShell extends ConsumerWidget {
                   '/manager',
                   operationsColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isProLocked,
                 ),
                 _buildNavItem(
                   context,
@@ -673,6 +906,7 @@ class AdminShell extends ConsumerWidget {
                   '/procurement',
                   operationsColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isProLocked,
                 ),
                 _buildNavItem(
                   context,
@@ -682,6 +916,7 @@ class AdminShell extends ConsumerWidget {
                   '/growth',
                   operationsColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isProLocked,
                 ),
 
                 // ==========================================
@@ -701,6 +936,7 @@ class AdminShell extends ConsumerWidget {
                   '/auditor',
                   staffAuditColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isProLocked,
                 ),
                 _buildNavItem(
                   context,
@@ -710,6 +946,7 @@ class AdminShell extends ConsumerWidget {
                   '/guard',
                   staffAuditColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isGrowthLocked,
                 ),
 
                 Padding(
@@ -734,6 +971,7 @@ class AdminShell extends ConsumerWidget {
                   '/risk',
                   financeRiskColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isGrowthLocked,
                 ),
                 _buildNavItem(
                   context,
@@ -743,6 +981,7 @@ class AdminShell extends ConsumerWidget {
                   '/fraud',
                   financeRiskColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isProLocked,
                 ),
                 _buildNavItem(
                   context,
@@ -752,6 +991,7 @@ class AdminShell extends ConsumerWidget {
                   '/qr-reactivation',
                   financeRiskColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isGrowthLocked,
                 ),
                 _buildNavItem(
                   context,
@@ -761,6 +1001,7 @@ class AdminShell extends ConsumerWidget {
                   '/refunds',
                   financeRiskColor,
                   isReadOnly: isSuperAdmin,
+                  isSubscriptionLocked: isProLocked,
                 ),
                 const SizedBox(height: 20),
               ], // 🚀 WRAPPER CLOSED HERE
@@ -779,15 +1020,15 @@ class AdminShell extends ConsumerWidget {
     String route,
     Color sectionColor, {
     bool isReadOnly = false,
+    bool isSubscriptionLocked = false,
     VoidCallback? onCustomTap,
   }) {
     bool isActive = false;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // 💎 Dynamic inactive color (White70 for Emerald Light Mode, Grey for Dark Mode)
-    final inactiveColor = isDark ? const Color(0xFF888888) : Colors.white70;
-    // 💎 Boost active section color visibility in Light Emerald mode
-    final activeColor = isDark ? sectionColor : Colors.white;
+    final inactiveColor = Theme.of(context).textTheme.labelLarge?.color ?? AppColors.darkMuted;
+    final activeColor = sectionColor;
 
     if (route == '/') {
       isActive = currentPath == '/';
@@ -846,6 +1087,27 @@ class AdminShell extends ConsumerWidget {
                     Icons.lock_outline,
                     size: 14,
                     color: inactiveColor,
+                  ),
+                ),
+              if (isExpanded && isSubscriptionLocked)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                  ),
+                  child: const Text(
+                    'UPGRADE',
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: Colors.amber,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
             ],

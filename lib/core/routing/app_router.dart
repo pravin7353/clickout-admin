@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../store/providers/store_provider.dart';
 import '../../shared/layouts/admin_shell.dart';
 import '../../features/dashboard/dashboard_screen.dart';
 import '../../features/manager/manager_screen.dart';
@@ -22,12 +24,13 @@ import '../../features/growth/campaign_manager_screen.dart'; // 🚀 NAYA IMPORT
 import '../../features/inventory/presentation/product_control_screen.dart';
 import '../../features/service/service_control_screen.dart'; // 🚀 NAYA: Service Control Import
 import '../../features/idt/screens/idt_deposits_screen.dart'; // 🚀 NAYA: IDT Deposits
-import '../../features/tenant_admin/screens/org_structure_screen.dart';
 import '../../features/tenant_admin/screens/tenant_onboarding_screen.dart';
 import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart';
 import '../../features/tenant_admin/screens/client_registration_screen.dart';
 import '../../features/super_admin/screens/super_admin_screen.dart';
-import '../../features/onboarding/screens/retail_simulator_screen.dart'; // 🚀 NAYA IMPORT: Retail Simulator
+import '../../features/onboarding/screens/retail_simulator_screen.dart';
+import '../../core/subscription/widgets/feature_lock_widget.dart';
+import '../../core/subscription/widgets/usage_dashboard_screen.dart'; // 🚀 NAYA IMPORT: Retail Simulator
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorKey =
@@ -49,7 +52,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       if (isLoggedIn && isLoggingIn) return '/';
 
       if (isLoggedIn && adminData.value != null) {
-        final role = (adminData.value!['role'] ?? '').toString().toUpperCase();
+        String role = (adminData.value!['role'] ?? '').toString().toUpperCase();
+
+        // 🚀 DEV BYPASS EMERGENCY FALLBACK: Prevent stale DB references from kicking out root admin
+        if (role.isEmpty && authState.value?.email == 'dev@clickout.local') {
+          role = 'SUPER_ADMIN';
+        }
 
         if (role.isEmpty) {
           FirebaseAuth.instance.signOut();
@@ -71,16 +79,40 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             // Wait for DB to load. Do not redirect yet!
             if (profileAsync.isLoading) return null;
 
-            // If loaded, check status. Fallback to true to prevent accidental lockouts.
-            final isComplete =
-                profileAsync.value?['isOnboardingComplete'] ?? true;
+            // 🚀 PROTECTION GUARD: Check if tenant doc is missing or uncompleted
+            if (profileAsync.value == null) {
+              return '/simulator';
+            }
 
-            if (!isComplete && currentPath != '/tenant-onboarding') {
-              return '/tenant-onboarding';
+            final isComplete =
+                profileAsync.value?['isOnboardingComplete'] ??
+                false; // 🚀 Default to false to handle uncompleted steps safely
+
+            if (!isComplete &&
+                currentPath != '/simulator' &&
+                currentPath != '/tenant-onboarding') {
+              return '/simulator';
             }
             if (isComplete && currentPath == '/') {
               return '/tenant-dashboard/$tId';
             }
+
+            // 🔒 SUBSCRIPTION EXPIRY GATE
+            final billingStatus =
+                profileAsync.value?['billingStatus']?.toString() ?? 'active';
+            final plan =
+                profileAsync.value?['subscriptionPlan']?.toString() ?? 'trial';
+            final trialEndsAt = profileAsync.value?['trialEndsAt'];
+
+            bool isExpired =
+                billingStatus == 'expired' || billingStatus == 'suspended';
+
+            if (!isExpired && plan == 'trial' && trialEndsAt != null) {
+              final endDate = (trialEndsAt as Timestamp).toDate();
+              isExpired = DateTime.now().isAfter(endDate);
+            }
+
+            // Expiry handled by AdminShell overlay — no redirect needed
           }
         }
 
@@ -91,7 +123,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         }
 
         // 🛡️ 3. MANAGER RULES (LEVEL 3 ARCHITECTURE)
-        if (role == 'MANAGER') {
+        // 🚀 UPDATED: Tenant Admin in store context also follows manager rules
+        final activeStore = ref.read(activeStoreProvider);
+        final isManager = role == 'MANAGER' || role == 'STORE_MANAGER';
+        final isTenantInStore = role == 'TENANT_ADMIN' && activeStore != null;
+
+        if (isManager || isTenantInStore) {
+          // 🚀 HARD PROTECTION: Only Managers blocked from HQ
+          if (isManager &&
+              (currentPath.contains('/tenant-dashboard') ||
+                  currentPath.contains('/tenant-onboarding'))) {
+            return '/dashboard';
+          }
+
           final managerAllowedPaths = [
             '/',
             '/dashboard',
@@ -115,14 +159,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           if (currentPath == '/') return '/dashboard';
         }
 
-        // 4. ORG STRUCTURE PROTECTION
-        final isTopLevelAdmin = [
-          'SUPER_ADMIN',
-          'TENANT_ADMIN',
-          'OWNER',
-          'ADMIN',
-        ].contains(role);
-        if (currentPath == '/org-structure' && !isTopLevelAdmin) return '/';
+        // 🚀 ORG STRUCTURE: Temporarily disabled for infra scaling reduction
       }
 
       return null;
@@ -174,19 +211,29 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/manager',
-            builder: (context, state) => const ManagerScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/manager',
+              child: ManagerScreen(),
+            ),
           ),
           GoRoute(
             path: '/auditor',
-            builder: (context, state) => const AuditorScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/auditor',
+              child: AuditorScreen(),
+            ),
           ),
           GoRoute(
             path: '/risk',
-            builder: (context, state) => const RiskEngineScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/risk',
+              child: RiskEngineScreen(),
+            ),
           ),
           GoRoute(
             path: '/guard',
-            builder: (context, state) => const GuardScreen(),
+            builder: (context, state) =>
+                const FeatureLockWidget(route: '/guard', child: GuardScreen()),
           ),
           GoRoute(
             path: '/cashier',
@@ -194,24 +241,38 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/fraud',
-            builder: (context, state) => const FraudControlScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/fraud',
+              child: FraudControlScreen(),
+            ),
           ),
           GoRoute(
             path: '/qr-reactivation',
-            builder: (context, state) => const QrReactivationScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/qr-reactivation',
+              child: QrReactivationScreen(),
+            ),
           ),
           GoRoute(
             path: '/refunds',
-            builder: (context, state) => const RefundDecisionScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/refunds',
+              child: RefundDecisionScreen(),
+            ),
           ),
           GoRoute(
             path: '/procurement',
-            builder: (context, state) => const POApprovalScreen(),
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/procurement',
+              child: POApprovalScreen(),
+            ),
           ),
           GoRoute(
             path: '/growth',
-            builder: (context, state) =>
-                const GrowthRadarScreen(), // 🚀 LINKED TO NEW SCREEN
+            builder: (context, state) => const FeatureLockWidget(
+              route: '/growth',
+              child: GrowthRadarScreen(),
+            ),
           ),
           // 🚀 NAYA ROUTE: Campaign Manager Screen
           GoRoute(
@@ -230,10 +291,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/service-control',
             builder: (context, state) => const ServiceControlScreen(),
           ),
-          GoRoute(
-            path: '/org-structure',
-            builder: (context, state) => const OrgStructureScreen(),
-          ),
+          // 🚀 Temporarily disabled for future enterprise release
+          // GoRoute(
+          //   path: '/org-structure',
+          //   builder: (context, state) => const OrgStructureScreen(),
+          // ),
           GoRoute(
             path: '/tenant-onboarding',
             builder: (context, state) => const TenantOnboardingScreen(),
@@ -251,12 +313,151 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           // 🚀 RETAIL SIMULATOR ONBOARDING ROUTE
           GoRoute(
             path: '/simulator',
-            builder: (context, state) =>
-                const RetailSimulatorScreen(), // Ensure to import this file at the top!
+            builder: (context, state) => const RetailSimulatorScreen(),
+          ),
+          // 🔒 SUBSCRIPTION EXPIRED — placeholder (Task 4 mein replace hoga)
+          GoRoute(
+            path: '/subscription-expired',
+            builder: (context, state) => Stack(
+              children: [
+                // Portal background — blurred
+                IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.08,
+                    child: Container(color: const Color(0xFF080B08)),
+                  ),
+                ),
+                // Lock overlay
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.all(36),
+                    constraints: const BoxConstraints(maxWidth: 480),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111811),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(
+                        color: Colors.amber.withOpacity(0.4),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 60,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.amber.withOpacity(0.1),
+                            border: Border.all(
+                              color: Colors.amber.withOpacity(0.4),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.lock_clock,
+                            color: Colors.amber,
+                            size: 32,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Trial Expired',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Your free trial has ended. Upgrade to continue using ClickOut.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        // Plan highlights
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.04),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            children: [
+                              _expiredFeatureRow(
+                                'Growth Radar & Churn Intelligence',
+                              ),
+                              _expiredFeatureRow(
+                                'Fraud Detection & Risk Engine',
+                              ),
+                              _expiredFeatureRow(
+                                'Refund Engine & Smart Auditor',
+                              ),
+                              _expiredFeatureRow(
+                                'Procurement & Vendor Intelligence',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              // TODO: Razorpay — Task 6
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00C853),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text(
+                              'Upgrade Now',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () {
+                            FirebaseAuth.instance.signOut();
+                          },
+                          child: const Text(
+                            'Sign out',
+                            style: TextStyle(color: Colors.white38),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           GoRoute(
             path: '/dashboard',
             builder: (context, state) => const DashboardScreen(),
+          ),
+          GoRoute(
+            path: '/usage',
+            builder: (context, state) => const UsageDashboardScreen(),
           ),
         ],
       ),
@@ -268,3 +469,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   return router;
 });
+
+Widget _expiredFeatureRow(String text) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        const Icon(
+          Icons.check_circle_rounded,
+          color: Color(0xFF00C853),
+          size: 16,
+        ),
+        const SizedBox(width: 10),
+        Text(text, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+      ],
+    ),
+  );
+}

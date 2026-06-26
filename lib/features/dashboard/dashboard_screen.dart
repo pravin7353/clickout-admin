@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../manpower_ai/presentation/manpower_widget.dart';
 import '../revenue_engine/providers/revenue_provider.dart';
 import '../auth/auth_provider.dart'; // 🚀 SAAS INJECTION IMPORT
+import '../coach/widgets/mission_banner.dart';
+import '../coach/widgets/info_button.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -80,6 +82,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const MissionBanner(route: '/dashboard'),
                 // 💎 SEQUENCE.IO HERO BANNER
                 Container(
                   width: double.infinity,
@@ -166,13 +169,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 const EnterpriseRevenueMatrixChart(),
                 const SizedBox(height: 40),
                 */
-                Text(
-                  "Reconciliation Table",
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: primaryTextColor,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      "Reconciliation Table",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: primaryTextColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const InfoButton(
+                      title: 'Reconciliation Table',
+                      en: 'Live order ledger showing all transactions with payment status, exit status, and audit trail. Filter by status to spot anomalies.',
+                      hi: 'Har transaction ka live record — payment hua, exit hua, refund hua sab yahan dikhega. Status filter karke suspicious orders pakdo.',
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 15),
                 // 🚀 TABLE RENDERED HERE
@@ -222,6 +235,73 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         true,
       ),
     ]);
+  }
+
+  Map<String, String> _cardInfo(String title) {
+    const Map<String, Map<String, String>> info = {
+      'Gross Revenue': {
+        'en':
+            'Total billed amount before any deductions. Includes paid, pending, and rejected orders.',
+        'hi':
+            'Ye aapka total billing amount hai — chahe payment hua ho ya nahi. Isse pata chalta hai store kitna generate kar raha hai.',
+      },
+      'Total Revenue': {
+        'en': 'Confirmed revenue from fully verified and exited orders only.',
+        'hi':
+            'Sirf wo paisa jo guard ne verify karke customer ko exit diya. Ye aapka real confirmed income hai.',
+      },
+      'Pending Verification': {
+        'en':
+            'Paid orders waiting for guard exit verification. High value here = bottleneck at exit.',
+        'hi':
+            'Customer ne payment kar diya par guard ne exit nahi diya abhi. Zyada pending = exit pe jam ya fraud risk.',
+      },
+      'Rejected Leakage': {
+        'en': 'Orders rejected at gate — potential fraud or billing mismatch.',
+        'hi':
+            'Guard ne in orders ko reject kiya. Ye financial leakage hai — seedha loss ya fraud ka signal.',
+      },
+      'Total Paid Orders': {
+        'en': 'Count of all orders where payment was completed.',
+        'hi':
+            'Kitne customers ne payment complete ki — chahe exit hua ho ya nahi.',
+      },
+      'Successful Exits': {
+        'en':
+            'Orders where customer completed payment AND guard verified exit.',
+        'hi':
+            'Pura cycle complete — payment + guard exit dono. Ye aapka healthy transaction count hai.',
+      },
+      'Pending Gate Pass': {
+        'en': 'Paid orders stuck at gate waiting for guard scan.',
+        'hi':
+            'Payment ho gayi par gate pass abhi pending hai. Guard busy hai ya koi technical issue.',
+      },
+      'Guard Rejections': {
+        'en':
+            'Orders rejected by guard — weight mismatch, QR fraud, or suspicious items.',
+        'hi':
+            'Guard ne kuch gadbad pakdi — weight mismatch, fake QR ya suspicious items. Investigate karo.',
+      },
+      'Refunds': {
+        'en':
+            'Total refund count and amount. High refunds = product issues or cashier fraud.',
+        'hi':
+            'Kitne refund hue aur kitna paisa gaya. Zyada refund = product problem ya cashier fraud.',
+      },
+      'QR Expired': {
+        'en':
+            'Carts abandoned after QR generation — customer left without completing purchase.',
+        'hi':
+            'Customer ne QR banaya par purchase complete nahi ki. Cart abandon hua.',
+      },
+    };
+    return info[title] ??
+        {
+          'en': 'This metric tracks important operational data for your store.',
+          'hi':
+              'Ye metric aapke store ki operations ka important data track karta hai.',
+        };
   }
 
   Widget _buildOrderGrid(RevenueMetrics metrics) {
@@ -338,13 +418,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             children: [
               Icon(icon, color: color, size: 18),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
+              ),
+              InfoButton(
+                title: title,
+                en: _cardInfo(title)['en']!,
+                hi: _cardInfo(title)['hi']!,
               ),
             ],
           ),
@@ -423,13 +510,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             children: [
               Icon(icon, color: color, size: 18),
               const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(
-                  color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
+              ),
+              InfoButton(
+                title: title,
+                en: _cardInfo(title)['en']!,
+                hi: _cardInfo(title)['hi']!,
               ),
             ],
           ),

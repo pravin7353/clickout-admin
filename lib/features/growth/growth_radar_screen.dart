@@ -7,6 +7,7 @@ import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'package:clickout_admin/features/growth/providers/churn_engine_service.dart';
 import 'package:clickout_admin/features/growth/providers/offer_engine_service.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../coach/widgets/info_button.dart';
 
 class GrowthRadarScreen extends ConsumerStatefulWidget {
   const GrowthRadarScreen({super.key});
@@ -93,13 +94,23 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                "Growth Radar",
-                style: GoogleFonts.syne(
-                  color: isDark ? Colors.white : const Color(0xFF0F172A),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 24,
-                ),
+              Row(
+                children: [
+                  Text(
+                    "Growth Radar",
+                    style: GoogleFonts.syne(
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const InfoButton(
+                    title: 'Growth Radar — Your Customer Intelligence Engine',
+                    en: 'Growth Radar tracks every customer who shops via ClickOut app. It tells you who is buying, who stopped coming, and who needs a nudge before they leave forever.\n\n🟢 Live Shoppers — currently in your store right now.\n👻 Ghost Visitors — entered store but added nothing to cart in 15 mins. They need guidance or a live offer.\n👑 VIP Customers — your highest-paying repeat buyers. Losing one VIP = losing ₹500–₹5000/month.\n\nSetup AI Growth config once → radar runs automatically forever.',
+                    hi: 'Growth Radar aapke har customer ko track karta hai jo ClickOut app se shopping karta hai. Ye batata hai kaun aa raha hai, kaun band ho gaya, aur kaun wapas laya ja sakta hai offer dekar.\n\n🟢 Live Shoppers — abhi store mein hain.\n👻 Ghost Visitors — aaye par kuch add nahi kiya 15 min mein. Inhe offer chahiye ya Clickout app ka walkthrough do.\n👑 VIP Customers — aapke sabse zyada paisa dene wale customers. Ek VIP khoya matlab ₹500–₹5000/mahina gaya.\n\nAI Growth Setup ek baar karo — radar khud chalega.',
+                  ),
+                ],
               ),
               Text(
                 "Total VIPs: $vipCount",
@@ -176,10 +187,49 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
             unselectedLabelStyle: GoogleFonts.inter(
               fontWeight: FontWeight.w500,
             ),
-            tabs: const [
-              Tab(text: "Live Shoppers"),
-              Tab(text: "Ghost Visitors"),
-              Tab(text: "VIP Customers"),
+            tabs: [
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("Live Shoppers"),
+                    const SizedBox(width: 4),
+                    const InfoButton(
+                      title: 'Live Shoppers',
+                      en: 'Customers currently active in your store via ClickOut app. They have scanned your store QR and are browsing right now. Use this to monitor real-time footfall.',
+                      hi: 'Ye wo customers hain jo abhi aapke store mein hain aur ClickOut app use kar rahe hain. Store QR scan karke active session mein hain. Real-time footfall monitor karo.',
+                    ),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("Ghost Visitors"),
+                    const SizedBox(width: 4),
+                    const InfoButton(
+                      title: 'Ghost Visitors',
+                      en: 'Customers who scanned your store QR but added NOTHING to cart in 15 minutes. High ghost rate = confusing store layout, poor product visibility, or pricing issues. Send them a live offer to convert.',
+                      hi: 'Ye wo customers hain jo store mein aaye par 15 min mein kuch bhi cart mein add nahi kiya. Zyada ghost visitors matlab store layout confusing hai ya pricing issue hai. Inhe live offer bhejo ya Clickout app ka walkthrough do — conversion chance hai.',
+                    ),
+                  ],
+                ),
+              ),
+              Tab(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text("VIP Customers"),
+                    const SizedBox(width: 4),
+                    const InfoButton(
+                      title: 'VIP Customers',
+                      en: 'Your highest-value repeat customers based on AI Growth Setup config. Tracked by spend threshold and return frequency. Medium Risk = send 1st offer. High Risk = send 2nd offer. No 3rd offer — avoid spam.',
+                      hi: 'Ye aapke sabse zyada paisa dene wale regular customers hain. AI Growth Setup ke hisaab se track hote hain. Medium Risk pe pehla offer bhejo. High Risk pe doosra offer. Teesra offer kabhi mat bhejo — spam se impression kharab hota hai.',
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -1520,13 +1570,23 @@ class _ShopGrowthSetupDialogState extends ConsumerState<ShopGrowthSetupDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "AI Growth Setup",
-                style: GoogleFonts.syne(
-                  color: textColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
+              Row(
+                children: [
+                  Text(
+                    "AI Growth Setup",
+                    style: GoogleFonts.syne(
+                      color: textColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const InfoButton(
+                    title: 'AI Growth Setup — Configure Once, Run Forever',
+                    en: 'Set two things:\n\n1. VIP Threshold (₹) — minimum spend to qualify as VIP. Example: ₹2000/visit = VIP.\n2. Return Days — how many days before a customer is considered "at risk". Example: your store = weekly visits, set 10 days.\n\nAfter setup, radar auto-classifies every customer into Live, Ghost, or VIP — no manual work needed ever.',
+                    hi: 'Sirf do cheezein set karo:\n\n1. VIP Amount (₹) — kitna paisa kharchne wala customer VIP hai. Example: ₹2000/visit.\n2. Return Days — kitne din baad customer "risk mein" maana jaye. Example: aapki shop weekly visit wali hai to 10 din set karo.\n\nEk baar setup karo — radar khud saare customers ko classify karta rahega. Koi manual kaam nahi.',
+                  ),
+                ],
               ),
               IconButton(
                 icon: const Icon(Icons.close_rounded, color: Colors.grey),

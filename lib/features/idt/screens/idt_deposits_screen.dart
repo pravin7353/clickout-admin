@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/idt_deposit_provider.dart';
+import '../../coach/widgets/info_button.dart';
 
 class IdtDepositsScreen extends ConsumerWidget {
   const IdtDepositsScreen({Key? key}) : super(key: key);
@@ -616,13 +617,24 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
             spacing: 10,
             runSpacing: 10,
             children: [
-              Text(
-                "IDT Deposits",
-                style: TextStyle(
-                  color: theme.textTheme.bodyLarge?.color,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "IDT Deposits",
+                    style: TextStyle(
+                      color: theme.textTheme.bodyLarge?.color,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const InfoButton(
+                    title: 'IDT — Inventory Deposit Terminal',
+                    en: 'IDT is your stock intake system. Staff scan products via ClickOut IDT app or You can connect the barcode scanner directly to the system to scan the barcode or Manually you can enter the details → syncs here → Manager verifies → products go LIVE for billing. Prevents unauthorized or unverified stock from entering the system.',
+                    hi: 'IDT matlab Inventory Deposit Terminal. Clickout IDT mobile app se product barcode scan karte hain ya barcode scanner connect karke barcode scan kar sakte hai ya manually details enter karke → yahan sync hota hai → Manager "Verify & Go Live" karta hai → tabhi product billing mein available hota hai. Bina verify ke koi product bill nahi ho sakta — ye ek security layer hai.',
+                  ),
+                ],
               ),
               const SizedBox(width: 16),
               SizedBox(

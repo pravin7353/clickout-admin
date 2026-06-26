@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_fonts/google_fonts.dart'; // 🚀 IMPORT GOOGLE FONTS
+import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// 🚀 ADDED
-import 'package:go_router/go_router.dart'; // 🚀 ADDED
+import 'package:go_router/go_router.dart';
 import '../../core/auth/unified_auth_service.dart';
+import '../../core/theme/app_theme.dart';
 import 'auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -58,76 +58,61 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF111811),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withOpacity(0.08)),
-        ),
-        title: Text(
-          "Confirm Email",
-          style: GoogleFonts.syne(
-            color: const Color(0xFFF0F0F0),
-            fontWeight: FontWeight.bold,
+      builder: (ctx) {
+        final cs = Theme.of(context).colorScheme;
+        final tt = Theme.of(context).textTheme;
+        return AlertDialog(
+          backgroundColor: Theme.of(context).cardColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Theme.of(context).dividerColor),
           ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "For security, please confirm your email to board the ship.",
-              style: GoogleFonts.dmSans(color: Colors.white54, fontSize: 13),
+          title: Text(
+            "Confirm Email",
+            style: GoogleFonts.syne(
+              color: cs.onSurface,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: confirmCtrl,
-              style: GoogleFonts.dmSans(color: const Color(0xFFF0F0F0)),
-              decoration: InputDecoration(
-                labelText: "Work Email",
-                labelStyle: GoogleFonts.dmSans(color: Colors.white54),
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: Color(0xFF00FF88)),
-                  borderRadius: BorderRadius.circular(8),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                "For security, please confirm your email to board the ship.",
+                style: GoogleFonts.dmSans(
+                  color: tt.labelLarge?.color,
+                  fontSize: 13,
                 ),
               ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: confirmCtrl,
+                style: TextStyle(color: cs.onSurface),
+                decoration: const InputDecoration(labelText: "Work Email"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                setState(() => _isLoading = false);
+              },
+              child: Text(
+                "CANCEL",
+                style: TextStyle(color: tt.labelLarge?.color),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _executeMagicLogin(url, confirmCtrl.text.trim());
+              },
+              child: const Text("LOGIN"),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => _isLoading = false);
-            },
-            child: Text(
-              "CANCEL",
-              style: GoogleFonts.dmSans(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00FF88),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _executeMagicLogin(url, confirmCtrl.text.trim());
-            },
-            child: Text(
-              "LOGIN",
-              style: GoogleFonts.dmSans(
-                color: const Color(0xFF080B08),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -139,14 +124,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(authControllerProvider.notifier)
           .setupAdminSession();
 
-      // 🚀 SECURE ROUTING: Smart Interception
       if (mounted) {
         if (isFirstTime) {
-          context.go('/simulator'); // 🚀 New Users get the AI Coach
+          context.go('/simulator');
         } else {
-          context.go(
-            '/dashboard',
-          ); // Existing Users go straight to Command Center
+          context.go('/dashboard');
         }
       }
     } catch (e) {
@@ -154,7 +136,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Login Error: $e"),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -176,8 +158,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _linkSent = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("Magic Link sent! Please check your Email Inbox."),
-            backgroundColor: Color(0xFF00FF88),
+            content: Text(
+              "Magic Link sent! Please check your Email Inbox. Check Spam if you don't see it.",
+            ),
+            backgroundColor: AppColors.accent,
           ),
         );
       }
@@ -186,7 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -214,7 +198,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Dev Login Failed: $e"),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -225,21 +209,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
+    final tt = Theme.of(context).textTheme;
+
     return Scaffold(
-      backgroundColor: const Color(
-        0xFF080B08,
-      ), // 🚀 Web Landing Page Background
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: Container(
           width: 420,
           padding: const EdgeInsets.all(48),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04), // 🚀 Glassmorphism Card
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            color: Theme.of(context).cardColor,
+            border: Border.all(color: Theme.of(context).dividerColor),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withOpacity(isDark ? 0.4 : 0.08),
                 blurRadius: 30,
                 offset: const Offset(0, 10),
               ),
@@ -248,7 +234,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🚀 CLAUDE'S TYPOGRAPHY LOGO
               RichText(
                 text: TextSpan(
                   style: GoogleFonts.syne(
@@ -256,15 +241,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     fontWeight: FontWeight.w800,
                     letterSpacing: -1.0,
                   ),
-                  children: const [
+                  children: [
                     TextSpan(
                       text: 'Click',
-                      style: TextStyle(color: Color(0xFFF0F0F0)),
+                      style: TextStyle(color: cs.onSurface),
                     ),
-                    TextSpan(
+                    const TextSpan(
                       text: 'Out',
-                      style: TextStyle(color: Color(0xFF00FF88)),
-                    ), // Neon Green
+                      style: TextStyle(color: AppColors.accent),
+                    ),
                   ],
                 ),
               ),
@@ -272,7 +257,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               Text(
                 "Command Center Gateway",
                 style: GoogleFonts.dmSans(
-                  color: Colors.white54,
+                  color: tt.labelLarge?.color,
                   fontSize: 13,
                   letterSpacing: 0.5,
                 ),
@@ -280,14 +265,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               const SizedBox(height: 48),
 
               if (!_linkSent) ...[
-                // 🚀 CLAUDE'S INPUT FIELD STYLE
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       "EMAIL ADDRESS",
                       style: GoogleFonts.dmSans(
-                        color: Colors.white54,
+                        color: tt.labelLarge?.color,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                         letterSpacing: 1.0,
@@ -296,57 +280,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     const SizedBox(height: 8),
                     TextField(
                       controller: _emailController,
-                      style: GoogleFonts.dmSans(
-                        color: const Color(0xFFF0F0F0),
-                        fontSize: 15,
-                      ),
-                      cursorColor: const Color(0xFF00FF88),
-                      decoration: InputDecoration(
+                      style: TextStyle(color: cs.onSurface, fontSize: 15),
+                      cursorColor: AppColors.accent,
+                      decoration: const InputDecoration(
                         hintText: "you@yourstore.com",
-                        hintStyle: GoogleFonts.dmSans(
-                          color: Colors.white.withOpacity(0.35),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.05),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(
-                            color: Colors.white.withOpacity(0.12),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF00FF88),
-                            width: 1.5,
-                          ),
-                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // 🚀 CLAUDE'S GREEN BUTTON
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00FF88),
-                      foregroundColor: const Color(0xFF080B08),
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      elevation: 0,
                     ),
                     onPressed: _isLoading ? null : _handleMagicLink,
                     child: _isLoading
@@ -354,7 +302,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(
-                              color: Color(0xFF080B08),
+                              color: Colors.black,
                               strokeWidth: 2,
                             ),
                           )
@@ -372,25 +320,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   "We will send a secure password-less login link.",
                   style: GoogleFonts.dmSans(
                     fontSize: 12,
-                    color: Colors.white38,
+                    color: tt.labelLarge?.color,
                   ),
                   textAlign: TextAlign.center,
                 ),
 
-                // 🛠️ DEV BYPASS BUTTON (Match React btn-outline style)
                 if (kDebugMode) ...[
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFF0F0F0),
-                        side: BorderSide(color: Colors.white.withOpacity(0.2)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
                       onPressed: _isLoading ? null : _handleDevBypass,
                       icon: const Icon(Icons.rocket_launch, size: 18),
                       label: Text(
@@ -406,11 +345,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ] else ...[
                 _isLoading
-                    ? const CircularProgressIndicator(color: Color(0xFF00FF88))
+                    ? const CircularProgressIndicator(color: AppColors.accent)
                     : const Icon(
                         Icons.mark_email_read,
                         size: 60,
-                        color: Color(0xFF00FF88),
+                        color: AppColors.accent,
                       ),
                 const SizedBox(height: 24),
                 Text(
@@ -418,7 +357,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: GoogleFonts.syne(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: const Color(0xFFF0F0F0),
+                    color: cs.onSurface,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -427,7 +366,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     "Click the secure link we just sent you to access the Command Center.",
                     textAlign: TextAlign.center,
                     style: GoogleFonts.dmSans(
-                      color: Colors.white54,
+                      color: tt.labelLarge?.color,
                       fontSize: 14,
                       height: 1.5,
                     ),
@@ -439,7 +378,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Text(
                       "Use a different email",
                       style: GoogleFonts.dmSans(
-                        color: const Color(0xFF00FF88),
+                        color: AppColors.accent,
                         fontWeight: FontWeight.w500,
                       ),
                     ),

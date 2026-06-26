@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,6 +13,7 @@ import 'add_product_dialog.dart';
 import 'edit_product_dialog.dart';
 import '../providers/product_master/product_master_provider.dart';
 import 'package:clickout_admin/features/procurement/services/stock_service.dart';
+import '../../coach/widgets/info_button.dart';
 
 class ProductControlScreen extends ConsumerStatefulWidget {
   const ProductControlScreen({super.key});
@@ -139,6 +141,32 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
   }
 
   // 🚀 CSV UPLOAD LOGIC (Calling Cloud Function with SaaS Context)
+  Widget _csvRuleRow(String field, String wrong, String right) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 70,
+            child: Text(
+              field,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+            ),
+          ),
+          Text(
+            wrong,
+            style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            right,
+            style: const TextStyle(color: Color(0xFF00C853), fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _processCsvImport() async {
     setState(() => _isUploadingCsv = true);
     try {
@@ -167,6 +195,32 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
       final String adminName = adminData?['name'] ?? 'Unknown Manager';
       final String adminEmail = adminData?['email'] ?? 'Unknown Email';
 
+      // 🚨 FIELD VALIDATOR — Rejects units/symbols in numeric fields
+      String? _validateNumericField(
+        String value,
+        String fieldName,
+        int rowNum,
+      ) {
+        final cleaned = value.trim();
+        if (cleaned.isEmpty) return null;
+        // Reject if contains letters, %, ₹, or any non-numeric chars except dot
+        if (RegExp(r'[a-zA-Z%₹\s]').hasMatch(cleaned)) {
+          throw "🚨 Row $rowNum: '$fieldName' = '$cleaned' — INVALID FORMAT.\n\n"
+              "❌ Wrong: ${fieldName == 'weight'
+                  ? '250ml or 250gm'
+                  : fieldName == 'gst'
+                  ? '18%'
+                  : '₹100'}\n"
+              "✅ Correct: ${fieldName == 'weight'
+                  ? '250'
+                  : fieldName == 'gst'
+                  ? '18'
+                  : '100'}\n\n"
+              "⚠️ Units/symbols in numeric fields WILL CRASH THE SYSTEM.\nFix CSV and re-upload.";
+        }
+        return null;
+      }
+
       List<Map<String, dynamic>> productList = [];
       for (int i = 1; i < lines.length; i++) {
         String line = lines[i].trim();
@@ -174,6 +228,16 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
 
         List<String> row = line.split(',');
         if (row.isEmpty || row[0].trim().isEmpty) continue;
+
+        // 🛡️ Validate numeric fields — reject units/symbols
+        _validateNumericField(row.length > 2 ? row[2].trim() : '', 'price', i);
+        _validateNumericField(
+          row.length > 3 ? row[3].trim() : '',
+          'unit cost',
+          i,
+        );
+        _validateNumericField(row.length > 5 ? row[5].trim() : '', 'gst', i);
+        _validateNumericField(row.length > 7 ? row[7].trim() : '', 'weight', i);
 
         // 🚀 SMART DATE NORMALIZATION (Fixes the MM/YYYY vs DD/MM/YYYY issue)
         String rawDate = row.length > 6 ? row[6].trim() : '';
@@ -293,14 +357,24 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Product Master Roster 📦",
-                      style: TextStyle(
-                        fontSize: isMobile ? 24 : 28,
-                        fontWeight: FontWeight.w900,
-                        color: textPrimary,
-                        letterSpacing: 0.5,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          "Product Master Roster 📦",
+                          style: TextStyle(
+                            fontSize: isMobile ? 24 : 28,
+                            fontWeight: FontWeight.w900,
+                            color: textPrimary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const InfoButton(
+                          title: 'Product Master Roster',
+                          en: 'Central inventory control — add, edit, delete products. Each product has barcode, stock, price, GST, and offer eligibility. Linked directly to billing and procurement.',
+                          hi: 'Yahan se saare products manage karo — add karo, edit karo, delete karo. Barcode, stock, price, GST sab yahan set hota hai. Ye directly billing aur procurement se linked hai.',
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 5),
                     Text(
@@ -338,11 +412,80 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            content: const Text(
-                              "Ensure your CSV has exactly these headers (comma separated):\n\nbarcode, name, price, weight, physicalStock, openingStock, gst, expiryDate\n\nExample:\n8901542001, Example Item, 75, 60ml, 100, 100, 18, 12/2026",
-                              style: TextStyle(color: Colors.grey, height: 1.5),
+                            content: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Column Order:',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                const Text(
+                                  'barcode, name, price, unit_cost, gst, physical_stock, expiry_date, weight',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Example row:',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  '8901542001234, Mango Juice, 100, 70, 18, 50, 12/2027, 250',
+                                  style: TextStyle(
+                                    fontFamily: 'monospace',
+                                    fontSize: 11,
+                                    color: Color(0xFF00C853),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Colors.red.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    '⚠️ Weight: 250 ✅  250ml ❌\n⚠️ Price: 100 ✅  ₹100 ❌\n⚠️ GST: 18 ✅  18% ❌',
+                                    style: TextStyle(
+                                      color: Colors.redAccent,
+                                      fontSize: 12,
+                                      height: 1.6,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                             actions: [
+                              TextButton.icon(
+                                icon: const Icon(Icons.copy, size: 14),
+                                label: const Text('Copy Template'),
+                                onPressed: () {
+                                  Clipboard.setData(
+                                    const ClipboardData(
+                                      text:
+                                          'barcode,name,price,unit_cost,gst,physical_stock,expiry_date,weight\n8901542001234,Mango Juice,100,70,18,50,12/2027,250',
+                                    ),
+                                  );
+                                  Navigator.pop(ctx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        '✅ Template copied to clipboard',
+                                      ),
+                                      backgroundColor: Color(0xFF00C853),
+                                    ),
+                                  );
+                                },
+                              ),
                               TextButton(
                                 onPressed: () => Navigator.pop(ctx),
                                 child: const Text("Got it"),
@@ -372,7 +515,146 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                           ),
                         ),
                       ),
-                      onPressed: _isUploadingCsv ? null : _processCsvImport,
+                      onPressed: _isUploadingCsv
+                          ? null
+                          : () async {
+                              // Show warning dialog before upload
+                              await showDialog(
+                                context: context,
+                                builder: (_) => AlertDialog(
+                                  backgroundColor: isDark
+                                      ? const Color(0xFF111811)
+                                      : Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  title: Row(
+                                    children: const [
+                                      Icon(
+                                        Icons.warning_amber_rounded,
+                                        color: Colors.amber,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'CSV Format Rules',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
+                                    ],
+                                  ),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Numeric fields must be NUMBERS ONLY:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      _csvRuleRow('Weight', '250ml ❌', '250 ✅'),
+                                      _csvRuleRow('Price', '₹100 ❌', '100 ✅'),
+                                      _csvRuleRow('GST', '18% ❌', '18 ✅'),
+                                      _csvRuleRow('Unit Cost', '₹70 ❌', '70 ✅'),
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.red.withOpacity(0.3),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          '⚠️ Units or symbols in numeric fields will CRASH the system and corrupt your inventory.',
+                                          style: TextStyle(
+                                            color: Colors.redAccent,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'CSV Column Order:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Text(
+                                        'barcode, name, price, unit_cost, gst, physical_stock, expiry_date(MM/YYYY), weight',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      const Text(
+                                        'Example row:',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        '8901542001234, Mango Juice, 100, 70, 18, 50, 12/2027, 250',
+                                        style: TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 11,
+                                          color: Color(0xFF00C853),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.copy, size: 14),
+                                      label: const Text('Copy Template'),
+                                      onPressed: () {
+                                        Clipboard.setData(
+                                          const ClipboardData(
+                                            text:
+                                                'barcode,name,price,unit_cost,gst,physical_stock,expiry_date,weight\n8901542001234,Mango Juice,100,70,18,50,12/2027,250',
+                                          ),
+                                        );
+                                        Navigator.pop(context);
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              '✅ Template copied to clipboard',
+                                            ),
+                                            backgroundColor: Color(0xFF00C853),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: accentGreen,
+                                        foregroundColor: Colors.black,
+                                      ),
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        _processCsvImport();
+                                      },
+                                      child: const Text(
+                                        'Understood, Upload CSV',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                       icon: _isUploadingCsv
                           ? SizedBox(
                               width: 18,

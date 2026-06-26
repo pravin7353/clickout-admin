@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import '../../../coach/widgets/info_button.dart';
 
 class QuantumMetricsWidget extends StatelessWidget {
   final String storeId;
@@ -81,6 +82,12 @@ class QuantumMetricsWidget extends StatelessWidget {
                           fontSize: 16,
                           letterSpacing: 0.5,
                         ),
+                      ),
+                      const SizedBox(width: 6),
+                      const InfoButton(
+                        title: 'Promotion Analytics',
+                        en: 'Real-time financial snapshot of your inventory and promotions. Total Inventory Value = full MRP value of stock. Promotion Impact = total discount given. Proj. Margin = estimated profit % after discounts.',
+                        hi: 'Aapke stock aur offers ka live financial summary. Total Inventory Value matlab poore stock ki MRP value. Promotion Impact matlab kitna discount gaya customers ko. Proj. Margin matlab discount ke baad kitna profit bacha.',
                       ),
                     ],
                   ),

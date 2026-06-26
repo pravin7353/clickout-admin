@@ -7,6 +7,7 @@ import 'providers/guard_provider.dart';
 import 'widgets/scanner_modal.dart';
 import 'services/guard_service.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import '../coach/widgets/info_button.dart';
 
 class GuardScreen extends ConsumerWidget {
   const GuardScreen({super.key});
@@ -504,16 +505,26 @@ class GuardScreen extends ConsumerWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Super Guard 🛡️",
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w900,
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyLarge?.color,
-                              letterSpacing: -0.5,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                "Super Guard 🛡️",
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodyLarge?.color,
+                                  letterSpacing: -0.5,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const InfoButton(
+                                title: 'Super Guard — Gate Intelligence',
+                                en: 'Real-time exit control system. Every customer who pays via ClickOut app gets a Gate Pass (QR). Guard scans it here to authorize exit.\n\nApprove = customer exits normally.\nReject = weight mismatch, QR fraud, or suspicious items detected.\nOverride = emergency exit without QR (requires reason logging).\n\nEvery rejection is logged as a fraud alert automatically.',
+                                hi: 'Ye exit control system hai. Jo customer ClickOut app se payment karta hai use Gate Pass milta hai. Guard yahan scan karta hai exit ke liye.\n\nApprove = normal exit.\nReject = weight mismatch ya suspicious activity pakdi.\nOverride = emergency mein bina QR exit — reason log hota hai automatically.\n\nHar rejection fraud alert mein jaata hai — koi cheez chhupti nahi.',
+                              ),
+                            ],
                           ),
                           Text(
                             "Gate Intelligence & Live Radar",

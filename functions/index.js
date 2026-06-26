@@ -844,3 +844,82 @@ exports.onServiceDeleted = onDocumentDeleted('services/{serviceId}', async (even
         console.error(`🚨 ERROR cleaning up data for Service ${serviceId}:`, error);
     }
 });
+// ============================================================================
+// 💳 14. USAGE LEDGER — TRANSACTION COUNTER (SUBSCRIPTION ENGINE)
+// ============================================================================
+exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
+    const before = event.data.before?.data();
+    const after = event.data.after?.data();
+
+    if (!after) return; // Document deleted — ignore
+
+    const statusAfter = after.status || '';
+    const statusBefore = before?.status || '';
+
+    // Sirf jab status PAID ya completed ho — aur pehle nahi tha
+    const isPaidNow =
+        (statusAfter === 'PAID' || statusAfter === 'completed') &&
+        (statusBefore !== 'PAID' && statusBefore !== 'completed');
+
+    if (!isPaidNow) return;
+
+    const tenantId = after.tenantId;
+    if (!tenantId) {
+        console.warn(`⚠️ Order ${event.params.orderId} has no tenantId. Skipping.`);
+        return;
+    }
+
+    // Current month key: "2025-06"
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    const ledgerRef = db
+        .collection('tenants')
+        .doc(tenantId)
+        .collection('usageLedger')
+        .doc(monthKey);
+
+    try {
+        await ledgerRef.set(
+            {
+                transactionCount: admin.firestore.FieldValue.increment(1),
+                lastUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+        );
+        console.log(`✅ Transaction counted for tenant ${tenantId} — Month: ${monthKey}`);
+    } catch (error) {
+        console.error(`🚨 UsageLedger update failed for ${tenantId}:`, error);
+    }
+});
+
+exports.onServiceDeleted = onDocumentDeleted('services/{serviceId}', async (event) => {
+    const snap = event.data;
+    if (!snap) return; 
+
+    const serviceId = event.params.serviceId;
+    const deletedData = snap.data();
+    const barcode = deletedData.barcode;
+
+    console.log(`🧹 Service Deleted (${serviceId}). Hunting Offers...`);
+
+    const batch = db.batch();
+    let deleteCount = 0;
+
+    try {
+        if (barcode) {
+            const offersSnap = await db.collection('offers').where('barcode', '==', barcode).get();
+            offersSnap.forEach((doc) => {
+                batch.delete(doc.ref);
+                deleteCount++;
+            });
+        }
+
+        if (deleteCount > 0) {
+            await batch.commit();
+            console.log(`💥 SUCCESS: Vaporized ${deleteCount} ghost offers for Service ${serviceId}!`);
+        }
+    } catch (error) {
+        console.error(`🚨 ERROR cleaning up data for Service ${serviceId}:`, error);
+    }
+});

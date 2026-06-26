@@ -35,7 +35,6 @@ final tenantStoresProvider =
       return FirebaseFirestore.instance
           .collection('stores')
           .where('tenantId', isEqualTo: tenantId)
-          .where('isDeleted', isEqualTo: false) // 🚀 FIX: Ignore deleted stores
           .snapshots()
           .map(
             (snapshot) => snapshot.docs.map((doc) {
@@ -96,3 +95,31 @@ Future<Map<String, dynamic>> getSettlementBankDetails({
   final tenantBank = tenantSnap.data()?['bankDetails'] ?? {};
   return {'source': 'TENANT', ...tenantBank};
 }
+
+// 🚀 6. Real-time Isolated Active Today Store Counter
+final tenantActiveTodayProvider = StreamProvider.family<int, String>((
+  ref,
+  tenantId,
+) {
+  if (tenantId.isEmpty) return Stream.value(0);
+  return FirebaseFirestore.instance
+      .collection('stores')
+      .where('tenantId', isEqualTo: tenantId)
+      .where('status', isEqualTo: 'ACTIVE')
+      .snapshots()
+      .map((snap) => snap.docs.length);
+});
+
+// 🚀 7. Real-time Isolated Pending Security Alerts Anomaly Counter
+final tenantPendingAlertsProvider = StreamProvider.family<int, String>((
+  ref,
+  tenantId,
+) {
+  if (tenantId.isEmpty) return Stream.value(0);
+  return FirebaseFirestore.instance
+      .collection('alerts')
+      .where('tenantId', isEqualTo: tenantId)
+      .where('status', isEqualTo: 'PENDING')
+      .snapshots()
+      .map((snap) => snap.docs.length);
+});

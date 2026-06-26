@@ -281,36 +281,43 @@ class _ClientRegistrationScreenState
       final batch = db.batch();
 
       final tenantRef = db.collection('tenants').doc(tenantId);
+
+      // 🚀 ALIGNING INITIAL REGISTRATION WITH NEW EDIT PROFILE SCHEMA
+      final List<Map<String, String>> initialLicenses = [
+        {'type': 'PAN', 'number': _panCtrl.text.trim().toUpperCase()},
+        if (_gstCtrl.text.trim().isNotEmpty)
+          {'type': 'GSTIN', 'number': _gstCtrl.text.trim().toUpperCase()},
+      ];
+
       batch.set(tenantRef, {
         'tenantId': tenantId,
         'companyName': _storeNameCtrl.text.trim(),
         'ownerName': _ownerNameCtrl.text.trim(),
-        'businessType': _businessType,
-        'totalBranches': int.parse(_branchesCtrl.text.trim()),
         'establishedYear': int.parse(_yearCtrl.text.trim()),
-        'contact': {'email': adminEmail, 'phone': phoneNo},
+        'industries': [_businessType], // 🚀 Converted to Array Schema
+        'goods_or_services': [], // To be configured in Edit Profile
+        'contact': {
+          'email': adminEmail,
+          'phone': phoneNo,
+          'recoveryEmail': '',
+          'recoveryPhone': '',
+        },
         'location': {
           'address': _addressCtrl.text.trim(),
           'city': _cityCtrl.text.trim(),
           'state': _selectedState,
           'pincode': _pincodeCtrl.text.trim(),
         },
-        'kyc': {
-          'gstin': _gstCtrl.text.trim().toUpperCase(),
-          'pan': _panCtrl.text.trim().toUpperCase(),
-        },
+        'licenses': initialLicenses, // 🚀 Replaces old KYC object
         'bankDetails': {
           'accountName': _accNameCtrl.text.trim(),
           'accountNo': _fullAccountNumber,
           'ifsc': _ifscCtrl.text.trim().toUpperCase(),
           'upi': _upiCtrl.text.trim(),
+          'bankName': '', // Will be resolved if edited
+          'isCustom': false, // Inheritance flag
         },
-        'config': {
-          'openTime': _openTimeCtrl.text.trim(),
-          'closeTime': _closeTimeCtrl.text.trim(),
-          'expectedEmployees': int.parse(_empCountCtrl.text.trim()),
-          'monthlyVolume': _monthlyVolume,
-        },
+        // 🚀 Removed 'config' and 'totalBranches' to prevent schema pollution
         'legal': {
           'tcAccepted': _tcAccepted,
           'dataConsent': _dataConsent,

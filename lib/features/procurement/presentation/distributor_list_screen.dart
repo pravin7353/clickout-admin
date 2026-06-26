@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'edit_distributor_dialog.dart';
+import '../../coach/widgets/info_button.dart';
 
 class DistributorListScreen extends ConsumerStatefulWidget {
   const DistributorListScreen({super.key});
@@ -161,14 +162,23 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          // 🚀 REMOVED CONST
-                          "Vendor Intelligence Directory",
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w900,
-                            color: textPrimary,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              "Vendor Intelligence Directory",
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: textPrimary,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const InfoButton(
+                              title: 'Vendor Intelligence Directory',
+                              en: 'Your complete supplier database — distributors, wholesalers, and service providers. Add contact details, GST, and payment terms. Linked to Purchase Orders for one-click reordering.',
+                              hi: 'Aapke saare suppliers ka directory — distributors, wholesalers, service providers. Contact, GST, payment terms sab yahan save karo. PO raise karne ke liye directly linked hai.',
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(

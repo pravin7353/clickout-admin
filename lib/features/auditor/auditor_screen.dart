@@ -16,6 +16,8 @@ import 'widgets/risk_alert_strip.dart';
 //import 'widgets/time_intelligence_card.dart';
 import 'widgets/audit_vault_screen.dart';
 import '../invoice/invoice_rules_dialog.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
+import '../auditor/service/audit_export_service.dart';
 
 // 🚀 INVOICE SERVICE IMPORT
 import '../invoice/pdf_invoice_service.dart';
@@ -1287,16 +1289,27 @@ class AuditorScreen extends ConsumerWidget {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "AI FRAUD SCORE",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: fraudScore > 50
-                                    ? Colors.redAccent
-                                    : Colors.green.shade400,
-                                fontSize: 12,
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  "AI FRAUD SCORE",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: fraudScore > 50
+                                        ? Colors.redAccent
+                                        : Colors.green.shade400,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const InfoButton(
+                                  title: "AI Fraud Score",
+                                  en: "A 0–100 risk score from our AI engine. Above 50 means suspicious patterns — weight mismatch, rapid checkout, or unusual cart items.",
+                                  hi: "0 se 100 tak ka risk number. 50 se zyada matlab order mein kuch suspicious hai — weight mismatch, bahut jaldi checkout, ya unusual items.",
+                                ),
+                              ],
                             ),
+
                             const SizedBox(height: 2),
                             Text(
                               fraudScore > 50
@@ -1844,6 +1857,11 @@ class AuditorScreen extends ConsumerWidget {
                                 Icons.account_balance_wallet,
                                 Colors.green,
                                 subtitle: "Only verified exits",
+                                infoWidget: const InfoButton(
+                                  title: "Realized Revenue",
+                                  en: "Total revenue from orders where the customer has physically exited the store. Pending exits are excluded.",
+                                  hi: "Sirf woh orders count hote hain jahan customer store se bahar ja chuka hai. Jo abhi andar hain woh is mein nahi aate.",
+                                ),
                               ),
                               _buildPremiumCard(
                                 context,
@@ -1852,6 +1870,11 @@ class AuditorScreen extends ConsumerWidget {
                                 Icons.hourglass_bottom,
                                 Colors.orange.shade700,
                                 subtitle: "Paid but pending exit",
+                                infoWidget: const InfoButton(
+                                  title: "Financial Leakage",
+                                  en: "Orders where payment was received but store exit is still pending. This amount is at risk if the customer backtracks.",
+                                  hi: "Payment ho gayi par customer abhi tak bahar nahi gaya. Yeh amount risky hai — guard verify kare tab hi safe hoga.",
+                                ),
                               ),
                               _buildPremiumCard(
                                 context,
@@ -1860,6 +1883,11 @@ class AuditorScreen extends ConsumerWidget {
                                 Icons.gpp_bad,
                                 Colors.redAccent,
                                 subtitle: "Security interventions",
+                                infoWidget: const InfoButton(
+                                  title: "Guard Rejects",
+                                  en: "Orders flagged and stopped by the security guard at exit. These are mismatched or suspicious transactions requiring investigation.",
+                                  hi: "Guard ne exit pe jo orders rok diye. Yeh mismatch ya suspicious transactions hain — fraud ka pehla signal hota hai.",
+                                ),
                               ),
                               _buildPremiumCard(
                                 context,
@@ -1868,6 +1896,11 @@ class AuditorScreen extends ConsumerWidget {
                                 Icons.currency_exchange,
                                 Colors.purple,
                                 subtitle: "${finData.refundCount} transactions",
+                                infoWidget: const InfoButton(
+                                  title: "Refunds Initiated",
+                                  en: "Total money refunded to customers today. Every refund is logged and linked to the original order for full traceability.",
+                                  hi: "Aaj customers ko wapas kiya gaya paisa. Har refund original order se linked hai — audit trail bilkul safe hai.",
+                                ),
                               ),
                             ],
                           );
@@ -1948,53 +1981,8 @@ class AuditorScreen extends ConsumerWidget {
                                     color: textColor,
                                   ),
                                 ),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    OutlinedButton.icon(
-                                      icon: const Icon(
-                                        Icons.table_view,
-                                        size: 16,
-                                      ),
-                                      label: const Text(
-                                        "Export Today",
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.green,
-                                        side: const BorderSide(
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                      onPressed: () => _downloadCsvReport(
-                                        context,
-                                        "Today",
-                                        ledgerState.records,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    OutlinedButton.icon(
-                                      icon: const Icon(
-                                        Icons.table_view,
-                                        size: 16,
-                                      ),
-                                      label: const Text(
-                                        "Export All",
-                                        style: TextStyle(fontSize: 12),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: Colors.blue,
-                                        side: const BorderSide(
-                                          color: Colors.blue,
-                                        ),
-                                      ),
-                                      onPressed: () => _downloadCsvReport(
-                                        context,
-                                        "All",
-                                        ledgerState.records,
-                                      ),
-                                    ),
-                                  ],
+                                _SmartExportButton(
+                                  records: ledgerState.records,
                                 ),
                               ],
                             ),
@@ -2474,6 +2462,12 @@ class AuditorScreen extends ConsumerWidget {
                   color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
+              const SizedBox(width: 8),
+              const InfoButton(
+                title: "Online Payment Collection",
+                en: "Total UPI/online amount expected from today's verified transactions. Cross-check this with your payment gateway (Razorpay/PhonePe) dashboard.",
+                hi: "Aaj ke verified UPI payments ka total. Razorpay/PhonePe se match karo — koi gap ho toh turant investigate karo.",
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -2596,6 +2590,7 @@ class AuditorScreen extends ConsumerWidget {
     IconData icon,
     Color color, {
     String subtitle = "",
+    Widget? infoWidget,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -2630,13 +2625,21 @@ class AuditorScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: isDark ? Colors.white70 : Colors.grey.shade600,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.grey.shade600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (infoWidget != null) ...[
+                      const SizedBox(width: 4),
+                      infoWidget,
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -2662,6 +2665,206 @@ class AuditorScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SmartExportButton extends StatefulWidget {
+  final List<QueryDocumentSnapshot> records;
+  const _SmartExportButton({required this.records});
+
+  @override
+  State<_SmartExportButton> createState() => _SmartExportButtonState();
+}
+
+class _SmartExportButtonState extends State<_SmartExportButton> {
+  String _selected = 'Today';
+  bool _isLoading = false;
+
+  static const List<Map<String, dynamic>> _options = [
+    {'label': 'Today', 'icon': Icons.today},
+    {'label': 'Monthly', 'icon': Icons.calendar_month},
+    {'label': 'Quarterly', 'icon': Icons.bar_chart},
+    {'label': 'Yearly', 'icon': Icons.calendar_today},
+    {'label': 'All Time', 'icon': Icons.all_inclusive},
+  ];
+
+  String _quarterLabel(DateTime now) {
+    if (now.month >= 4 && now.month <= 6) return 'AMJ';
+    if (now.month >= 7 && now.month <= 9) return 'JAS';
+    if (now.month >= 10 && now.month <= 12) return 'OND';
+    return 'JFM';
+  }
+
+  DateTime _quarterStart(DateTime now) {
+    if (now.month >= 4 && now.month <= 6) return DateTime(now.year, 4, 1);
+    if (now.month >= 7 && now.month <= 9) return DateTime(now.year, 7, 1);
+    if (now.month >= 10 && now.month <= 12) return DateTime(now.year, 10, 1);
+    return DateTime(now.year, 1, 1);
+  }
+
+  String get _displayLabel {
+    if (_selected == 'Quarterly') {
+      return 'Quarterly (${_quarterLabel(DateTime.now())})';
+    }
+    return _selected;
+  }
+
+  List<QueryDocumentSnapshot> _filtered() {
+    final now = DateTime.now();
+    return widget.records.where((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final ts = (data['timestamp'] as Timestamp?)?.toDate();
+      if (ts == null) return _selected == 'All Time';
+      switch (_selected) {
+        case 'Today':
+          return ts.year == now.year &&
+              ts.month == now.month &&
+              ts.day == now.day;
+        case 'Monthly':
+          return ts.year == now.year && ts.month == now.month;
+        case 'Quarterly':
+          return ts.isAfter(
+            _quarterStart(now).subtract(const Duration(seconds: 1)),
+          );
+        case 'Yearly':
+          return ts.year == now.year;
+        default:
+          return true;
+      }
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color accent = Colors.greenAccent.shade400;
+    final Color bg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final Color text = isDark ? Colors.white : const Color(0xFF0F172A);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── DROPDOWN ──────────────────────────────────────────────
+        PopupMenuButton<String>(
+          initialValue: _selected,
+          onSelected: (val) => setState(() => _selected = val),
+          color: bg,
+          elevation: 8,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: accent.withOpacity(0.2)),
+          ),
+          offset: const Offset(0, 44),
+          itemBuilder: (_) => _options
+              .map(
+                (opt) => PopupMenuItem<String>(
+                  value: opt['label'] as String,
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selected == opt['label']
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_unchecked,
+                        size: 15,
+                        color: _selected == opt['label'] ? accent : Colors.grey,
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(
+                        opt['icon'] as IconData,
+                        size: 15,
+                        color: _selected == opt['label'] ? accent : Colors.grey,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        opt['label'] as String,
+                        style: TextStyle(
+                          color: text,
+                          fontWeight: _selected == opt['label']
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      if (opt['label'] == 'Quarterly') ...[
+                        const SizedBox(width: 6),
+                        Text(
+                          '(${_quarterLabel(DateTime.now())})',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              border: Border.all(color: accent.withOpacity(0.5)),
+              borderRadius: BorderRadius.circular(8),
+              color: accent.withOpacity(0.05),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.summarize_outlined, size: 15, color: accent),
+                const SizedBox(width: 6),
+                Text(
+                  'Smart Export: $_displayLabel',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: accent,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_drop_down, color: accent, size: 18),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 8),
+
+        // ── DOWNLOAD BUTTON ───────────────────────────────────────
+        _isLoading
+            ? SizedBox(
+                width: 34,
+                height: 34,
+                child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+              )
+            : Tooltip(
+                message: 'Download $_displayLabel Report',
+                child: InkWell(
+                  onTap: () async {
+                    setState(() => _isLoading = true);
+                    await AuditExportService.downloadSmartReport(
+                      context,
+                      _displayLabel,
+                      _filtered(),
+                    );
+                    setState(() => _isLoading = false);
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: accent.withOpacity(0.3)),
+                    ),
+                    child: Icon(
+                      Icons.download_rounded,
+                      color: accent,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+      ],
     );
   }
 }

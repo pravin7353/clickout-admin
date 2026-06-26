@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 // 🚀 SAAS INJECTIONS
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
@@ -58,17 +59,27 @@ class RiskEngineScreen extends ConsumerWidget {
               const SizedBox(width: 15),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    "Risk Engine 🚨",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.redAccent,
-                    ),
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        "Risk Engine 🚨",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const InfoButton(
+                        title: 'Risk Engine',
+                        en: 'Shows all REJECTED orders in real-time. Every failed gate scan is logged here with amount, payment mode, and timestamp. Use this to detect fraud patterns, guard misuse, or system errors.',
+                        hi: 'Yahan sirf REJECTED orders dikhte hain. Har failed scan ka record — amount, payment mode, aur time ke saath. Fraud, guard galti, ya system error — sab yahan pakda jayega.',
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 5),
-                  Text(
+                  const SizedBox(height: 5),
+                  const Text(
                     "Live Fraud Detection & Guard Rejections",
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),

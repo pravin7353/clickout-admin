@@ -6,36 +6,24 @@ import '../providers/tenant_dashboard_provider.dart';
 import '../../auth/auth_provider.dart';
 import 'create_store_dialog.dart';
 import 'edit_tenant_profile_dialog.dart';
-// 🚀 Added for the Dialog Import
+import 'edit_store_profile_dialog.dart';
+import '../../../core/store/providers/store_provider.dart';
 
-// 🚀 STEP 5: STORE CONFIG STATUS PROVIDER
-final growthConfigProvider = FutureProvider.family<Map<String, dynamic>?, String>((
-  ref,
-  tenantId,
-) async {
-  // Fetch the first configured store just to show the health card on dashboard
-  final snap = await FirebaseFirestore.instance
-      .collection('growth_configs')
-      .where('tenantId', isEqualTo: tenantId)
-      .limit(1)
-      .get();
-  return snap.docs.isNotEmpty ? snap.docs.first.data() : null;
-});
-
-// --- THEME CONSTANTS (STRICT) ---
-const Color bgDark = Color(0xFF080B08);
-const Color cardDark = Color(0xFF111811);
-const Color accentGreen = Color(0xFF00C853);
-const Color textPrimary = Color(0xFFF0F0F0);
-const Color textSecondary = Color(0xFF888888);
-final Color borderColor = accentGreen.withOpacity(0.15);
+final growthConfigProvider =
+    FutureProvider.family<Map<String, dynamic>?, String>((ref, tenantId) async {
+      final snap = await FirebaseFirestore.instance
+          .collection('growth_configs')
+          .where('tenantId', isEqualTo: tenantId)
+          .limit(1)
+          .get();
+      return snap.docs.isNotEmpty ? snap.docs.first.data() : null;
+    });
 
 class TenantDashboardScreen extends ConsumerWidget {
   final String tenantId;
 
   const TenantDashboardScreen({super.key, required this.tenantId});
 
-  // 🛡️ SECURITY ACTION DIALOG FOR TENANT ADMINS
   void _showStoreActionDialog({
     required BuildContext context,
     required String title,
@@ -45,10 +33,18 @@ class TenantDashboardScreen extends ConsumerWidget {
     required VoidCallback onConfirm,
   }) {
     final ctrl = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? const Color(0xFF111811) : Colors.white;
+    final inputBg = isDark ? const Color(0xFF080B08) : const Color(0xFFF3F4F6);
+    final textCol = isDark ? const Color(0xFFF0F0F0) : const Color(0xFF111111);
+    final textMuted = isDark
+        ? const Color(0xFF888888)
+        : const Color(0xFF6B7280);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: cardDark,
+        backgroundColor: dialogBg,
         title: Text(
           title,
           style: TextStyle(color: actionColor, fontWeight: FontWeight.bold),
@@ -59,17 +55,17 @@ class TenantDashboardScreen extends ConsumerWidget {
           children: [
             Text(
               "Type $actionKeyword to confirm this action for $storeName.",
-              style: const TextStyle(color: textPrimary),
+              style: TextStyle(color: textCol),
             ),
             const SizedBox(height: 15),
             TextField(
               controller: ctrl,
-              style: const TextStyle(color: textPrimary),
+              style: TextStyle(color: textCol),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: bgDark,
+                fillColor: inputBg,
                 hintText: actionKeyword,
-                hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                hintStyle: TextStyle(color: textMuted.withOpacity(0.5)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -80,7 +76,7 @@ class TenantDashboardScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text("CANCEL", style: TextStyle(color: textSecondary)),
+            child: Text("CANCEL", style: TextStyle(color: textMuted)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -105,8 +101,25 @@ class TenantDashboardScreen extends ConsumerWidget {
     final profileState = ref.watch(tenantProfileProvider(tenantId));
     final storesState = ref.watch(tenantStoresProvider(tenantId));
     final staffCountState = ref.watch(tenantStaffCountProvider(tenantId));
+    final activeTodayState = ref.watch(tenantActiveTodayProvider(tenantId));
+    final pendingAlertsState = ref.watch(tenantPendingAlertsProvider(tenantId));
 
-    // 🔐 Role Check
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final bgDark = isDark ? const Color(0xFF080B08) : const Color(0xFFF6F6F4);
+    final cardDark = isDark ? const Color(0xFF111811) : Colors.white;
+    final textPrimary = isDark
+        ? const Color(0xFFF0F0F0)
+        : const Color(0xFF111111);
+    final textSecondary = isDark
+        ? const Color(0xFF888888)
+        : const Color(0xFF6B7280);
+    final accentGreen = theme.primaryColor;
+    final borderColor = isDark
+        ? accentGreen.withOpacity(0.15)
+        : const Color(0xFFE5E7EB);
+
     final adminData = ref.watch(adminRoleProvider).value;
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
     final isSuperAdmin = role == 'SUPER_ADMIN';
@@ -120,6 +133,53 @@ class TenantDashboardScreen extends ConsumerWidget {
         : rawTenantId;
     final companyName = profileState.value?['companyName'] ?? "Loading...";
 
+    if (!profileState.isLoading && profileState.value == null) {
+      return Scaffold(
+        backgroundColor: bgDark,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.broken_image_outlined,
+                color: Colors.redAccent,
+                size: 60,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                "Data Integrity Failure: Tenant missing.",
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+                onPressed: () async {
+                  await ref.read(authControllerProvider.notifier).logout();
+                  if (context.mounted) context.go('/');
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text(
+                  "FORCE LOGOUT",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: bgDark,
       body: SingleChildScrollView(
@@ -127,7 +187,6 @@ class TenantDashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🚀 SMART ONBOARDING GUIDANCE BANNER (Injected at the very top)
             Builder(
               builder: (context) {
                 final tenantData = profileState.value ?? {};
@@ -135,19 +194,15 @@ class TenantDashboardScreen extends ConsumerWidget {
                     tenantData['location'] as Map<String, dynamic>? ?? {};
                 final kyc = tenantData['kyc'] as Map<String, dynamic>? ?? {};
 
-                // Condition 1: Profile is incomplete
                 bool isProfileIncomplete =
                     (location['address']?.toString().isEmpty ?? true) ||
                     (kyc['pan']?.toString().isEmpty ?? true);
-
-                // Condition 2: No active stores (Using real-time store state)
                 final storesList = storesState.value ?? [];
                 final activeStoresCount = storesList
                     .where((s) => s['isDeleted'] != true)
                     .length;
                 bool isNoStores = activeStoresCount == 0;
 
-                // 🚀 STEP 4: CONDITION 3 - NO GROWTH CONFIG
                 final configState = ref.watch(growthConfigProvider(tenantId));
                 bool hasNoConfig =
                     configState.value == null && !configState.isLoading;
@@ -172,14 +227,14 @@ class TenantDashboardScreen extends ConsumerWidget {
                             color: Colors.redAccent.withOpacity(0.4),
                           ),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.warning_amber_rounded,
                               color: Colors.redAccent,
                               size: 20,
                             ),
-                            SizedBox(width: 10),
+                            const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 "ACTION REQUIRED: Your Company Profile is incomplete. Click here to setup your business details.",
@@ -190,7 +245,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            Icon(
+                            const Icon(
                               Icons.arrow_forward_ios,
                               color: Colors.redAccent,
                               size: 14,
@@ -222,15 +277,15 @@ class TenantDashboardScreen extends ConsumerWidget {
                             color: Colors.blueAccent.withOpacity(0.4),
                           ),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.storefront,
                               color: Colors.blueAccent,
                               size: 20,
                             ),
-                            SizedBox(width: 10),
-                            Expanded(
+                            const SizedBox(width: 10),
+                            const Expanded(
                               child: Text(
                                 "PROFILE COMPLETE: Next, click here to add your first Store/Branch.",
                                 style: TextStyle(
@@ -240,7 +295,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                 ),
                               ),
                             ),
-                            Icon(
+                            const Icon(
                               Icons.arrow_forward_ios,
                               color: Colors.blueAccent,
                               size: 14,
@@ -251,7 +306,6 @@ class TenantDashboardScreen extends ConsumerWidget {
                     ),
                   );
                 } else if (hasNoConfig) {
-                  // 🚀 TENANT HELICOPTER VIEW: Passive Information, no click allowed.
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 20),
                     child: Container(
@@ -287,12 +341,10 @@ class TenantDashboardScreen extends ConsumerWidget {
                     ),
                   );
                 }
-
                 return const SizedBox.shrink();
               },
             ),
 
-            // 🚀 STEP 5: DASHBOARD PER-STORE HEALTH CARD
             Builder(
               builder: (context) {
                 final configState = ref.watch(growthConfigProvider(tenantId));
@@ -315,7 +367,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                             color: accentGreen.withOpacity(0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.rocket_launch,
                             color: accentGreen,
                             size: 24,
@@ -326,7 +378,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 "Growth Engine Active",
                                 style: TextStyle(
                                   color: accentGreen,
@@ -337,7 +389,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                               const SizedBox(height: 4),
                               Text(
                                 "Category: $catName • Custom AI Logic Applied",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 13,
                                 ),
@@ -350,8 +402,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                             backgroundColor: accentGreen,
                             foregroundColor: bgDark,
                           ),
-                          onPressed: () =>
-                              context.go('/growth'), // 🚀 Navigation to Radar
+                          onPressed: () => context.go('/growth'),
                           child: const Text(
                             "View Radar",
                             style: TextStyle(fontWeight: FontWeight.bold),
@@ -365,9 +416,6 @@ class TenantDashboardScreen extends ConsumerWidget {
               },
             ),
 
-            // ==========================================
-            // SECTION A: COMPANY HEADER
-            // ==========================================
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -389,7 +437,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: borderColor),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.business_rounded,
                                 color: accentGreen,
                                 size: 28,
@@ -408,7 +456,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                     children: [
                                       Text(
                                         companyName,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 20,
                                           fontWeight: FontWeight.w900,
                                           color: textPrimary,
@@ -430,9 +478,12 @@ class TenantDashboardScreen extends ConsumerWidget {
                                             ),
                                           ),
                                         ),
-                                        child: const Text(
-                                          "PRO PLAN",
-                                          style: TextStyle(
+                                        child: Text(
+                                          (profileState
+                                                      .value?['subscriptionPlan'] ??
+                                                  'trial')
+                                              .toUpperCase(),
+                                          style: const TextStyle(
                                             color: Colors.amber,
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
@@ -444,7 +495,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                   const SizedBox(height: 4),
                                   Text(
                                     "ID: $displayId",
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: textSecondary,
                                       fontSize: 12,
                                       fontFamily: 'monospace',
@@ -462,7 +513,6 @@ class TenantDashboardScreen extends ConsumerWidget {
                           children: [
                             Expanded(
                               child: OutlinedButton.icon(
-                                // 🚀 REROUTED TO POPUP DIALOG
                                 onPressed: () => showDialog(
                                   context: context,
                                   barrierDismissible: false,
@@ -470,18 +520,15 @@ class TenantDashboardScreen extends ConsumerWidget {
                                     tenantId: tenantId,
                                   ),
                                 ),
-                                icon: const Icon(
+                                icon: Icon(
                                   Icons.edit_note,
                                   color: textPrimary,
                                   size: 18,
                                 ),
                                 label: const Flexible(
                                   child: Text(
-                                    "Edit Profile",
-                                    style: TextStyle(
-                                      color: textPrimary,
-                                      fontSize: 12,
-                                    ),
+                                    "Company Profile",
+                                    style: TextStyle(fontSize: 12),
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -505,12 +552,12 @@ class TenantDashboardScreen extends ConsumerWidget {
                                     tenantId,
                                     companyName,
                                   ),
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.add_business,
                                     color: bgDark,
                                     size: 18,
                                   ),
-                                  label: const Flexible(
+                                  label: Flexible(
                                     child: Text(
                                       "Add Store",
                                       style: TextStyle(
@@ -547,7 +594,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: borderColor),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.business_rounded,
                             color: accentGreen,
                             size: 32,
@@ -563,7 +610,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                   Flexible(
                                     child: Text(
                                       companyName,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 24,
                                         fontWeight: FontWeight.w900,
                                         color: textPrimary,
@@ -598,7 +645,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                               const SizedBox(height: 4),
                               Text(
                                 "Tenant ID: $rawTenantId",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 13,
                                   fontFamily: 'monospace',
@@ -610,16 +657,15 @@ class TenantDashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         OutlinedButton.icon(
-                          // 🚀 DESKTOP POPUP FIX
                           onPressed: () => showDialog(
                             context: context,
                             barrierDismissible: false,
                             builder: (_) =>
                                 EditTenantProfileDialog(tenantId: tenantId),
                           ),
-                          icon: const Icon(Icons.edit_note, color: textPrimary),
-                          label: const Text(
-                            "Edit Profile",
+                          icon: Icon(Icons.edit_note, color: textPrimary),
+                          label: Text(
+                            "Company Profile",
                             style: TextStyle(color: textPrimary),
                           ),
                           style: OutlinedButton.styleFrom(
@@ -641,8 +687,8 @@ class TenantDashboardScreen extends ConsumerWidget {
                               tenantId,
                               companyName,
                             ),
-                            icon: const Icon(Icons.add_business, color: bgDark),
-                            label: const Text(
+                            icon: Icon(Icons.add_business, color: bgDark),
+                            label: Text(
                               "Add Store",
                               style: TextStyle(
                                 color: bgDark,
@@ -666,9 +712,6 @@ class TenantDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 30),
 
-            // ==========================================
-            // SECTION B: KPI CARDS
-            // ==========================================
             LayoutBuilder(
               builder: (context, constraints) {
                 final w = constraints.maxWidth;
@@ -685,6 +728,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: itemWidth,
                       child: _buildKPICard(
+                        context: context,
                         title: "Total Stores",
                         value: storesState.value?.length.toString() ?? "0",
                         icon: Icons.storefront,
@@ -694,6 +738,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: itemWidth,
                       child: _buildKPICard(
+                        context: context,
                         title: "Total Staff",
                         value: staffCountState.value?.toString() ?? "0",
                         icon: Icons.people_alt_outlined,
@@ -703,8 +748,9 @@ class TenantDashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: itemWidth,
                       child: _buildKPICard(
+                        context: context,
                         title: "Active Today",
-                        value: "0",
+                        value: activeTodayState.value?.toString() ?? "0",
                         icon: Icons.local_activity_outlined,
                         color: accentGreen,
                       ),
@@ -712,8 +758,9 @@ class TenantDashboardScreen extends ConsumerWidget {
                     SizedBox(
                       width: itemWidth,
                       child: _buildKPICard(
+                        context: context,
                         title: "Pending Alerts",
-                        value: "0",
+                        value: pendingAlertsState.value?.toString() ?? "0",
                         icon: Icons.warning_amber_rounded,
                         color: Colors.redAccent,
                       ),
@@ -724,9 +771,6 @@ class TenantDashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 30),
 
-            // ==========================================
-            // SECTION C: STORE LIST TABLE
-            // ==========================================
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
@@ -742,7 +786,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           "Store Locations",
                           style: TextStyle(
                             fontSize: 18,
@@ -757,8 +801,8 @@ class TenantDashboardScreen extends ConsumerWidget {
                   Divider(height: 1, color: borderColor),
 
                   storesState.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(40.0),
+                    loading: () => Padding(
+                      padding: const EdgeInsets.all(40.0),
                       child: Center(
                         child: CircularProgressIndicator(color: accentGreen),
                       ),
@@ -786,7 +830,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                   color: textSecondary.withOpacity(0.3),
                                 ),
                                 const SizedBox(height: 15),
-                                const Text(
+                                Text(
                                   "No stores yet.",
                                   style: TextStyle(
                                     fontSize: 18,
@@ -819,7 +863,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                             ),
                             dataRowMaxHeight: 80,
                             dataRowMinHeight: 70,
-                            columns: const [
+                            columns: [
                               DataColumn(
                                 label: Text(
                                   "Store Name",
@@ -856,10 +900,6 @@ class TenantDashboardScreen extends ConsumerWidget {
                                   ),
                                 ),
                               ),
-
-                              // 🚀 FUTURE UPDATE: HIDDEN MANAGER COLUMNS
-                              // DataColumn(label: Text("Manager", style: TextStyle(fontWeight: FontWeight.bold, color: textSecondary))),
-                              // DataColumn(label: Text("Assign Manager", style: TextStyle(fontWeight: FontWeight.bold, color: textSecondary))),
                               DataColumn(
                                 label: Text(
                                   "Store Actions",
@@ -874,19 +914,12 @@ class TenantDashboardScreen extends ConsumerWidget {
                               final isActive =
                                   store['status'] == 'ACTIVE' &&
                                   store['isActive'] == true;
-                              // 🚀 FUTURE UPDATE: UNCOMMENT WHEN MANAGER SYSTEM IS READY
-                              /*
-                              final hasManager =
-                                  store['managerName'] != null &&
-                                  store['managerName'].toString().isNotEmpty;
-                              */
-
                               return DataRow(
                                 cells: [
                                   DataCell(
                                     Text(
                                       store['storeName'] ?? 'Unnamed Store',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: textPrimary,
                                       ),
@@ -895,7 +928,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                   DataCell(
                                     Text(
                                       store['branchCode'] ?? 'N/A',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: textSecondary,
                                         fontFamily: 'monospace',
                                       ),
@@ -904,9 +937,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                   DataCell(
                                     Text(
                                       store['location']?['city'] ?? 'N/A',
-                                      style: const TextStyle(
-                                        color: textPrimary,
-                                      ),
+                                      style: TextStyle(color: textPrimary),
                                     ),
                                   ),
                                   DataCell(
@@ -942,106 +973,13 @@ class TenantDashboardScreen extends ConsumerWidget {
                                       ),
                                     ),
                                   ),
-
-                                  /* FUTURE UPDATE: UNCOMMENT WHEN MANAGER SYSTEM IS READY// 1. 🛡️ MANAGER COLUMN (Only Tenant Admin can remove)
-                                  DataCell(
-                                    hasManager
-                                        ? Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                store['managerName'],
-                                                style: const TextStyle(
-                                                  color: textPrimary,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 4),
-                                              if (!isSuperAdmin) // Tenant Admin only
-                                                InkWell(
-                                                  onTap: () async {
-                                                    await FirebaseFirestore
-                                                        .instance
-                                                        .collection('stores')
-                                                        .doc(store['id'])
-                                                        .update({
-                                                          'managerName':
-                                                              FieldValue.delete(),
-                                                          'managerPhone':
-                                                              FieldValue.delete(),
-                                                          'managerId':
-                                                              FieldValue.delete(),
-                                                        });
-                                                  },
-                                                  child: const Text(
-                                                    "Remove Manager",
-                                                    style: TextStyle(
-                                                      color: Colors.redAccent,
-                                                      fontSize: 11,
-                                                      decoration: TextDecoration
-                                                          .underline,
-                                                      decorationColor:
-                                                          Colors.redAccent,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          )
-                                        : const Text(
-                                            "Unassigned",
-                                            style: TextStyle(
-                                              color: Colors.amber,
-                                            ),
-                                          ),
-                                  ),
-
-                                  // 2. 🛡️ ASSIGN MANAGER COLUMN (Only Tenant Admin can assign)
-                                  DataCell(
-                                    !isSuperAdmin
-                                        ? TextButton.icon(
-                                            onPressed: () => showDialog(
-                                              context: context,
-                                              builder: (_) =>
-                                                  AssignManagerDialog(
-                                                    tenantId: tenantId,
-                                                    storeId: store['id'],
-                                                    branchCode:
-                                                        store['branchCode'],
-                                                  ),
-                                            ),
-                                            icon: const Icon(
-                                              Icons.person_add_alt_1,
-                                              color: accentGreen,
-                                              size: 16,
-                                            ),
-                                            label: const Text(
-                                              "+ Assign",
-                                              style: TextStyle(
-                                                color: accentGreen,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          )
-                                        : const Text(
-                                            "View Only",
-                                            style: TextStyle(
-                                              color: textSecondary,
-                                              fontStyle: FontStyle.italic,
-                                            ),
-                                          ),
-                                  ),
-                                  */
-
-                                  // 3. STORE ACTIONS COLUMN
                                   DataCell(
                                     _buildResponsiveStoreActions(
                                       context: context,
                                       width: width,
                                       isSuperAdmin: isSuperAdmin,
                                       store: store,
+                                      ref: ref,
                                     ),
                                   ),
                                 ],
@@ -1061,22 +999,43 @@ class TenantDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // =========================================================
-  // ⚡ RESPONSIVE ACTION COLUMN ENGINE (ICON ONLY)
-  // =========================================================
   Widget _buildResponsiveStoreActions({
     required BuildContext context,
     required double width,
     required bool isSuperAdmin,
     required Map<String, dynamic> store,
+    required WidgetRef ref,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardDark = isDark ? const Color(0xFF111811) : Colors.white;
+    final textPrimary = isDark
+        ? const Color(0xFFF0F0F0)
+        : const Color(0xFF111111);
+    final textSecondary = isDark
+        ? const Color(0xFF888888)
+        : const Color(0xFF6B7280);
+    final accentGreen = Theme.of(context).primaryColor;
+
     final bool isMobile = width < 600;
     final bool isTablet = width >= 600 && width <= 1024;
     final String storeId = store['id'];
     final bool isActive = store['status'] == 'ACTIVE';
 
-    // 🚀 ROUTING: Operations Dashboard
-    void enterStore() => context.go('/dashboard');
+    // 🚀 FIX: Ab yahan 'ref' accessible hoga aur hum state set karenge
+    void enterStore() {
+      ref
+          .read(activeStoreProvider.notifier)
+          .setStore(
+            tenantId: store['tenantId'] ?? '',
+            branchCode: store['branchCode'] ?? '',
+            storeName: store['storeName'] ?? 'Store',
+            managerEmail: store['managerEmail'] ?? '',
+            managerEmpId: store['managerEmpId'] ?? '',
+            managerName: store['managerName'] ?? '',
+            managerPhone: store['managerPhone'] ?? '',
+          );
+      context.go('/dashboard');
+    }
 
     void promptSuspend() {
       final keyword = isActive ? 'SUSPEND' : 'REACTIVATE';
@@ -1097,6 +1056,43 @@ class TenantDashboardScreen extends ConsumerWidget {
       );
     }
 
+    Future<void> _deleteStoreCascade(String storeId) async {
+      final db = FirebaseFirestore.instance;
+      final batch = db.batch();
+
+      // 🚀 1. PURE CASCADE DELETE: Hard delete records across all operational collections
+      final collectionsToCascade = [
+        'staff',
+        'products',
+        'carts',
+        'idt_deposits',
+        'logs',
+        'audit_logs',
+        'notifications',
+        'invoices',
+        'analytics',
+        'customer_sessions',
+        'orders',
+        'store_metrics',
+      ];
+
+      for (String collectionName in collectionsToCascade) {
+        final querySnap = await db
+            .collection(collectionName)
+            .where('storeId', isEqualTo: storeId)
+            .get();
+        for (var doc in querySnap.docs) {
+          batch.delete(doc.reference); // 🔥 PERMANENT WIPE (NO FLAGS)
+        }
+      }
+
+      // 🚀 2. PURE CASCADE DELETE: Delete the store document LAST
+      final storeRef = db.collection('stores').doc(storeId);
+      batch.delete(storeRef); // 🔥 WIPE STORE FROM FIRESTORE
+
+      await batch.commit();
+    }
+
     void promptDelete() {
       _showStoreActionDialog(
         context: context,
@@ -1105,21 +1101,14 @@ class TenantDashboardScreen extends ConsumerWidget {
         storeName: store['storeName'] ?? 'Store',
         actionColor: Colors.redAccent,
         onConfirm: () async {
-          await FirebaseFirestore.instance
-              .collection('stores')
-              .doc(storeId)
-              .update({
-                'isDeleted': true,
-                'deletedAt': FieldValue.serverTimestamp(),
-              });
+          await _deleteStoreCascade(storeId);
         },
       );
     }
 
-    // 📱 MOBILE: POPUP MENU
     if (isMobile) {
       return PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, color: textSecondary),
+        icon: Icon(Icons.more_vert, color: textSecondary),
         color: cardDark,
         onSelected: (val) {
           if (val == 'enter') enterStore();
@@ -1127,17 +1116,35 @@ class TenantDashboardScreen extends ConsumerWidget {
           if (val == 'delete') promptDelete();
         },
         itemBuilder: (ctx) => [
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'enter',
             child: Row(
               children: [
                 Icon(Icons.login, color: accentGreen, size: 18),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text('Enter Store', style: TextStyle(color: textPrimary)),
               ],
             ),
           ),
-          if (!isSuperAdmin) // 🛡️ ONLY TENANT ADMIN CAN SEE
+          if (!isSuperAdmin)
+            PopupMenuItem(
+              value: 'edit',
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.edit_outlined,
+                    color: Colors.blueAccent,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Edit Store',
+                    style: TextStyle(color: Colors.blueAccent),
+                  ),
+                ],
+              ),
+            ),
+          if (!isSuperAdmin)
             PopupMenuItem(
               value: 'suspend',
               child: Row(
@@ -1147,22 +1154,22 @@ class TenantDashboardScreen extends ConsumerWidget {
                     color: Colors.amber,
                     size: 18,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
                     isActive ? 'Suspend Store' : 'Activate Store',
-                    style: const TextStyle(color: textPrimary),
+                    style: TextStyle(color: textPrimary),
                   ),
                 ],
               ),
             ),
-          if (!isSuperAdmin) // 🛡️ ONLY TENANT ADMIN CAN SEE
-            const PopupMenuItem(
+          if (!isSuperAdmin)
+            PopupMenuItem(
               value: 'delete',
               child: Row(
                 children: [
-                  Icon(Icons.delete, color: Colors.redAccent, size: 18),
-                  SizedBox(width: 8),
-                  Text(
+                  const Icon(Icons.delete, color: Colors.redAccent, size: 18),
+                  const SizedBox(width: 8),
+                  const Text(
                     'Delete Store',
                     style: TextStyle(color: Colors.redAccent),
                   ),
@@ -1173,17 +1180,35 @@ class TenantDashboardScreen extends ConsumerWidget {
       );
     }
 
-    // 💻 TABLET / DESKTOP: ICONS WITH TOOLTIPS
     final List<Widget> actions = [
       Tooltip(
         message: "Enter Store",
         child: IconButton(
-          icon: const Icon(Icons.login, color: accentGreen, size: 20),
+          icon: Icon(Icons.login, color: accentGreen, size: 20),
           onPressed: enterStore,
           splashRadius: 20,
         ),
       ),
-      if (!isSuperAdmin) // 🛡️ ONLY TENANT ADMIN
+      if (!isSuperAdmin)
+        Tooltip(
+          message: "Edit Store",
+          child: IconButton(
+            icon: const Icon(
+              Icons.edit_outlined,
+              color: Colors.blueAccent,
+              size: 20,
+            ),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (_) => EditStoreProfileDialog(
+                storeId: storeId,
+                branchCode: store['branchCode'],
+              ),
+            ),
+            splashRadius: 20,
+          ),
+        ),
+      if (!isSuperAdmin)
         Tooltip(
           message: isActive ? "Suspend Store" : "Reactivate Store",
           child: IconButton(
@@ -1196,7 +1221,7 @@ class TenantDashboardScreen extends ConsumerWidget {
             splashRadius: 20,
           ),
         ),
-      if (!isSuperAdmin) // 🛡️ ONLY TENANT ADMIN
+      if (!isSuperAdmin)
         Tooltip(
           message: "Delete Store",
           child: IconButton(
@@ -1231,11 +1256,24 @@ class TenantDashboardScreen extends ConsumerWidget {
   }
 
   Widget _buildKPICard({
+    required BuildContext context,
     required String title,
     required String value,
     required IconData icon,
     required Color color,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardDark = isDark ? const Color(0xFF111811) : Colors.white;
+    final textPrimary = isDark
+        ? const Color(0xFFF0F0F0)
+        : const Color(0xFF111111);
+    final textSecondary = isDark
+        ? const Color(0xFF888888)
+        : const Color(0xFF6B7280);
+    final borderColor = isDark
+        ? Theme.of(context).primaryColor.withOpacity(0.15)
+        : const Color(0xFFE5E7EB);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       decoration: BoxDecoration(
@@ -1263,7 +1301,7 @@ class TenantDashboardScreen extends ConsumerWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: textSecondary,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -1274,7 +1312,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: textPrimary,
@@ -1289,9 +1327,6 @@ class TenantDashboardScreen extends ConsumerWidget {
   }
 }
 
-// =========================================================
-// 🧑‍💼 ASSIGN MANAGER DIALOG
-// =========================================================
 class AssignManagerDialog extends StatefulWidget {
   final String tenantId;
   final String storeId;
@@ -1315,69 +1350,76 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
   final _emailCtrl = TextEditingController();
   bool _isLoading = false;
 
-  void _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _isLoading = true);
-
-    try {
-      final db = FirebaseFirestore.instance;
-      final batch = db.batch();
-      final staffRef = db.collection('staff').doc();
-
-      // 1. Create Staff Doc
-      batch.set(staffRef, {
-        'docId': staffRef.id,
-        'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim(),
-        'email': _emailCtrl.text.trim(),
-        'role': 'MANAGER',
-        'tenantId': widget.tenantId,
-        'storeId': widget.storeId,
-        'branchCode': widget.branchCode,
-        'isActive': true,
-        'isDeleted': false,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // 2. Link to Store
-      batch.update(db.collection('stores').doc(widget.storeId), {
-        'managerName': _nameCtrl.text.trim(),
-        'managerPhone': _phoneCtrl.text.trim(),
-        'managerId': staffRef.id,
-      });
-
-      await batch.commit();
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Manager Assigned Successfully!"),
-            backgroundColor: accentGreen,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Error: $e"),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? const Color(0xFF111811) : Colors.white;
+    final inputBg = isDark ? const Color(0xFF080B08) : const Color(0xFFF3F4F6);
+    final textCol = isDark ? const Color(0xFFF0F0F0) : const Color(0xFF111111);
+    final textMuted = isDark
+        ? const Color(0xFF888888)
+        : const Color(0xFF6B7280);
+    final brandColor = Theme.of(context).primaryColor;
+
+    void _submit() async {
+      if (!_formKey.currentState!.validate()) return;
+      setState(() => _isLoading = true);
+
+      try {
+        final db = FirebaseFirestore.instance;
+        final batch = db.batch();
+        final staffRef = db.collection('staff').doc();
+
+        batch.set(staffRef, {
+          'docId': staffRef.id,
+          'name': _nameCtrl.text.trim(),
+          'phone': _phoneCtrl.text.trim(),
+          'email': _emailCtrl.text.trim(),
+          'role': 'MANAGER',
+          'tenantId': widget.tenantId,
+          'storeId': widget.storeId,
+          'branchCode': widget.branchCode,
+          'isActive': true,
+          'isDeleted': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        batch.update(db.collection('stores').doc(widget.storeId), {
+          'managerName': _nameCtrl.text.trim(),
+          'managerPhone': _phoneCtrl.text.trim(),
+          'managerId': staffRef.id,
+        });
+
+        await batch.commit();
+
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("Manager Assigned Successfully!"),
+              backgroundColor: brandColor,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Error: $e"),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    }
+
     return AlertDialog(
-      backgroundColor: cardDark,
-      title: const Text(
+      backgroundColor: dialogBg,
+      title: Text(
         "Assign Store Manager",
-        style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
+        style: TextStyle(color: textCol, fontWeight: FontWeight.bold),
       ),
       content: Form(
         key: _formKey,
@@ -1386,11 +1428,11 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
           children: [
             TextFormField(
               controller: _nameCtrl,
-              style: const TextStyle(color: textPrimary),
+              style: TextStyle(color: textCol),
               decoration: InputDecoration(
                 labelText: "Manager Name",
                 filled: true,
-                fillColor: bgDark,
+                fillColor: inputBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1400,11 +1442,11 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
             const SizedBox(height: 15),
             TextFormField(
               controller: _phoneCtrl,
-              style: const TextStyle(color: textPrimary),
+              style: TextStyle(color: textCol),
               decoration: InputDecoration(
                 labelText: "Phone Number",
                 filled: true,
-                fillColor: bgDark,
+                fillColor: inputBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1414,11 +1456,11 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
             const SizedBox(height: 15),
             TextFormField(
               controller: _emailCtrl,
-              style: const TextStyle(color: textPrimary),
+              style: TextStyle(color: textCol),
               decoration: InputDecoration(
                 labelText: "Email ID (For Login)",
                 filled: true,
-                fillColor: bgDark,
+                fillColor: inputBg,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1431,19 +1473,21 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("CANCEL", style: TextStyle(color: textSecondary)),
+          child: Text("CANCEL", style: TextStyle(color: textMuted)),
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: accentGreen,
-            foregroundColor: bgDark,
+            backgroundColor: brandColor,
+            foregroundColor: isDark ? const Color(0xFF080B08) : Colors.white,
           ),
           onPressed: _isLoading ? null : _submit,
           child: _isLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(color: bgDark),
+                  child: CircularProgressIndicator(
+                    color: isDark ? const Color(0xFF080B08) : Colors.white,
+                  ),
                 )
               : const Text("ASSIGN"),
         ),

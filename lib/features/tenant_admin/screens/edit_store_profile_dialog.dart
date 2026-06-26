@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class EditStoreProfileDialog extends StatefulWidget {
   final String? storeId;
@@ -18,9 +21,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   final _formKey = GlobalKey<FormState>();
   final ScrollController _scrollController = ScrollController();
   String? _targetDocId;
-  String _originalManagerEmail = '';
 
-  // --- THEME COLORS (BLUE FOR EDIT) ---
   static const Color bgDark = Color(0xFF080B08);
   static const Color cardDark = Color(0xFF111811);
   static const Color accentBlue = Color(0xFF378ADD);
@@ -28,13 +29,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   static const Color textSecondary = Color(0xFF888888);
   static const Color inputBg = Color(0xFF1A221A);
 
-  // --- FIELD CONTROLLERS ---
   final _storeNameCtrl = TextEditingController();
   final _branchCodeCtrl = TextEditingController();
-
   final List<TextEditingController> _phoneControllers = [];
   final List<TextEditingController> _landlineControllers = [];
-
   final _addressCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   final _pincodeCtrl = TextEditingController();
@@ -47,24 +45,35 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
     'Drug License',
     'Liquor License',
     'Trade License',
+    'Fire NOC',
     'Other',
   ];
-
-  final _openTimeCtrl = TextEditingController();
-  final _closeTimeCtrl = TextEditingController();
-  final _countersCtrl = TextEditingController();
-
-  final _mgrEmpIdCtrl = TextEditingController();
-  final _mgrNameCtrl = TextEditingController();
-  final _mgrPhoneCtrl = TextEditingController();
-  final _mgrEmailCtrl = TextEditingController();
 
   final _accNameCtrl = TextEditingController();
   final _accNoCtrl = TextEditingController();
   final _ifscCtrl = TextEditingController();
   final _upiCtrl = TextEditingController();
+  final _bankNameCtrl = TextEditingController();
+  final _kIfsc = GlobalKey();
+  final _kAccNo = GlobalKey();
+  final _kUpi = GlobalKey();
   final FocusNode _accNoFocus = FocusNode();
   String _fullAccountNumber = '';
+  bool _useTenantBank = true;
+
+  // Manager Details Controllers
+  final _managerEmailCtrl = TextEditingController();
+  final _managerEmpIdCtrl = TextEditingController();
+  final _managerNameCtrl = TextEditingController();
+  final _managerPhoneCtrl = TextEditingController();
+
+  bool _isAdmin = false;
+  bool _isManagerView = true;
+
+  bool _isFetchingLocation = false;
+  bool _isLocationVerified = false;
+  bool _isFetchingBank = false;
+  bool _isBankVerified = false;
 
   final List<String> _states = [
     'Andaman & Nicobar Islands',
@@ -74,6 +83,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
     'Bihar',
     'Chandigarh',
     'Chhattisgarh',
+    'Dadra & Nagar Haveli and Daman & Diu',
     'Delhi',
     'Goa',
     'Gujarat',
@@ -83,6 +93,8 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
     'Jharkhand',
     'Karnataka',
     'Kerala',
+    'Ladakh',
+    'Lakshadweep',
     'Madhya Pradesh',
     'Maharashtra',
     'Manipur',
@@ -106,7 +118,6 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   void initState() {
     super.initState();
     _fetchStoreData();
-
     _accNoFocus.addListener(() {
       if (!_accNoFocus.hasFocus) {
         if (_fullAccountNumber.length >= 4) {
@@ -123,7 +134,6 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   Future<void> _fetchStoreData() async {
     try {
       _targetDocId = widget.storeId;
-
       if (_targetDocId == null && widget.branchCode != null) {
         final snap = await FirebaseFirestore.instance
             .collection('stores')
@@ -143,30 +153,52 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
           _storeNameCtrl.text = data['storeName'] ?? '';
           _branchCodeCtrl.text = data['branchCode'] ?? '';
 
-          // Phones
+          _managerEmailCtrl.text = data['managerEmail'] ?? '';
+          _managerEmpIdCtrl.text = data['managerEmpId'] ?? '';
+          _managerNameCtrl.text = data['managerName'] ?? '';
+          _managerPhoneCtrl.text = data['managerPhone'] ?? '';
+
+          final currentUser = FirebaseAuth.instance.currentUser;
+          if (currentUser != null) {
+            final staffSnap = await FirebaseFirestore.instance
+                .collection('staff')
+                .where('email', isEqualTo: currentUser.email)
+                .limit(1)
+                .get();
+            if (staffSnap.docs.isNotEmpty) {
+              final r =
+                  staffSnap.docs.first
+                      .data()['role']
+                      ?.toString()
+                      .toUpperCase() ??
+                  '';
+              _isAdmin =
+                  (r == 'TENANT_ADMIN' ||
+                  r == 'SUPER_ADMIN' ||
+                  r == 'OWNER' ||
+                  r == 'TENANT');
+              _isManagerView = !_isAdmin;
+            }
+          }
+
           List phones = data['contactNumbers'] ?? [];
           if (phones.isEmpty) _phoneControllers.add(TextEditingController());
-          for (var p in phones) {
+          for (var p in phones)
             _phoneControllers.add(TextEditingController(text: p.toString()));
-          }
 
-          // Landlines
           List landlines = data['landlineNumbers'] ?? [];
-          if (landlines.isEmpty) {
+          if (landlines.isEmpty)
             _landlineControllers.add(TextEditingController());
-          }
-          for (var l in landlines) {
+          for (var l in landlines)
             _landlineControllers.add(TextEditingController(text: l.toString()));
-          }
 
-          // Location
           final loc = data['location'] ?? {};
           _addressCtrl.text = loc['address'] ?? '';
           _cityCtrl.text = loc['city'] ?? '';
           _pincodeCtrl.text = loc['pincode'] ?? '';
           if (_states.contains(loc['state'])) _selectedState = loc['state'];
+          if (_pincodeCtrl.text.length == 6) _isLocationVerified = true;
 
-          // Licenses
           List lics = data['licenses'] ?? [];
           for (var lic in lics) {
             _dynamicLicenses.add({
@@ -175,28 +207,16 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
             });
           }
 
-          // Operations
-          final ops = data['operations'] ?? {};
-          _openTimeCtrl.text = ops['openingTime'] ?? '09:00 AM';
-          _closeTimeCtrl.text = ops['closingTime'] ?? '10:00 PM';
-          _countersCtrl.text = (ops['billingCounters'] ?? 1).toString();
-
-          // Manager
-          _mgrNameCtrl.text = data['managerName'] ?? '';
-          _mgrEmailCtrl.text = data['managerEmail'] ?? '';
-          _originalManagerEmail = data['managerEmail'] ?? '';
-          _mgrPhoneCtrl.text = data['managerPhone'] ?? '';
-          _mgrEmpIdCtrl.text = data['managerEmpId'] ?? '';
-
-          // Bank
           final bank = data['bankDetails'] ?? {};
-          if (bank['isCustom'] == true) {
-            _accNameCtrl.text = bank['accountName'] ?? '';
-            _fullAccountNumber = bank['accountNo'] ?? '';
-            _accNoCtrl.text = _fullAccountNumber;
-            _ifscCtrl.text = bank['ifsc'] ?? '';
-            _upiCtrl.text = bank['upi'] ?? '';
-          }
+          _useTenantBank = bank['isCustom'] != true;
+
+          _accNameCtrl.text = bank['accountName']?.toString() ?? '';
+          _fullAccountNumber = bank['accountNo']?.toString() ?? '';
+          _accNoCtrl.text = _fullAccountNumber;
+          _ifscCtrl.text = bank['ifsc']?.toString() ?? '';
+          _upiCtrl.text = bank['upi']?.toString() ?? '';
+          _bankNameCtrl.text = bank['bankName']?.toString() ?? '';
+          if (_ifscCtrl.text.length == 11) _isBankVerified = true;
         }
       }
     } catch (e) {
@@ -210,6 +230,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   void dispose() {
     _storeNameCtrl.dispose();
     _branchCodeCtrl.dispose();
+    _managerEmailCtrl.dispose();
+    _managerEmpIdCtrl.dispose();
+    _managerNameCtrl.dispose();
+    _managerPhoneCtrl.dispose();
     for (var c in _phoneControllers) {
       c.dispose();
     }
@@ -219,119 +243,159 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
     _addressCtrl.dispose();
     _cityCtrl.dispose();
     _pincodeCtrl.dispose();
-    _openTimeCtrl.dispose();
-    _closeTimeCtrl.dispose();
-    _countersCtrl.dispose();
-    _mgrNameCtrl.dispose();
-    _mgrEmailCtrl.dispose();
-    _mgrPhoneCtrl.dispose();
-    _mgrEmpIdCtrl.dispose();
     _accNameCtrl.dispose();
     _accNoCtrl.dispose();
     _ifscCtrl.dispose();
     _upiCtrl.dispose();
+    _bankNameCtrl.dispose();
     _accNoFocus.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _addPhoneField() {
-    if (_phoneControllers.length < 3) {
-      setState(() => _phoneControllers.add(TextEditingController()));
-    }
-  }
-
-  void _removePhoneField(int index) {
-    if (_phoneControllers.length > 1) {
-      setState(() {
-        _phoneControllers[index].dispose();
-        _phoneControllers.removeAt(index);
-      });
-    }
-  }
-
-  void _addLandlineField() {
-    if (_landlineControllers.length < 3) {
-      setState(() => _landlineControllers.add(TextEditingController()));
-    }
-  }
-
-  void _removeLandlineField(int index) {
-    if (_landlineControllers.length > 1) {
-      setState(() {
-        _landlineControllers[index].dispose();
-        _landlineControllers.removeAt(index);
-      });
-    }
-  }
-
   void _addLicenseRow() =>
       setState(() => _dynamicLicenses.add({'type': 'GSTIN', 'number': ''}));
 
-  Future<void> _selectTime(TextEditingController ctrl) async {
-    final TimeOfDay? picked = await showTimePicker(
-      context: context,
-      initialTime: const TimeOfDay(hour: 9, minute: 0),
-      builder: (context, child) => Theme(
-        data: ThemeData.dark().copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: accentBlue,
-            onPrimary: bgDark,
-            surface: cardDark,
-            onSurface: textPrimary,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) setState(() => ctrl.text = picked.format(context));
+  Map<String, dynamic> _getLicenseConfig(String type) {
+    switch (type) {
+      case 'GSTIN':
+        return {
+          'label': 'GST Number *',
+          'hint': '27ABCDE1234F1Z5',
+          'maxLength': 15,
+          'keyboard': TextInputType.text,
+          'formatters': [
+            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+          ],
+          'regex': r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{3}$',
+          'errorMsg': 'Invalid 15-digit GST format',
+        };
+      default:
+        return {
+          'label': 'Registration Code *',
+          'hint': 'Enter code',
+          'maxLength': 30,
+          'keyboard': TextInputType.text,
+          'formatters': <TextInputFormatter>[],
+          'regex': r'^.{3,30}$',
+          'errorMsg': 'Required',
+        };
+    }
+  }
+
+  Future<void> _onPincodeChanged(String val) async {
+    if (val.length == 6) {
+      setState(() {
+        _isFetchingLocation = true;
+        _isLocationVerified = false;
+      });
+      try {
+        final response = await http
+            .get(Uri.parse('https://api.postalpincode.in/pincode/$val'))
+            .timeout(const Duration(seconds: 3));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data[0]['Status'] == 'Success') {
+            final postOffice = data[0]['PostOffice'][0];
+            if (mounted)
+              setState(() {
+                _cityCtrl.text = postOffice['District'] ?? postOffice['Block'];
+                String fetchedState = postOffice['State'];
+                _selectedState = _states.contains(fetchedState)
+                    ? fetchedState
+                    : null;
+                _isLocationVerified = true;
+                _isFetchingLocation = false;
+              });
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint("Pincode API Fallback: $e");
+      }
+      if (mounted)
+        setState(() {
+          _isFetchingLocation = false;
+          _isLocationVerified = false;
+          _cityCtrl.clear();
+          _selectedState = null;
+        });
+    } else
+      setState(() {
+        _isLocationVerified = false;
+        _isFetchingLocation = false;
+      });
+  }
+
+  Future<void> _onIfscChanged(String val) async {
+    if (val.length == 11) {
+      setState(() {
+        _isFetchingBank = true;
+        _isBankVerified = false;
+      });
+      try {
+        final response = await http
+            .get(Uri.parse('https://ifsc.razorpay.com/${val.toUpperCase()}'))
+            .timeout(const Duration(seconds: 3));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (mounted)
+            setState(() {
+              _bankNameCtrl.text = "${data['BANK']} (${data['BRANCH']})";
+              _isBankVerified = true;
+              _isFetchingBank = false;
+              if (_accNameCtrl.text.isEmpty)
+                _accNameCtrl.text = _storeNameCtrl.text.toUpperCase();
+            });
+          return;
+        }
+      } catch (e) {
+        debugPrint("IFSC API Fallback: $e");
+      }
+      if (mounted)
+        setState(() {
+          _isFetchingBank = false;
+          _isBankVerified = false;
+          _bankNameCtrl.clear();
+        });
+    } else
+      setState(() {
+        _isBankVerified = false;
+        _isFetchingBank = false;
+        _bankNameCtrl.clear();
+      });
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate() || _targetDocId == null) return;
+
+    if (!_useTenantBank) {
+      if (_fullAccountNumber.length < 9) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Valid account number required")),
+        );
+        return;
+      }
+      if (!RegExp(
+        r'^[A-Z]{4}0[A-Z0-9]{6}$',
+      ).hasMatch(_ifscCtrl.text.trim().toUpperCase())) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("Valid IFSC required")));
+        return;
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final db = FirebaseFirestore.instance;
-      final emailInput = _mgrEmailCtrl.text.trim().toLowerCase();
-
-      // Check Email uniqueness if changed
-      if (emailInput != _originalManagerEmail.toLowerCase()) {
-        final staffCheck = await db
-            .collection('staff')
-            .where('email', isEqualTo: emailInput)
-            .get();
-        if (staffCheck.docs.isNotEmpty) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("🚨 Email already registered!"),
-                backgroundColor: Colors.redAccent,
-              ),
-            );
-            setState(() => _isLoading = false);
-          }
-          return;
-        }
-      }
-
-      bool hasBankDetails =
-          _accNameCtrl.text.trim().isNotEmpty ||
-          _fullAccountNumber.isNotEmpty ||
-          _ifscCtrl.text.trim().isNotEmpty;
-      Map<String, dynamic> finalBankDetails = {
-        'isCustom': hasBankDetails,
-        'accountName': _accNameCtrl.text.trim(),
-        'accountNo': _fullAccountNumber,
-        'ifsc': _ifscCtrl.text.trim().toUpperCase(),
-        'upi': _upiCtrl.text.trim(),
-      };
-
-      final batch = db.batch();
       final storeRef = db.collection('stores').doc(_targetDocId);
 
-      batch.update(storeRef, {
+      final updateData = {
         'storeName': _storeNameCtrl.text.trim(),
+        'managerName': _managerNameCtrl.text.trim(),
+        'managerPhone': _managerPhoneCtrl.text.trim(),
         'contactNumbers': _phoneControllers
             .map((c) => c.text.trim())
             .where((t) => t.isNotEmpty)
@@ -340,43 +404,33 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
             .map((c) => c.text.trim())
             .where((t) => t.isNotEmpty)
             .toList(),
-        'managerName': _mgrNameCtrl.text.trim(),
-        'managerEmail': emailInput,
-        'managerPhone': _mgrPhoneCtrl.text.trim(),
-        'managerEmpId': _mgrEmpIdCtrl.text.trim().toUpperCase(),
         'location.address': _addressCtrl.text.trim(),
         'location.city': _cityCtrl.text.trim(),
         'location.state': _selectedState,
         'location.pincode': _pincodeCtrl.text.trim(),
         'licenses': _dynamicLicenses,
-        'operations.openingTime': _openTimeCtrl.text.trim(),
-        'operations.closingTime': _closeTimeCtrl.text.trim(),
-        'operations.billingCounters':
-            int.tryParse(_countersCtrl.text.trim()) ?? 1,
-        'bankDetails': finalBankDetails,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
 
-      // Update Staff doc if exists
-      if (_originalManagerEmail.isNotEmpty) {
-        final staffQuery = await db
-            .collection('staff')
-            .where('email', isEqualTo: _originalManagerEmail)
-            .where('role', isEqualTo: 'MANAGER')
-            .limit(1)
-            .get();
-        if (staffQuery.docs.isNotEmpty) {
-          batch.update(staffQuery.docs.first.reference, {
-            'name': _mgrNameCtrl.text.trim(),
-            'email': emailInput,
-            'phone': _mgrPhoneCtrl.text.trim(),
-            'empId': _mgrEmpIdCtrl.text.trim().toUpperCase(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          });
-        }
+      if (_isAdmin) {
+        updateData['managerEmail'] = _managerEmailCtrl.text
+            .trim()
+            .toLowerCase();
+        updateData['managerEmpId'] = _managerEmpIdCtrl.text.trim();
       }
 
-      await batch.commit();
+      if (!_useTenantBank && _isAdmin) {
+        updateData['bankDetails.isCustom'] = true;
+        updateData['bankDetails.accountName'] = _accNameCtrl.text.trim();
+        updateData['bankDetails.accountNo'] = _fullAccountNumber;
+        updateData['bankDetails.ifsc'] = _ifscCtrl.text.trim().toUpperCase();
+        updateData['bankDetails.bankName'] = _bankNameCtrl.text.trim();
+        updateData['bankDetails.upi'] = _upiCtrl.text.trim();
+      } else if (_isAdmin) {
+        updateData['bankDetails.isCustom'] = false;
+      }
+
+      await storeRef.update(updateData);
 
       if (mounted) {
         Navigator.pop(context);
@@ -388,28 +442,34 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error: $e"),
             backgroundColor: Colors.redAccent,
           ),
         );
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  InputDecoration _inputDeco(String label, {String? hint, Widget? prefix}) {
+  InputDecoration _inputDeco(
+    String label, {
+    String? hint,
+    Widget? prefix,
+    Widget? suffix,
+    bool isReadOnly = false,
+  }) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon: prefix,
-      labelStyle: const TextStyle(color: textSecondary),
+      suffixIcon: suffix,
+      labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
       hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
       filled: true,
-      fillColor: inputBg,
+      fillColor: isReadOnly ? inputBg.withOpacity(0.55) : inputBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
@@ -422,12 +482,13 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
       ),
+      errorStyle: const TextStyle(color: Colors.redAccent),
     );
   }
 
   Widget _buildSectionTitle(String title, IconData icon) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20, top: 10),
+      padding: const EdgeInsets.only(bottom: 20, top: 15),
       child: Row(
         children: [
           Icon(icon, color: accentBlue, size: 20),
@@ -436,9 +497,9 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
             title,
             style: const TextStyle(
               color: accentBlue,
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
-              letterSpacing: 1,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -447,12 +508,11 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   }
 
   Widget _responsiveRow(bool isMobile, Widget child1, Widget child2) {
-    if (isMobile) {
+    if (isMobile)
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [child1, const SizedBox(height: 20), child2],
       );
-    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -476,7 +536,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
         side: BorderSide(color: accentBlue.withOpacity(0.2)),
       ),
       child: Container(
-        width: isMobile ? double.infinity : 800,
+        width: isMobile ? double.infinity : 850,
         height: MediaQuery.of(context).size.height * 0.9,
         decoration: BoxDecoration(
           color: cardDark,
@@ -497,10 +557,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text(
-                          "Edit Store Details",
+                          "Update Operational Node",
                           style: TextStyle(
                             color: textPrimary,
-                            fontSize: 24,
+                            fontSize: 22,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -518,104 +578,281 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                         controller: _scrollController,
                         padding: EdgeInsets.all(isMobile ? 20 : 30),
                         children: [
-                          // --- SECTION 1 ---
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: accentBlue.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: accentBlue.withOpacity(0.2),
+                              ),
+                            ),
+                            child: const Row(
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  color: accentBlue,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    "Updating profile will automatically re-sync store routing, invoicing models, and compliance architectures for this branch.",
+                                    style: TextStyle(
+                                      color: accentBlue,
+                                      fontSize: 13,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           _buildSectionTitle(
                             "1. Basic Store Details",
                             Icons.storefront,
                           ),
-                          TextFormField(
-                            controller: _storeNameCtrl,
-                            style: const TextStyle(color: textPrimary),
-                            decoration: _inputDeco("Store Name *"),
-                            validator: (v) => (v == null || v.trim().length < 3)
-                                ? "Min 3 chars"
-                                : null,
-                          ),
-                          const SizedBox(height: 20),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 350),
-                            child: TextFormField(
+                          _responsiveRow(
+                            isMobile,
+                            TextFormField(
+                              controller: _storeNameCtrl,
+                              style: const TextStyle(color: textPrimary),
+                              decoration: _inputDeco(
+                                "Store / Branch Name *",
+                                hint: "e.g. Jaiswar Flour Mill",
+                              ),
+                              validator: (v) =>
+                                  (v == null || v.trim().length < 3)
+                                  ? "Min 3 chars"
+                                  : null,
+                            ),
+                            TextFormField(
                               controller: _branchCodeCtrl,
-                              readOnly: true, // 🚀 PROTECTED PRIMARY KEY
+                              readOnly: true,
                               style: const TextStyle(color: textSecondary),
                               decoration: _inputDeco(
-                                "Branch Code (System Protected)",
+                                "Branch Code (Protected)",
                                 prefix: const Icon(
                                   Icons.lock,
                                   color: textSecondary,
+                                  size: 16,
                                 ),
+                                isReadOnly: true,
                               ),
                             ),
                           ),
                           const SizedBox(height: 20),
-                          ...List.generate(
-                            _phoneControllers.length,
-                            (index) => Padding(
-                              padding: const EdgeInsets.only(bottom: 15),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Flexible(
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 350,
+                          _responsiveRow(
+                            isMobile,
+                            TextFormField(
+                              controller: _phoneControllers[0],
+                              style: const TextStyle(color: textPrimary),
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              decoration: _inputDeco(
+                                "Primary Mobile *",
+                                prefix: const Icon(
+                                  Icons.phone_android,
+                                  size: 18,
+                                  color: textSecondary,
+                                ),
+                              ).copyWith(counterText: ""),
+                              validator: (v) =>
+                                  (v == null ||
+                                      !RegExp(r'^[6-9]\d{9}$').hasMatch(v))
+                                  ? "Invalid Mobile"
+                                  : null,
+                            ),
+                            TextFormField(
+                              controller: _landlineControllers[0],
+                              style: const TextStyle(color: textPrimary),
+                              keyboardType: TextInputType.phone,
+                              decoration: _inputDeco(
+                                "Primary Landline (Optional)",
+                                prefix: const Icon(
+                                  Icons.phone,
+                                  size: 18,
+                                  color: textSecondary,
+                                ),
+                                hint: "e.g. 022-12345678",
+                              ),
+                              validator: (v) =>
+                                  (v != null &&
+                                      v.trim().isNotEmpty &&
+                                      !RegExp(
+                                        r'^[0-9]{3,4}[-\s]?[0-9]{6,8}$',
+                                      ).hasMatch(v.trim()))
+                                  ? "Invalid format"
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(height: 25),
+
+                          _buildSectionTitle(
+                            "2. Location Context",
+                            Icons.location_on,
+                          ),
+                          isMobile
+                              ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    TextFormField(
+                                      controller: _pincodeCtrl,
+                                      style: const TextStyle(
+                                        color: textPrimary,
                                       ),
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 6,
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      ],
+                                      onChanged: _onPincodeChanged,
+                                      decoration: _inputDeco(
+                                        "Pincode *",
+                                        suffix: _isFetchingLocation
+                                            ? const Padding(
+                                                padding: EdgeInsets.all(12),
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : (_isLocationVerified
+                                                  ? const Icon(
+                                                      Icons.check_circle,
+                                                      color: Colors.green,
+                                                    )
+                                                  : null),
+                                      ).copyWith(counterText: ""),
+                                      validator: (v) =>
+                                          (v == null || v.length != 6)
+                                          ? "6 digits required"
+                                          : null,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    TextFormField(
+                                      controller: _cityCtrl,
+                                      style: const TextStyle(
+                                        color: textPrimary,
+                                      ),
+                                      decoration: _inputDeco("City *"),
+                                      validator: (v) =>
+                                          v!.trim().isEmpty ? "Required" : null,
+                                    ),
+                                    const SizedBox(height: 20),
+                                    DropdownButtonFormField<String>(
+                                      isExpanded: true,
+                                      value: _selectedState,
+                                      dropdownColor: inputBg,
+                                      style: const TextStyle(
+                                        color: textPrimary,
+                                      ),
+                                      decoration: _inputDeco("State *"),
+                                      items: _states
+                                          .map(
+                                            (e) => DropdownMenuItem(
+                                              value: e,
+                                              child: Text(
+                                                e,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (v) =>
+                                          setState(() => _selectedState = v),
+                                      validator: (v) =>
+                                          v == null ? "Required" : null,
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Expanded(
                                       child: TextFormField(
-                                        controller: _phoneControllers[index],
+                                        controller: _pincodeCtrl,
                                         style: const TextStyle(
                                           color: textPrimary,
                                         ),
-                                        keyboardType: TextInputType.phone,
-                                        maxLength: 10,
+                                        keyboardType: TextInputType.number,
+                                        maxLength: 6,
                                         inputFormatters: [
                                           FilteringTextInputFormatter
                                               .digitsOnly,
                                         ],
+                                        onChanged: _onPincodeChanged,
                                         decoration: _inputDeco(
-                                          index == 0
-                                              ? "Primary Contact *"
-                                              : "Additional Contact ${index + 1}",
+                                          "Pincode *",
+                                          suffix: _isFetchingLocation
+                                              ? const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : (_isLocationVerified
+                                                    ? const Icon(
+                                                        Icons.check_circle,
+                                                        color: Colors.green,
+                                                      )
+                                                    : null),
                                         ).copyWith(counterText: ""),
                                         validator: (v) =>
-                                            (index == 0 &&
-                                                (v == null || v.length != 10))
-                                            ? "10 digits required"
+                                            (v == null || v.length != 6)
+                                            ? "6 digits required"
                                             : null,
                                       ),
                                     ),
-                                  ),
-                                  if (index > 0)
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                        color: Colors.redAccent,
+                                    const SizedBox(width: 15),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _cityCtrl,
+                                        style: const TextStyle(
+                                          color: textPrimary,
+                                        ),
+                                        decoration: _inputDeco("City *"),
+                                        validator: (v) => v!.trim().isEmpty
+                                            ? "Required"
+                                            : null,
                                       ),
-                                      onPressed: () => _removePhoneField(index),
                                     ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (_phoneControllers.length < 3)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: TextButton.icon(
-                                onPressed: _addPhoneField,
-                                icon: const Icon(
-                                  Icons.add,
-                                  color: accentBlue,
-                                  size: 18,
+                                    const SizedBox(width: 15),
+                                    Expanded(
+                                      child: DropdownButtonFormField<String>(
+                                        isExpanded: true,
+                                        value: _selectedState,
+                                        dropdownColor: inputBg,
+                                        style: const TextStyle(
+                                          color: textPrimary,
+                                        ),
+                                        decoration: _inputDeco("State *"),
+                                        items: _states
+                                            .map(
+                                              (e) => DropdownMenuItem(
+                                                value: e,
+                                                child: Text(
+                                                  e,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (v) =>
+                                            setState(() => _selectedState = v),
+                                        validator: (v) =>
+                                            v == null ? "Required" : null,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                label: const Text(
-                                  "Add Contact",
-                                  style: TextStyle(color: accentBlue),
-                                ),
-                              ),
-                            ),
-                          const SizedBox(height: 40),
-
-                          // --- SECTION 2 ---
-                          _buildSectionTitle("2. Location", Icons.location_on),
+                          const SizedBox(height: 15),
                           TextFormField(
                             controller: _addressCtrl,
                             style: const TextStyle(color: textPrimary),
@@ -623,58 +860,86 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             validator: (v) =>
                                 v!.trim().isEmpty ? "Required" : null,
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 25),
+
+                          // 🚀 NEW SECTION: MANAGER DETAILS (RBAC Applied)
+                          _buildSectionTitle("3. Manager Details", Icons.badge),
                           _responsiveRow(
                             isMobile,
                             TextFormField(
-                              controller: _cityCtrl,
+                              controller: _managerNameCtrl,
                               style: const TextStyle(color: textPrimary),
-                              decoration: _inputDeco("City *"),
+                              decoration: _inputDeco("Manager Full Name *"),
                               validator: (v) =>
                                   v!.trim().isEmpty ? "Required" : null,
                             ),
                             TextFormField(
-                              controller: _pincodeCtrl,
+                              controller: _managerEmpIdCtrl,
+                              readOnly: _isManagerView,
+                              style: TextStyle(
+                                color: _isManagerView
+                                    ? textSecondary
+                                    : textPrimary,
+                              ),
+                              decoration: _inputDeco(
+                                "Manager Employee ID *",
+                                isReadOnly: _isManagerView,
+                              ),
+                              validator: (v) =>
+                                  v!.trim().isEmpty ? "Required" : null,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _responsiveRow(
+                            isMobile,
+                            TextFormField(
+                              controller: _managerPhoneCtrl,
                               style: const TextStyle(color: textPrimary),
-                              keyboardType: TextInputType.number,
-                              maxLength: 6,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
                               decoration: _inputDeco(
-                                "Pincode *",
+                                "Manager Phone *",
                               ).copyWith(counterText: ""),
-                              validator: (v) => (v == null || v.length != 6)
-                                  ? "6 digits required"
+                              validator: (v) =>
+                                  (v == null ||
+                                      !RegExp(r'^[6-9]\d{9}$').hasMatch(v))
+                                  ? "Invalid Mobile"
                                   : null,
                             ),
+                            TextFormField(
+                              controller: _managerEmailCtrl,
+                              readOnly: _isManagerView,
+                              style: TextStyle(
+                                color: _isManagerView
+                                    ? textSecondary
+                                    : textPrimary,
+                              ),
+                              decoration: _inputDeco(
+                                "Manager Login Email *",
+                                isReadOnly: _isManagerView,
+                                prefix: Icon(
+                                  Icons.email_outlined,
+                                  size: 18,
+                                  color: textSecondary,
+                                ),
+                              ),
+                              validator: (v) {
+                                if (v == null || !v.contains('@'))
+                                  return "Valid Email Required";
+                                return null;
+                              },
+                            ),
                           ),
-                          const SizedBox(height: 20),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedState,
-                            dropdownColor: inputBg,
-                            style: const TextStyle(color: textPrimary),
-                            decoration: _inputDeco("State *"),
-                            items: _states
-                                .map(
-                                  (e) => DropdownMenuItem(
-                                    value: e,
-                                    child: Text(e),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) =>
-                                setState(() => _selectedState = v),
-                            validator: (v) => v == null ? "Select State" : null,
-                          ),
-                          const SizedBox(height: 40),
+                          const SizedBox(height: 25),
 
-                          // --- SECTION 3 ---
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _buildSectionTitle(
-                                "3. Legal & Compliance",
+                                "4. Legal & Compliance",
                                 Icons.gavel,
                               ),
                               TextButton.icon(
@@ -685,7 +950,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                   size: 16,
                                 ),
                                 label: const Text(
-                                  "Add License",
+                                  "Add",
                                   style: TextStyle(color: accentBlue),
                                 ),
                               ),
@@ -694,18 +959,25 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                           ..._dynamicLicenses.asMap().entries.map((entry) {
                             int idx = entry.key;
                             Map<String, String> lic = entry.value;
+                            final config = _getLicenseConfig(
+                              lic['type'] ?? 'Other',
+                            );
+                            final val = lic['number'] ?? '';
+                            final isValid = RegExp(
+                              config['regex'] as String,
+                            ).hasMatch(val.toUpperCase());
+
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 15),
                               child: _responsiveRow(
                                 isMobile,
                                 DropdownButtonFormField<String>(
-                                  initialValue:
-                                      _licenseTypes.contains(lic['type'])
+                                  value: _licenseTypes.contains(lic['type'])
                                       ? lic['type']
                                       : 'Other',
                                   dropdownColor: inputBg,
                                   style: const TextStyle(color: textPrimary),
-                                  decoration: _inputDeco("License Type"),
+                                  decoration: _inputDeco("Compliance Type"),
                                   items: _licenseTypes
                                       .map(
                                         (e) => DropdownMenuItem(
@@ -714,192 +986,185 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                         ),
                                       )
                                       .toList(),
-                                  onChanged: (v) => setState(
-                                    () => _dynamicLicenses[idx]['type'] = v!,
-                                  ),
+                                  onChanged: (v) => setState(() {
+                                    _dynamicLicenses[idx]['type'] = v!;
+                                    _dynamicLicenses[idx]['number'] = '';
+                                  }),
                                 ),
                                 TextFormField(
-                                  initialValue: lic['number'],
+                                  key: ValueKey("${idx}_${lic['type']}"),
+                                  initialValue: val,
                                   style: const TextStyle(color: textPrimary),
                                   textCapitalization:
                                       TextCapitalization.characters,
-                                  decoration: _inputDeco("License Number"),
-                                  onChanged: (v) =>
-                                      _dynamicLicenses[idx]['number'] = v
-                                          .trim(),
+                                  maxLength: config['maxLength'],
+                                  keyboardType: config['keyboard'],
+                                  inputFormatters: config['formatters'],
+                                  decoration: _inputDeco(
+                                    config['label'] as String,
+                                    hint: config['hint'] as String,
+                                    suffix: val.isNotEmpty
+                                        ? Icon(
+                                            isValid
+                                                ? Icons.check_circle
+                                                : Icons.error_outline,
+                                            color: isValid
+                                                ? Colors.green
+                                                : Colors.redAccent,
+                                            size: 20,
+                                          )
+                                        : null,
+                                  ).copyWith(counterText: ""),
+                                  onChanged: (v) {
+                                    _dynamicLicenses[idx]['number'] = v
+                                        .trim()
+                                        .toUpperCase();
+                                    setState(() {});
+                                  },
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty)
+                                      return "Required";
+                                    if (!isValid)
+                                      return config['errorMsg'] as String;
+                                    return null;
+                                  },
                                 ),
                               ),
                             );
                           }),
                           const SizedBox(height: 25),
 
-                          // --- SECTION 4 ---
                           _buildSectionTitle(
-                            "4. Operations",
-                            Icons.access_time,
-                          ),
-                          _responsiveRow(
-                            isMobile,
-                            TextFormField(
-                              controller: _openTimeCtrl,
-                              readOnly: true,
-                              onTap: () => _selectTime(_openTimeCtrl),
-                              style: const TextStyle(color: textPrimary),
-                              decoration: _inputDeco(
-                                "Opening Time *",
-                                prefix: const Icon(
-                                  Icons.timer,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ),
-                            TextFormField(
-                              controller: _closeTimeCtrl,
-                              readOnly: true,
-                              onTap: () => _selectTime(_closeTimeCtrl),
-                              style: const TextStyle(color: textPrimary),
-                              decoration: _inputDeco(
-                                "Closing Time *",
-                                prefix: const Icon(
-                                  Icons.timer,
-                                  color: textSecondary,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 350),
-                            child: TextFormField(
-                              controller: _countersCtrl,
-                              style: const TextStyle(color: textPrimary),
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              decoration: _inputDeco("Billing Counters *"),
-                              validator: (v) {
-                                int val = int.tryParse(v ?? '') ?? 0;
-                                return (val < 1 || val > 50) ? "1 to 50" : null;
-                              },
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-
-                          // --- SECTION 5 ---
-                          _buildSectionTitle(
-                            "5. Manager Assignment",
-                            Icons.manage_accounts,
-                          ),
-                          _responsiveRow(
-                            isMobile,
-                            TextFormField(
-                              controller: _mgrNameCtrl,
-                              style: const TextStyle(color: textPrimary),
-                              decoration: _inputDeco(
-                                "Manager Full Name *",
-                                prefix: const Icon(
-                                  Icons.person,
-                                  color: textSecondary,
-                                ),
-                              ),
-                              validator: (v) =>
-                                  v!.trim().isEmpty ? "Required" : null,
-                            ),
-                            TextFormField(
-                              controller: _mgrEmpIdCtrl,
-                              textCapitalization: TextCapitalization.characters,
-                              style: const TextStyle(color: textPrimary),
-                              decoration: _inputDeco(
-                                "Manager EMP ID *",
-                                prefix: const Icon(
-                                  Icons.badge,
-                                  color: textSecondary,
-                                ),
-                              ),
-                              validator: (v) =>
-                                  v!.trim().isEmpty ? "Required" : null,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          _responsiveRow(
-                            isMobile,
-                            TextFormField(
-                              controller: _mgrPhoneCtrl,
-                              style: const TextStyle(color: textPrimary),
-                              keyboardType: TextInputType.phone,
-                              maxLength: 10,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              decoration: _inputDeco(
-                                "Manager Phone Number *",
-                              ).copyWith(counterText: ""),
-                              validator: (v) => (v == null || v.length != 10)
-                                  ? "10 digits required"
-                                  : null,
-                            ),
-                            TextFormField(
-                              controller: _mgrEmailCtrl,
-                              style: const TextStyle(color: textPrimary),
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: _inputDeco("Manager Email *"),
-                              validator: (v) => (v == null || !v.contains('@'))
-                                  ? "Valid email required"
-                                  : null,
-                            ),
-                          ),
-                          const SizedBox(height: 40),
-
-                          // --- SECTION 6 ---
-                          _buildSectionTitle(
-                            "6. Bank Details",
+                            "5. Banking & Settlement Node",
                             Icons.account_balance,
                           ),
+                          if (_useTenantBank)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 20),
+                              decoration: BoxDecoration(
+                                color: accentBlue.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: accentBlue.withOpacity(0.2),
+                                ),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.account_balance,
+                                    color: accentBlue,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      "This store inherits the master HQ settlement account. Bank details are read-only.",
+                                      style: TextStyle(
+                                        color: accentBlue,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           TextFormField(
                             controller: _accNameCtrl,
-                            style: const TextStyle(color: textPrimary),
-                            decoration: _inputDeco("Account Holder Name"),
+                            readOnly: _isManagerView,
+                            style: TextStyle(
+                              color: _isManagerView
+                                  ? textSecondary
+                                  : textPrimary,
+                            ),
+                            decoration: _inputDeco(
+                              "Store Account Holder Name *",
+                              isReadOnly: _isManagerView,
+                            ),
                           ),
                           const SizedBox(height: 20),
                           _responsiveRow(
                             isMobile,
                             TextFormField(
-                              focusNode: _accNoFocus,
+                              key: _kIfsc,
+                              controller: _ifscCtrl,
+                              readOnly: _isManagerView,
+                              style: TextStyle(
+                                color: _isManagerView
+                                    ? textSecondary
+                                    : textPrimary,
+                              ),
+                              textCapitalization: TextCapitalization.characters,
+                              maxLength: 11,
+                              onChanged: _isManagerView ? null : _onIfscChanged,
+                              decoration: _inputDeco(
+                                "IFSC Code *",
+                                isReadOnly: _isManagerView,
+                                suffix: _isFetchingBank
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : (_isBankVerified
+                                          ? const Icon(
+                                              Icons.check_circle,
+                                              color: Colors.green,
+                                            )
+                                          : null),
+                              ).copyWith(counterText: ""),
+                            ),
+                            TextFormField(
+                              controller: _bankNameCtrl,
+                              readOnly: true,
+                              style: const TextStyle(color: textSecondary),
+                              decoration: _inputDeco(
+                                "Resolved Branch Name",
+                                isReadOnly: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          _responsiveRow(
+                            isMobile,
+                            TextFormField(
+                              key: _kAccNo,
+                              focusNode: _isManagerView ? null : _accNoFocus,
                               controller: _accNoCtrl,
-                              style: const TextStyle(color: textPrimary),
+                              readOnly: _isManagerView,
+                              style: TextStyle(
+                                color: _isManagerView
+                                    ? textSecondary
+                                    : textPrimary,
+                              ),
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
-                              decoration: _inputDeco("Account Number"),
+                              decoration: _inputDeco(
+                                "Store Settlement Account *",
+                                isReadOnly: _isManagerView,
+                              ),
                               onChanged: (v) {
-                                if (_accNoFocus.hasFocus) {
+                                if (_accNoFocus.hasFocus)
                                   _fullAccountNumber = v;
-                                }
                               },
                             ),
                             TextFormField(
-                              controller: _ifscCtrl,
-                              style: const TextStyle(color: textPrimary),
-                              textCapitalization: TextCapitalization.characters,
-                              maxLength: 11,
-                              inputFormatters: [
-                                LengthLimitingTextInputFormatter(11),
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'[a-zA-Z0-9]'),
-                                ),
-                              ],
+                              key: _kUpi,
+                              controller: _upiCtrl,
+                              readOnly: _isManagerView,
+                              style: TextStyle(
+                                color: _isManagerView
+                                    ? textSecondary
+                                    : textPrimary,
+                              ),
                               decoration: _inputDeco(
-                                "IFSC Code",
-                              ).copyWith(counterText: ""),
+                                "Settlement UPI ID (Optional)",
+                                isReadOnly: _isManagerView,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-                          TextFormField(
-                            controller: _upiCtrl,
-                            style: const TextStyle(color: textPrimary),
-                            decoration: _inputDeco("Settlement UPI ID"),
                           ),
                         ],
                       ),
@@ -922,24 +1187,33 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                           onPressed: () => Navigator.pop(context),
                           child: const Text(
                             "CANCEL",
-                            style: TextStyle(color: textSecondary),
+                            style: TextStyle(
+                              color: textSecondary,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 20),
-                        ElevatedButton(
+                        ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: accentBlue,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 40,
-                              vertical: 20,
+                              horizontal: 30,
+                              vertical: 16,
                             ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
                           onPressed: _isLoading ? null : _submit,
-                          child: _isLoading
+                          icon: _isLoading
+                              ? const SizedBox.shrink()
+                              : const Icon(
+                                  Icons.check_circle_outline,
+                                  size: 18,
+                                ),
+                          label: _isLoading
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
@@ -949,8 +1223,11 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                   ),
                                 )
                               : const Text(
-                                  "UPDATE STORE",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                  "UPDATE PLATFORM OS",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                         ),
                       ],

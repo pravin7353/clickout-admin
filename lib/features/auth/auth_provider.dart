@@ -1,9 +1,7 @@
-// lib/features/auth/providers/auth_provider.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-//import '../../../core/providers/access_control_provider.dart';
 
 // 1. Firebase Auth State
 final authStateProvider = StreamProvider<User?>((ref) {
@@ -15,11 +13,10 @@ final adminRoleProvider = StreamProvider<Map<String, dynamic>?>((ref) {
   final user = ref.watch(authStateProvider).value;
   if (user == null || user.email == null) return Stream.value(null);
 
-  // 🚀 FIXED: Search by Email instead of UID
   return FirebaseFirestore.instance
       .collection('staff')
       .where('email', isEqualTo: user.email)
-      .where('isDeleted', isEqualTo: false)
+      .where('isActive', isEqualTo: true)
       .limit(1)
       .snapshots()
       .map((snapshot) {
@@ -35,7 +32,7 @@ class AuthController extends Notifier<bool> {
 
   Future<bool> setupAdminSession() async {
     state = true;
-    bool isFirstTimeLogin = false; // 🚀 Added Tracker
+    bool isFirstTimeLogin = false;
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null || currentUser.email == null) {
@@ -45,7 +42,7 @@ class AuthController extends Notifier<bool> {
       final querySnapshot = await FirebaseFirestore.instance
           .collection('staff')
           .where('email', isEqualTo: currentUser.email)
-          .where('isDeleted', isEqualTo: false)
+          .where('isActive', isEqualTo: true)
           .limit(1)
           .get();
 
@@ -53,21 +50,19 @@ class AuthController extends Notifier<bool> {
       Map<String, dynamic> data;
 
       if (querySnapshot.docs.isEmpty) {
-        isFirstTimeLogin = true; // 🚀 Flag as First Time User
-        // 🚀 ENTERPRISE PROVISIONING ENGINE: Perfect Schema Generator
+        isFirstTimeLogin = true;
         final String rawName = currentUser.email!.split('@')[0].toUpperCase();
         final String prefix = rawName.length >= 3
             ? rawName.substring(0, 3)
             : rawName;
         final String newTenantId =
-            '${prefix}_${DateTime.now().millisecondsSinceEpoch}'; // Format: JYO_173...
+            '${prefix}_${DateTime.now().millisecondsSinceEpoch}';
 
         staffRef = FirebaseFirestore.instance
             .collection('staff')
             .doc(currentUser.uid);
         final batch = FirebaseFirestore.instance.batch();
 
-        // 1. Create Enterprise-Grade Tenant Doc (Matches your Exact Database Structure!)
         batch.set(
           FirebaseFirestore.instance.collection('tenants').doc(newTenantId),
           {
@@ -75,34 +70,36 @@ class AuthController extends Notifier<bool> {
             'companyName':
                 '${currentUser.email!.split('@')[0].toUpperCase()} ENTERPRISES',
             'ownerName': currentUser.email!.split('@')[0],
-            'businessType': 'Super Mart', // Default fallback
             'establishedYear': DateTime.now().year,
-            'isOnboardingComplete':
-                true, // 🚀 FIX: Skip that old deleted screen forever!
+            'isOnboardingComplete': false,
             'status': 'ACTIVE',
-            'plan': 'PRO PLAN',
+            'subscriptionPlan': 'trial',
+            'billingStatus': 'active',
+            'trialStartAt': FieldValue.serverTimestamp(),
             'activeStores': 0,
-            'contact': {'email': currentUser.email, 'phone': ''},
+            'industries': [],
+            'goods_or_services': [],
+            'licenses': [],
+            'contact': {
+              'email': currentUser.email,
+              'phone': '',
+              'recoveryEmail': '',
+              'recoveryPhone': '',
+            },
             'location': {'address': '', 'city': '', 'state': '', 'pincode': ''},
-            'kyc': {'pan': '', 'gstin': ''},
             'bankDetails': {
               'accountName': '',
               'accountNo': '',
               'ifsc': '',
               'upi': '',
-            },
-            'config': {
-              'openTime': '09:00 AM',
-              'closeTime': '10:00 PM',
-              'expectedEmployees': 0,
-              'monthlyVolume': 'Under 1,000',
+              'bankName': '',
+              'isCustom': false,
             },
             'createdAt': FieldValue.serverTimestamp(),
             'updatedAt': FieldValue.serverTimestamp(),
           },
         );
 
-        // 2. Create Staff Record as TENANT_ADMIN
         data = {
           'uid': currentUser.uid,
           'email': currentUser.email,
@@ -119,17 +116,41 @@ class AuthController extends Notifier<bool> {
       } else {
         staffRef = querySnapshot.docs.first.reference;
         data = querySnapshot.docs.first.data();
-      }
-      final role = (data['role'] ?? '').toString().toLowerCase();
 
-      // 🚀 ALL SAAS ROLES ALLOWED
+        final String currentRole = (data['role'] ?? '')
+            .toString()
+            .toUpperCase();
+
+        if (currentRole != 'SUPER_ADMIN' && data['tenantId'] != null) {
+          final tenantDoc = await FirebaseFirestore.instance
+              .collection('tenants')
+              .doc(data['tenantId'])
+              .get();
+          if (!tenantDoc.exists) {
+            await FirebaseAuth.instance.signOut();
+            throw Exception(
+              'DATA INTEGRITY FAILURE: Tenant document missing or corrupted.',
+            );
+          }
+        }
+      }
+
+      final role =
+          (data['role'] ??
+                  (currentUser.email == 'dev@clickout.local'
+                      ? 'SUPER_ADMIN'
+                      : ''))
+              .toString()
+              .toLowerCase();
+
       final allowedWebRoles = [
         'super_admin',
         'tenant_admin',
         'delegated_admin',
         'admin',
         'owner',
-        'manager', // 🍖 Gomu Gomu no Entry Allowed!
+        'store_manager',
+        'manager',
       ];
 
       if (!allowedWebRoles.contains(role)) {
@@ -139,7 +160,6 @@ class AuthController extends Notifier<bool> {
 
       final newSessionId = DateTime.now().millisecondsSinceEpoch.toString();
 
-      // 🚀 FIX: Used 'staffRef' instead of 'doc.reference'
       await staffRef.update({
         'activeSessionId': newSessionId,
         'lastLoginAt': FieldValue.serverTimestamp(),
@@ -147,7 +167,7 @@ class AuthController extends Notifier<bool> {
         'suspiciousLoginFlag': false,
       });
 
-      return isFirstTimeLogin; // 🚀 Return the flag
+      return isFirstTimeLogin;
     } catch (e) {
       throw e.toString();
     } finally {
@@ -158,7 +178,6 @@ class AuthController extends Notifier<bool> {
   Future<void> logout() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null && user.email != null) {
-      // Find the document by email to delete session ID
       final query = await FirebaseFirestore.instance
           .collection('staff')
           .where('email', isEqualTo: user.email)

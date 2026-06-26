@@ -12,6 +12,7 @@ import 'services/pos_order_service.dart';
 // 🚨 BHAILOG DHYAN DE: Local Paths for Admin
 import '../../core/services/cart_item.dart';
 import 'providers/cart_provider.dart';
+import '../coach/widgets/info_button.dart';
 
 // ── UI DATA MODELS ──
 class CartGroup {
@@ -361,13 +362,23 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            "Assisted Checkout",
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w900,
-              color: text1Col,
-            ),
+          Row(
+            children: [
+              Text(
+                "Assisted Checkout",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: text1Col,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const InfoButton(
+                title: 'Assisted Checkout',
+                en: 'Staff-assisted billing for customers without a mobile phone — senior citizens, walk-ins, or emergency cases. Add products by search or barcode scan. Bill is generated instantly with no security gate check required.',
+                hi: 'Ye un customers ke liye hai jinke paas mobile nahi hai — senior citizens ya walk-in customers. Staff product search karke ya barcode scan karke cart mein add karta hai. Bill seedha checkout hota hai — koi guard verification nahi hogi kyunki staff khud process kar raha hai.',
+              ),
+            ],
           ),
           const SizedBox(height: 20),
 

@@ -7,6 +7,7 @@ import 'package:clickout_admin/core/store/providers/store_provider.dart';
 import 'presentation/add_service_dialog.dart';
 import 'presentation/edit_service_dialog.dart';
 import 'providers/service_master_provider.dart';
+import '../coach/widgets/info_button.dart';
 
 class ServiceControlScreen extends ConsumerStatefulWidget {
   const ServiceControlScreen({super.key});
@@ -206,13 +207,23 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // 🚀 CONST HATAYA
-                    Text(
-                      "Service Master Roster ✂️",
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          "Service Master Roster ✂️",
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const InfoButton(
+                          title: 'Service Master Roster',
+                          en: 'Manage all services — haircut, repair, consultation etc. Each service has price, GST, and duration. Linked to billing and staff performance tracking.',
+                          hi: 'Saari services yahan manage karo — price, GST, duration sab set karo. Billing aur staff performance dono se linked hai. Service add karo to seedha checkout mein milega.',
+                        ),
+                      ],
                     ),
                     SizedBox(height: 4),
                     Text(

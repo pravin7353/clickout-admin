@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../core/services/audit_service.dart';
+import '../../../core/subscription/services/subscription_service.dart';
 
 class EmployeeService {
   static final _db = FirebaseFirestore.instance;
@@ -27,12 +28,35 @@ class EmployeeService {
         throw "Phone number +91 $phone is already registered.";
       }
 
+      // 📧 Email unique check (system-wide)
+      if (email != null && email.trim().isNotEmpty) {
+        final existingEmail = await _db
+            .collection('staff')
+            .where('email', isEqualTo: email.trim().toLowerCase())
+            .get();
+        if (existingEmail.docs.isNotEmpty) {
+          throw "Email '${email.trim().toLowerCase()}' is already registered.";
+        }
+      }
+
+      // 📧 Email unique check (system-wide)
+      if (email != null && email.trim().isNotEmpty) {
+        final existingEmail = await _db
+            .collection('staff')
+            .where('email', isEqualTo: email.trim().toLowerCase())
+            .get();
+        if (existingEmail.docs.isNotEmpty) {
+          throw "Email '${email.trim().toLowerCase()}' is already registered.";
+        }
+      }
+
       final existingEmpId = await _db
           .collection('staff')
+          .where('tenantId', isEqualTo: tenantId)
           .where('empId', isEqualTo: empId.trim().toUpperCase())
           .get();
       if (existingEmpId.docs.isNotEmpty) {
-        throw "Employee ID '${empId.trim().toUpperCase()}' is already in use.";
+        throw "Employee ID '${empId.trim().toUpperCase()}' is already in use within this company.";
       }
 
       // 2. Create Document
@@ -97,6 +121,11 @@ class EmployeeService {
         severity: 'INFO',
         tenantId: tenantId ?? 'SYSTEM',
       );
+
+      // 📊 Usage Ledger — Staff Counter
+      if (tenantId != null && tenantId.isNotEmpty) {
+        await SubscriptionService().incrementStaff(tenantId);
+      }
     } catch (e) {
       throw "Onboarding Failed: $e";
     }

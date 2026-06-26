@@ -11,6 +11,10 @@ class Tenant {
   final int analyticsRetentionDays;
   final DateTime createdAt;
   final bool isActive;
+  final DateTime? trialStartAt;
+  final DateTime? trialEndsAt;
+  final DateTime? currentPeriodEnd;
+  final String billingCycle;
 
   Tenant({
     this.id,
@@ -23,6 +27,10 @@ class Tenant {
     required this.analyticsRetentionDays,
     required this.createdAt,
     required this.isActive,
+    this.trialStartAt,
+    this.trialEndsAt,
+    this.currentPeriodEnd,
+    this.billingCycle = 'monthly',
   });
 
   // Firestore se data read karne ke liye
@@ -40,6 +48,16 @@ class Tenant {
       analyticsRetentionDays: data['features']?['analyticsRetentionDays'] ?? 30,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       isActive: data['isActive'] ?? false,
+      trialStartAt: data['trialStartAt'] != null
+          ? (data['trialStartAt'] as Timestamp).toDate()
+          : null,
+      trialEndsAt: data['trialEndsAt'] != null
+          ? (data['trialEndsAt'] as Timestamp).toDate()
+          : null,
+      currentPeriodEnd: data['currentPeriodEnd'] != null
+          ? (data['currentPeriodEnd'] as Timestamp).toDate()
+          : null,
+      billingCycle: data['billingCycle'] ?? 'monthly',
     );
   }
 
@@ -56,6 +74,12 @@ class Tenant {
       },
       'createdAt': Timestamp.fromDate(createdAt),
       'isActive': isActive,
+      if (trialStartAt != null)
+        'trialStartAt': Timestamp.fromDate(trialStartAt!),
+      if (trialEndsAt != null) 'trialEndsAt': Timestamp.fromDate(trialEndsAt!),
+      if (currentPeriodEnd != null)
+        'currentPeriodEnd': Timestamp.fromDate(currentPeriodEnd!),
+      'billingCycle': billingCycle,
     };
   }
 }

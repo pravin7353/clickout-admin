@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../providers/qr_reactivation_provider.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 
 class QrReactivationScreen extends ConsumerStatefulWidget {
   const QrReactivationScreen({super.key});
@@ -84,15 +85,25 @@ class _QrReactivationScreenState extends ConsumerState<QrReactivationScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              "QR Reactivation Desk ⏳",
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: isDark
-                                    ? Colors.white
-                                    : const Color(0xFF2B3674),
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  "QR Reactivation Desk ⏳",
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w900,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF2B3674),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const InfoButton(
+                                  title: 'QR Reactivation Desk',
+                                  en: 'Lists all orders whose Gate Pass QR has expired. Each customer can regenerate QR max 2 times. Use "Bailout" to manually reactivate an expired QR — every bailout is logged in the Audit Trail with admin name and timestamp.',
+                                  hi: 'Yahan woh orders aate hain jinka Gate Pass QR expire ho gaya ho. Customer max 2 baar QR regenerate kar sakta hai. "Bailout" button se manually reactivate karo — har bailout ka record audit trail mein jaata hai, admin ke naam ke saath.',
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 4),
                             Wrap(

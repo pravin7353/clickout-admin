@@ -5,6 +5,7 @@ import 'package:clickout_admin/features/auth/auth_provider.dart';
 
 import '../providers/fraud_provider.dart';
 import 'leakage_kanban_widget.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 
 class FraudControlScreen extends ConsumerWidget {
   const FraudControlScreen({super.key});
@@ -98,13 +99,23 @@ class FraudControlScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Fraud Control & Radar",
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          "Fraud Control & Radar",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const InfoButton(
+                          title: 'Fraud Control & Radar',
+                          en: 'Central command for store fraud detection. Shows paid-but-not-exited orders (leakage), staff with low trust scores, and high-risk transactions. Suspend suspicious guards instantly — every action is logged in the Audit Trail.',
+                          hi: 'Store fraud ka central dashboard. Yahan dikhta hai — kaunsa order paid hua par exit nahi hua (leakage), kaunse staff ka trust score low hai, aur kaunse transactions risky hain. Suspicious guard ko turant suspend karo — har action audit trail mein save hota hai.',
+                        ),
+                      ],
                     ),
                     const Text(
                       "Live employee monitoring & leakage tracking",
@@ -117,25 +128,45 @@ class FraudControlScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 32),
 
-          Text(
-            "Live Leakage Radar",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          Row(
+            children: [
+              Text(
+                "Live Leakage Radar",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const InfoButton(
+                title: 'Live Leakage Radar',
+                en: 'Tracks orders that are PAID but customer has NOT exited yet. Sorted by wait time: Normal (0–5m), Warning (5–30m), Critical (30–120m), Escalated (2hr+). Long wait = possible leakage or guard negligence.',
+                hi: 'Yeh un orders ko track karta hai jo PAID hain par customer abhi tak bahar nahi gaya. Wait time ke hisaab se: Normal, Warning, Critical, Escalated. Zyada wait time = leakage ya guard ki laparwahi ka signal.',
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           const SizedBox(height: 400, child: LeakageKanbanBoard()),
           const SizedBox(height: 32),
 
-          Text(
-            "Suspect Watchlist (Low Trust Score)",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          Row(
+            children: [
+              Text(
+                "Suspect Watchlist (Low Trust Score)",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const InfoButton(
+                title: 'Suspect Watchlist',
+                en: 'Lists staff members whose trust score has dropped below the safe threshold. Trust score decreases with overrides, rejected scans, or suspicious activity. Tap "Suspend Access" to block their login immediately.',
+                hi: 'Woh staff members jinka trust score safe level se neeche gir gaya hai. Override karne se, failed scans se, ya suspicious activity se score ghatta hai. "Suspend Access" dabao toh unka login turant band ho jaata hai.',
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           suspectsState.when(
@@ -321,13 +352,23 @@ class FraudControlScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 32),
 
-          Text(
-            "High Risk Transactions",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
+          Row(
+            children: [
+              Text(
+                "High Risk Transactions",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const InfoButton(
+                title: 'High Risk Transactions',
+                en: 'Orders flagged by the system as suspicious — unusual amounts, repeated failures, or mismatched exit status. These require manual review by the admin.',
+                hi: 'System ne inhe suspicious mark kiya hai — unusual amount, baar baar fail hona, ya exit status mismatch. In orders ko admin ko manually review karna chahiye.',
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           highRiskOrdersState.when(

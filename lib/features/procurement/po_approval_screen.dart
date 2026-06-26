@@ -12,6 +12,7 @@ import 'presentation/widgets/expiry_dashboard.dart';
 import 'presentation/add_distributor_dialog.dart';
 import 'presentation/distributor_list_screen.dart';
 import 'presentation/widgets/quantum_metrics_widget.dart';
+import '../coach/widgets/info_button.dart';
 
 class POApprovalScreen extends ConsumerStatefulWidget {
   const POApprovalScreen({super.key});
@@ -207,13 +208,23 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            "Procurement & Supply Chain",
-                            style: TextStyle(
-                              fontSize: isMobile ? 22 : 28,
-                              fontWeight: FontWeight.w900,
-                              color: textPrimary,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                "Procurement & Supply Chain",
+                                style: TextStyle(
+                                  fontSize: isMobile ? 22 : 28,
+                                  fontWeight: FontWeight.w900,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const InfoButton(
+                                title: 'Procurement & Supply Chain',
+                                en: 'Complete vendor and inventory management hub. Add distributors, run promotions on slow-moving stock, raise purchase orders, and track blocked inventory — all from one place.',
+                                hi: 'Yahan se vendor manage karo, slow stock pe offer lagao, purchase order raise karo aur blocked inventory track karo. Sab ek jagah.',
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 4),
                           Text(
@@ -351,12 +362,24 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       Icons.pending_actions,
                       Colors.orange,
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 4),
+                    const InfoButton(
+                      title: 'Pending Approvals',
+                      en: 'Purchase orders created but not yet sent or confirmed by vendor. Review and approve before dispatching to distributor.',
+                      hi: 'Ye wo POs hain jo banaye hain par vendor ko abhi bheje nahi. Review karo aur approve karo tabhi distributor tak jayega.',
+                    ),
+                    const SizedBox(width: 12),
                     _buildTabButton(
                       2,
                       "PO History",
                       Icons.history,
                       Colors.green,
+                    ),
+                    const SizedBox(width: 4),
+                    const InfoButton(
+                      title: 'PO History',
+                      en: 'All previously raised purchase orders with status — sent, received, or cancelled. Use this to track vendor delivery performance.',
+                      hi: 'Pehle raise kiye gaye saare purchase orders yahan dikhenge — sent, received ya cancelled. Vendor ki delivery track karne ke liye use karo.',
                     ),
                   ],
                 ),

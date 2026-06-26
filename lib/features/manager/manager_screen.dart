@@ -8,6 +8,8 @@ import 'services/employee_service.dart';
 import 'providers/manager_provider.dart';
 import '../../core/providers/access_control_provider.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import '../coach/widgets/mission_banner.dart';
+import '../coach/widgets/info_button.dart';
 
 class ManagerScreen extends ConsumerStatefulWidget {
   const ManagerScreen({super.key});
@@ -71,12 +73,21 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
     final formKey = GlobalKey<FormState>();
 
     String selectedRole = staffData['role'] ?? 'CASHIER';
-    String selectedBranch =
-        staffData['branchCode'] ?? 'ALL'; // 🚀 TEXT CTRL KI JAGAH VARIABLE
+    String selectedBranch = staffData['branchCode'] ?? 'ALL';
     final phoneCtrl = TextEditingController(text: staffData['phone'] ?? '');
+    final emailCtrl = TextEditingController(text: staffData['email'] ?? '');
 
     final String empName = staffData['name'] ?? 'Unknown Staff';
     final String empId = staffData['empId'] ?? 'N/A';
+    final String currentEditorRole =
+        (ref.read(adminRoleProvider).value?['role'] ?? '')
+            .toString()
+            .toUpperCase();
+    final String currentEditorBranch =
+        (ref.read(adminRoleProvider).value?['branchCode'] ?? '')
+            .toString()
+            .toUpperCase();
+    final bool editorIsManager = currentEditorRole == 'MANAGER';
 
     bool isLoading = false;
 
@@ -232,17 +243,46 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                               decoration: _premiumInputStyle(
                                 context,
                                 "Phone Number",
-                                prefixIcon: Icons.phone_outlined,
+                                prefixIcon: Icons.phone_android_outlined,
                               ).copyWith(prefixText: "+91 "),
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(10),
                               ],
-                              validator: (v) => v!.length != 10
-                                  ? "Strictly 10 digits required"
-                                  : null,
                             ),
+                            const SizedBox(height: 20),
+
+                            // 📧 Email field
+                            if (selectedRole.toUpperCase() == 'MANAGER' ||
+                                emailCtrl.text.isNotEmpty)
+                              TextFormField(
+                                controller: emailCtrl,
+                                style: TextStyle(
+                                  color: theme.textTheme.bodyLarge?.color,
+                                ),
+                                decoration: _premiumInputStyle(
+                                  context,
+                                  selectedRole.toUpperCase() == 'MANAGER'
+                                      ? "Email Address *"
+                                      : "Email Address",
+                                  prefixIcon: Icons.email_outlined,
+                                ),
+                                validator: (v) {
+                                  if (selectedRole.toUpperCase() == 'MANAGER' &&
+                                      (v == null || v.trim().isEmpty)) {
+                                    return "Email mandatory for Manager";
+                                  }
+                                  if (v != null &&
+                                      v.isNotEmpty &&
+                                      !RegExp(
+                                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                      ).hasMatch(v)) {
+                                    return "Invalid email format";
+                                  }
+                                  return null;
+                                },
+                              ),
                             const SizedBox(height: 20),
 
                             // 🚀 DYNAMIC BRANCH SELECTION (StreamBuilder)
@@ -316,6 +356,40 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
+                                    ),
+                                  );
+                                }
+
+                                // Manager = branch locked
+                                if (editorIsManager) {
+                                  return Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: theme.cardColor,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.green.withOpacity(0.3),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.lock_outline,
+                                          color: Colors.green,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          "Branch: $currentEditorBranch (Locked)",
+                                          style: TextStyle(
+                                            color: theme
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.color,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }
@@ -405,7 +479,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                             'staff',
                                         role: selectedRole,
                                         phone: phoneCtrl.text.trim(),
-                                        branchCode: selectedBranch,
+                                        branchCode: editorIsManager
+                                            ? currentEditorBranch
+                                            : selectedBranch,
                                         tenantId: staffData['tenantId'],
                                         editedBy:
                                             editorName, // 🚀 NEW: Passed to service
@@ -545,6 +621,7 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const MissionBanner(route: '/manager'),
           Wrap(
             alignment: WrapAlignment.spaceBetween,
             crossAxisAlignment: WrapCrossAlignment.end,
@@ -553,18 +630,24 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    "Command Roster 👥",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: isDark
-                          ? textP
-                          : const Color(
-                              0xFF0B6B60,
-                            ), // 💎 Emerald Text in Light Mode
-                      letterSpacing: -0.5,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        "Command Roster 👥",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? textP : const Color(0xFF0B6B60),
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const InfoButton(
+                        title: 'Command Roster',
+                        en: 'Manage all staff — add, remove, reassign roles, or move between stores. Each staff member has role-based access to specific apps only.',
+                        hi: 'Yahan se sare employees ko manage karo — add karo, remove karo, role change karo ya ek store se doosre store mein move karo. Har role ka alag access hai — cashier sirf billing, guard sirf exit scan.',
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -1306,7 +1389,7 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
                 style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                 decoration: InputDecoration(
                   hintText:
-                      "e.g.\nEMP001, Manager Ji, manager@clickout.com, 9876543210, MANAGER, JAI_MUM_002\nEMP002, Cashier Babu, , 9876543211, CASHIER, JAI_MUM_002\nEMP003, Guard Bhaiya, , 9876543212, GUARD, JAI_MUM_002",
+                      "e.g.\nEMP001, Manager, manager@clickout.com, 9876543210, MANAGER, JAI_MUM_002\nEMP002, Cashier, , 9876543211, CASHIER, JAI_MUM_002\nEMP003, Guard Bhaiya, , 9876543212, GUARD, JAI_MUM_002",
                   hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
                   filled: true,
                   fillColor: theme.brightness == Brightness.dark

@@ -135,6 +135,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
         adminData?['branchCode']?.toString().toUpperCase() ?? 'HQ';
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
     final isTenantAdmin = role == 'TENANT_ADMIN' || role == 'SUPER_ADMIN';
+    final isManager = role == 'MANAGER';
 
     // 🚀 STATIC ROLES LIST
     final List<String> availableRoles = ['MANAGER', 'CASHIER', 'GUARD'];
@@ -260,6 +261,36 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                             );
                           }
 
+                          // 🔒 Manager = apni branch pe locked
+                          if (isManager)
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: cardDark,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: accentGreen.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.lock_outline,
+                                    color: accentGreen,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    "Branch: $autoFetchedBranch (Locked)",
+                                    style: const TextStyle(
+                                      color: textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+
                           // 🏢 Agar Tenant Admin hai, toh unke saare stores ka Dropdown dikhao
                           if (!snapshot.hasData) {
                             return const Center(
@@ -356,7 +387,9 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                               ),
                             )
                             .toList(),
-                        onChanged: (val) => setState(() => _selectedRole = val),
+                        onChanged: (val) => setState(() {
+                          _selectedRole = val;
+                        }),
                         validator: (v) => v == null ? "Required" : null,
                       ),
                       const SizedBox(height: 20),
@@ -435,10 +468,16 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                         controller: _emailCtrl,
                         style: const TextStyle(color: textPrimary),
                         decoration: _darkInputStyle(
-                          "Official Email Address (Optional)",
+                          _selectedRole == 'MANAGER'
+                              ? "Official Email Address *"
+                              : "Official Email Address (Optional)",
                           prefixIcon: Icons.email_outlined,
                         ),
                         validator: (v) {
+                          if (_selectedRole == 'MANAGER' &&
+                              (v == null || v.trim().isEmpty)) {
+                            return "Email is mandatory for Manager role";
+                          }
                           if (v != null &&
                               v.isNotEmpty &&
                               !RegExp(

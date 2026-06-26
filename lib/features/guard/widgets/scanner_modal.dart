@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../services/guard_service.dart';
+import '../../coach/widgets/info_button.dart';
 
 class ScannerModal extends ConsumerStatefulWidget {
   const ScannerModal({super.key});
@@ -121,9 +122,9 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1E1E1E), // 🔲 MATCHING COMMAND CENTER DARK THEME
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(
         child: Padding(
@@ -149,17 +150,33 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    _showOverrideMode
-                        ? "Gate Override Protocol"
-                        : "Verify Gate Pass",
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                      color: _showOverrideMode
-                          ? Colors.redAccent
-                          : Theme.of(context).textTheme.bodyLarge?.color,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        _showOverrideMode
+                            ? "Gate Override Protocol"
+                            : "Verify Gate Pass",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: _showOverrideMode
+                              ? Colors.redAccent
+                              : Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InfoButton(
+                        title: _showOverrideMode
+                            ? 'Gate Override Protocol'
+                            : 'Verify Gate Pass',
+                        en: _showOverrideMode
+                            ? 'Emergency override — allows exit WITHOUT a valid Gate Pass QR. Use only for: scanner failure, VIP customer, emergency, or system glitch. Every override is logged with reason and timestamp. Misuse is traceable.'
+                            : 'Scan or type the Order ID from customer\'s ClickOut app Gate Pass. System checks: payment status, weight match, QR validity, and tenant isolation. Green = authorize exit. Red = reject and flag.',
+                        hi: _showOverrideMode
+                            ? 'Emergency mein bina QR ke exit dene ka option. Sirf tab use karo jab scanner kharab ho, VIP ho, ya emergency ho. Har override ka reason aur time log hota hai — misuse pakda jayega.'
+                            : 'Customer ke ClickOut app ka Order ID scan karo ya type karo. System check karta hai — payment hua, weight match hai, QR valid hai. Green = exit do. Red = reject karo aur flag lagao.',
+                      ),
+                    ],
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.grey, size: 28),
@@ -186,7 +203,9 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                       fontWeight: FontWeight.w600,
                     ),
                     filled: true,
-                    fillColor: Theme.of(context).scaffoldBackgroundColor,
+                    fillColor: isDark
+                        ? const Color(0xFF2A2A2A)
+                        : const Color(0xFFF1F5F9),
                     prefixIcon: const Icon(
                       Icons.qr_code_scanner,
                       color: Colors.grey,
@@ -244,7 +263,9 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
               else ...[
                 DropdownButtonFormField<String>(
                   initialValue: _selectedReason,
-                  dropdownColor: Theme.of(context).scaffoldBackgroundColor,
+                  dropdownColor: isDark
+                      ? const Color(0xFF2A2A2A)
+                      : Colors.white,
                   icon: const Icon(Icons.arrow_drop_down, color: Colors.grey),
                   decoration: InputDecoration(
                     labelText: "Override Reason (Required)",
@@ -253,7 +274,9 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                       fontWeight: FontWeight.bold,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFF2A2A2A), // 🔲 DARK INPUT
+                    fillColor: isDark
+                        ? const Color(0xFF2A2A2A)
+                        : const Color(0xFFF1F5F9),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide.none,
@@ -283,7 +306,9 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                         style: TextStyle(
                           color: r == 'Select a reason'
                               ? Colors.grey
-                              : Colors.white,
+                              : (isDark
+                                    ? Colors.white
+                                    : const Color(0xFF1B2559)),
                         ),
                       ),
                     );
@@ -305,7 +330,9 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
                       fontWeight: FontWeight.w600,
                     ),
                     filled: true,
-                    fillColor: const Color(0xFF2A2A2A), // 🔲 DARK INPUT
+                    fillColor: isDark
+                        ? const Color(0xFF2A2A2A)
+                        : const Color(0xFFF1F5F9),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide.none,

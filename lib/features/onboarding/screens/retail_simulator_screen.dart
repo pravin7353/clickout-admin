@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 Added for State persistence
+import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 Added for Tenant Context
 
 // ── SIMULATOR DATA MODEL ──
 class SimulatorPhase {
@@ -135,14 +137,41 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
     });
   }
 
-  void _nextPhase() {
+  void _nextPhase() async {
     if (_currentIndex < _phases.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 600),
         curve: Curves.fastOutSlowIn,
       );
     } else {
-      context.go('/'); // 🚀 Finish onboarding
+      // 🚀 DATABASE UNLOCK: Current tenant ka onboarding status true mark karo
+      final adminData = ref.read(adminRoleProvider).value;
+      final String? tenantId = adminData?['tenantId'];
+
+      if (tenantId != null && tenantId.isNotEmpty) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('tenants')
+              .doc(tenantId)
+              .update({'isOnboardingComplete': true});
+        } catch (e) {
+          debugPrint("Failed to update onboarding state: $e");
+        }
+      }
+
+      if (mounted) {
+        // 🚀 CLEAR AUTH CACHE TO PREVENT ROUTE LOOP
+        ref.invalidate(adminRoleProvider);
+
+        final adminData = ref.read(adminRoleProvider).value;
+        final tId = adminData?['tenantId'];
+
+        if (tId != null && tId.isNotEmpty) {
+          context.go('/tenant-dashboard/$tId');
+        } else {
+          context.go('/');
+        }
+      }
     }
   }
 
@@ -210,6 +239,15 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
       padding: const EdgeInsets.all(30),
       child: Row(
         children: [
+          if (context.canPop()) // 🚀 UNIVERSAL BACK SUPPORT
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: IconButton(
+                icon: Icon(Icons.arrow_back_rounded, color: text1),
+                onPressed: () => context.pop(),
+                tooltip: 'Back',
+              ),
+            ),
           Icon(
             Icons.rocket_launch_rounded,
             color: _phases[_currentIndex].themeColor,

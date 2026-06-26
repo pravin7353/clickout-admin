@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // 🚀 THE FIX: Importing REAL Revenue Engine instead of fake AI provider
 import '../../revenue_engine/providers/revenue_provider.dart';
+import '../../coach/widgets/info_button.dart';
 
 class ManpowerRadarWidget extends ConsumerWidget {
   const ManpowerRadarWidget({super.key});
@@ -93,15 +94,26 @@ class ManpowerRadarWidget extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Text(
-                      "Tactical Staffing Radar 🤖",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: textColor,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Tactical Staffing Radar 🤖",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: textColor,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 2,
+                          ),
+                        ),
+                        const InfoButton(
+                          title: 'Tactical Staffing Radar',
+                          en: 'AI-powered staffing recommendation based on real footfall. Shows how many cashiers and guards are needed right now.',
+                          hi: 'Aaj ke real orders ke hisaab se batata hai kitne cashier aur guard chahiye. Kam staff = queue jam = customer loss.',
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 10),

@@ -7,6 +7,7 @@ import 'package:clickout_admin/core/utils/hierarchy_filter.dart';
 import '../../services/stock_service.dart';
 import 'offer_creation_dialog.dart';
 import 'create_po_dialog.dart';
+import '../../../coach/widgets/info_button.dart';
 
 // 🚀 CHANGED: StatefulWidget to ConsumerStatefulWidget
 class ExpiryAlertDashboard extends ConsumerStatefulWidget {
@@ -298,6 +299,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                       fontWeight: FontWeight.w900,
                       color: textPrimary,
                     ),
+                  ),
+                  const SizedBox(width: 8),
+                  const InfoButton(
+                    title: 'Quantum Promotion Engine',
+                    en: 'Smart offer engine showing all products with 7-day sales data. Dead stock = low sales = apply offer for quick clearance. 9 offer types available: BOGO, Flat discount, Percentage, Bundle, Flash Sale and more. Raise PO directly for low-stock items.',
+                    hi: 'Ye engine aapko batata hai konsa product chal raha hai aur konsa dead stock hai. 7 din ki sales dekho — agar kam hai to offer lagao jaldi clearance ke liye. 9 tarah ke offers hain. Stock khatam hone wala ho to seedha PO raise karo yahan se.',
                   ),
                 ],
               ),

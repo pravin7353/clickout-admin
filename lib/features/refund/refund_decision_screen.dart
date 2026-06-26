@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../refund/providers/refund_engine_provider.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 
 class RefundDecisionScreen extends ConsumerStatefulWidget {
   const RefundDecisionScreen({super.key});
@@ -32,14 +33,24 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 🎩 HEADER
-          Text(
-            "Refund Decision Engine 💸",
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF2B3674),
-              letterSpacing: 0.5,
-            ),
+          Row(
+            children: [
+              Text(
+                "Refund Decision Engine 💸",
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: isDark ? Colors.white : const Color(0xFF2B3674),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const InfoButton(
+                title: 'Refund Decision Engine',
+                en: 'Admin tool to process customer refunds in 3 tiers. Tier 1 (Wallet) keeps money inside the system — fastest and preferred. Tier 2 (Source/Bank) sends money back to original payment method — takes T+3 days. Tier 3 (Partial) refunds only a specific amount. Every refund is irreversible and logged in The Black Box with admin name, reason, and timestamp.',
+                hi: 'Customer refund process karne ka admin tool — 3 tier mein. Tier 1 (Wallet) mein paisa system ke andar rehta hai — sabse fast. Tier 2 (Source/Bank) mein paisa wapas bank mein jaata hai — T+3 din lagte hain. Tier 3 (Partial) mein sirf kuch amount refund hoti hai. Har refund irreversible hai aur The Black Box mein admin ke naam, reason, aur time ke saath record hoti hai.',
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           const Text(
@@ -204,13 +215,25 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
                     ],
                   ),
                   const SizedBox(height: 30),
-                  Text(
-                    "Select Refund Tier:",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : const Color(0xFF2B3674),
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        "Select Refund Tier:",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isDark
+                              ? Colors.white
+                              : const Color(0xFF2B3674),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const InfoButton(
+                        title: 'Refund Tiers',
+                        en: 'Tier 1 Wallet: Instant, money stays in app — recommended for high trust score (80+). Tier 2 Source: Refund to original bank/UPI — use for low trust or disputed orders, takes T+3 days. Tier 3 Partial: Enter a custom amount less than the total — use when only part of the order is being refunded.',
+                        hi: 'Tier 1 Wallet: Turant, paisa app mein rehta hai — high trust score (80+) wale customers ke liye best. Tier 2 Source: Bank/UPI mein wapas — low trust ya disputed orders ke liye, T+3 din lagte hain. Tier 3 Partial: Custom amount daalo — jab sirf order ka kuch hissa refund karna ho.',
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 15),
 

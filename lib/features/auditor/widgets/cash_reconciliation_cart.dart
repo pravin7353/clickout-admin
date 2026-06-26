@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../coach/widgets/info_button.dart';
 
 class CashReconciliationCard extends StatefulWidget {
   final double expectedCash;
@@ -63,13 +64,20 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
                 color: Theme.of(context).primaryColor,
               ), // 💎 Emerald Green Accent
               const SizedBox(width: 10),
-              Text(
-                "Cash Drawer Reconciliation",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w900,
-                  color: textColor,
+              Expanded(
+                child: Text(
+                  "Cash Drawer Reconciliation",
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                  ),
                 ),
+              ),
+              const InfoButton(
+                title: 'Cash Drawer Reconciliation',
+                en: 'Compare system-expected cash vs actual counted cash. Any variance indicates missing money or excess float.',
+                hi: 'System ka expected cash aur actual cash drawer ka cash compare karo. Farq hai to ya paisa missing hai ya extra cash hai — dono investigate karo.',
               ),
             ],
           ),

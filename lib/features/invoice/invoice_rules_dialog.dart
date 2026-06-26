@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 
 class InvoiceRulesDialog extends ConsumerStatefulWidget {
   const InvoiceRulesDialog({super.key});
@@ -187,14 +188,25 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                "Invoice Settings",
-                                style: TextStyle(
-                                  color: textC,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.5,
-                                ),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Invoice Settings",
+                                    style: TextStyle(
+                                      color: textC,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const InfoButton(
+                                    title: "Invoice Settings",
+                                    en: "Customize your invoice number format and legal terms that print on every customer receipt.",
+                                    hi: "Yahan apna invoice number ka format aur T&C set karo jo har customer ki receipt pe print hoga.",
+                                  ),
+                                ],
                               ),
                               Text(
                                 "Configure billing rules and legal terms",
@@ -220,14 +232,24 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
                       shrinkWrap: true,
                       padding: const EdgeInsets.all(24),
                       children: [
-                        Text(
-                          "BILLING IDENTIFIERS",
-                          style: TextStyle(
-                            color: textMuted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              "BILLING IDENTIFIERS",
+                              style: TextStyle(
+                                color: textMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const InfoButton(
+                              title: "Invoice Prefix",
+                              en: "This short code appears before every invoice number. e.g. 'MART01' → MART01/25-26/04-23-01",
+                              hi: "Yeh chhota code har invoice number ke aage lagta hai. Jaise 'MART01' → MART01/25-26/04-23-01 banega.",
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 16),
 
@@ -258,14 +280,24 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
                         ),
                         const SizedBox(height: 32),
 
-                        Text(
-                          "LEGAL & POLICIES",
-                          style: TextStyle(
-                            color: textMuted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              "LEGAL & POLICIES",
+                              style: TextStyle(
+                                color: textMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const InfoButton(
+                              title: "Terms & Conditions",
+                              en: "These lines print at the bottom of every invoice. Use it for exchange policy, refund rules, or any legal disclaimer.",
+                              hi: "Yeh lines har invoice ke neeche print hoti hain. Exchange policy, refund rules, ya koi bhi legal warning yahan likhein.",
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 12),
                         _buildPremiumTextField(

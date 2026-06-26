@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/fraud_provider.dart';
+import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 
 class LeakageKanbanBoard extends ConsumerWidget {
   const LeakageKanbanBoard({super.key});
@@ -119,14 +120,38 @@ class LeakageKanbanBoard extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      InfoButton(
+                        title: title,
+                        en: title.contains('Normal')
+                            ? 'Customer paid and is expected to exit soon. Wait time under 5 minutes — no action needed.'
+                            : title.contains('Warning')
+                            ? 'Customer has been waiting 5–30 minutes after payment. Keep an eye — may need a prompt.'
+                            : title.contains('Critical')
+                            ? 'Customer waiting 30 minutes to 2 hours. Immediate guard attention required. Possible leakage.'
+                            : 'Customer has not exited for over 2 hours after payment. Escalate to manager — high leakage risk.',
+                        hi: title.contains('Normal')
+                            ? 'Customer ne payment kar di hai aur jald bahar aane wala hai. 5 minute se kam wait — koi action nahi chahiye.'
+                            : title.contains('Warning')
+                            ? '5 se 30 minute ho gaye payment ke baad. Nazar rakho — guard ko check karna chahiye.'
+                            : title.contains('Critical')
+                            ? '30 minute se 2 ghante ho gaye. Guard ko abhi dhyan dena chahiye — leakage ka khatra hai.'
+                            : '2 ghante se zyada ho gaye payment ke baad bhi exit nahi hua. Manager ko escalate karo — high leakage risk.',
+                        iconColor: color,
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),

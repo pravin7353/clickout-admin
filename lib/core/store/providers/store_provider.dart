@@ -4,12 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class ActiveStoreState {
   final String tenantId;
   final String branchCode;
-  final String storeName; // 🚀 NAYA: Store ka naam yaad rakhne ke liye
+  final String storeName;
+  final String managerEmail;
+  final String managerEmpId;
+  final String managerName;
+  final String managerPhone;
 
   ActiveStoreState({
     required this.tenantId,
     required this.branchCode,
     required this.storeName,
+    required this.managerEmail,
+    required this.managerEmpId,
+    required this.managerName,
+    required this.managerPhone,
   });
 
   bool get isValid => tenantId.isNotEmpty && branchCode.isNotEmpty;
@@ -23,12 +31,23 @@ class ActiveStoreNotifier extends Notifier<ActiveStoreState?> {
   }
 
   // 🔒 CALL THIS WHEN USER CLICKS "ENTER PORTAL"
-  void setStore(String tenantId, String branchCode, String storeName) {
-    // 🚀 NAYA PARAMETER
+  void setStore({
+    required String tenantId,
+    required String branchCode,
+    required String storeName,
+    required String managerEmail,
+    required String managerEmpId,
+    required String managerName,
+    required String managerPhone,
+  }) {
     state = ActiveStoreState(
       tenantId: tenantId,
       branchCode: branchCode,
       storeName: storeName,
+      managerEmail: managerEmail,
+      managerEmpId: managerEmpId,
+      managerName: managerName,
+      managerPhone: managerPhone,
     );
   }
 
