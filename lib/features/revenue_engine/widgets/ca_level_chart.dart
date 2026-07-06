@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class CaLevelMatrixChart extends StatelessWidget {
   final Map<int, Map<String, double>> hourlyData;
@@ -55,9 +56,10 @@ class CaLevelMatrixChart extends StatelessWidget {
       height: 350,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
+        color: context.colors.cardBg,
         borderRadius: BorderRadius.circular(16),
-      ), // Terminal Dark Theme
+        border: Border.all(color: context.colors.border),
+      ),
       child: Stack(
         children: [
           // LAYER 1: BARS (REVENUE)
@@ -69,7 +71,7 @@ class CaLevelMatrixChart extends StatelessWidget {
                 show: true,
                 drawVerticalLine: false,
                 getDrawingHorizontalLine: (_) => FlLine(
-                  color: Colors.white10,
+                  color: context.colors.border,
                   strokeWidth: 1,
                   dashArray: [4, 4],
                 ),
@@ -81,9 +83,10 @@ class CaLevelMatrixChart extends StatelessWidget {
                     reservedSize: 40,
                     getTitlesWidget: (v, _) => Text(
                       "₹${v.toInt()}",
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
                         fontSize: 10,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
@@ -93,8 +96,8 @@ class CaLevelMatrixChart extends StatelessWidget {
                     showTitles: true,
                     getTitlesWidget: (v, _) => Text(
                       "${v.toInt()}:00",
-                      style: const TextStyle(
-                        color: Colors.white54,
+                      style: TextStyle(
+                        color: context.colors.textSecondary,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),

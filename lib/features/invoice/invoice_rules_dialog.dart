@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
+import '../../core/theme/app_theme.dart';
 
 class InvoiceRulesDialog extends ConsumerStatefulWidget {
   const InvoiceRulesDialog({super.key});
@@ -116,14 +117,10 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     // 🎨 Premium Colors based on theme
-    final bgDark = isDark
-        ? isDark
-              ? const Color(0xFF111811)
-              : Colors.white
-        : Colors.white;
-    final cardDark = isDark ? const Color(0xFF1A221A) : Colors.grey.shade50;
-    final textC = isDark ? Colors.white : const Color(0xFF2B3674);
-    final textMuted = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    final bgDark = context.colors.scaffoldBg;
+    final cardDark = context.colors.cardBg;
+    final textC = context.colors.textPrimary;
+    final textMuted = context.colors.textSecondary;
 
     return Dialog(
       backgroundColor: Colors.transparent,

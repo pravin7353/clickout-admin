@@ -8,6 +8,7 @@ import 'create_store_dialog.dart';
 import 'edit_tenant_profile_dialog.dart';
 import 'edit_store_profile_dialog.dart';
 import '../../../core/store/providers/store_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 final growthConfigProvider =
     FutureProvider.family<Map<String, dynamic>?, String>((ref, tenantId) async {
@@ -34,12 +35,10 @@ class TenantDashboardScreen extends ConsumerWidget {
   }) {
     final ctrl = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dialogBg = isDark ? const Color(0xFF111811) : Colors.white;
-    final inputBg = isDark ? const Color(0xFF080B08) : const Color(0xFFF3F4F6);
-    final textCol = isDark ? const Color(0xFFF0F0F0) : const Color(0xFF111111);
-    final textMuted = isDark
-        ? const Color(0xFF888888)
-        : const Color(0xFF6B7280);
+    final dialogBg = context.colors.cardBg;
+    final inputBg = context.colors.scaffoldBg;
+    final textCol = context.colors.textPrimary;
+    final textMuted = context.colors.textSecondary;
 
     showDialog(
       context: context,
@@ -107,18 +106,12 @@ class TenantDashboardScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final bgDark = isDark ? const Color(0xFF080B08) : const Color(0xFFF6F6F4);
-    final cardDark = isDark ? const Color(0xFF111811) : Colors.white;
-    final textPrimary = isDark
-        ? const Color(0xFFF0F0F0)
-        : const Color(0xFF111111);
-    final textSecondary = isDark
-        ? const Color(0xFF888888)
-        : const Color(0xFF6B7280);
-    final accentGreen = theme.primaryColor;
-    final borderColor = isDark
-        ? accentGreen.withOpacity(0.15)
-        : const Color(0xFFE5E7EB);
+    final bgDark = context.colors.scaffoldBg;
+    final cardDark = context.colors.cardBg;
+    final textPrimary = context.colors.textPrimary;
+    final textSecondary = context.colors.textSecondary;
+    final accentGreen = context.colors.success;
+    final borderColor = context.colors.border;
 
     final adminData = ref.watch(adminRoleProvider).value;
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
@@ -1184,7 +1177,7 @@ class TenantDashboardScreen extends ConsumerWidget {
       Tooltip(
         message: "Enter Store",
         child: IconButton(
-          icon: Icon(Icons.login, color: accentGreen, size: 20),
+          icon: Icon(Icons.login, color: Colors.white, size: 20),
           onPressed: enterStore,
           splashRadius: 20,
         ),

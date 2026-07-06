@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../providers/analytics_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class TimeIntelligenceCard extends ConsumerWidget {
   const TimeIntelligenceCard({super.key});
@@ -14,11 +15,9 @@ class TimeIntelligenceCard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827), // ⬛ Dark Terminal Theme for CA
+        color: context.colors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15),
-        ],
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -30,18 +29,21 @@ class TimeIntelligenceCard extends ConsumerWidget {
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
                     "Hourly Financial Matrix 📈",
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: context.colors.textPrimary,
                     ),
                   ),
                   Text(
                     "Realized Sales (Bars) vs Leakage Risk (Line)",
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'edit_distributor_dialog.dart';
 import '../../coach/widgets/info_button.dart';
+import '../../../core/theme/app_theme.dart';
 
 class DistributorListScreen extends ConsumerStatefulWidget {
   const DistributorListScreen({super.key});
@@ -24,20 +25,14 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
   }
 
   // 🎨 DYNAMIC LIGHT/DARK THEME
-  Color get bgDark => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF080B08)
-      : const Color(0xFFF4F5F7);
-  Color get cardDark => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF111811)
-      : const Color(0xFFFFFFFF);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   Color get accentGreen => Theme.of(context).brightness == Brightness.dark
       ? const Color(0xFF00C853)
       : const Color(0xFF2E7D32);
   Color get accentOrange => const Color(0xFFFF6D00);
-  Color get textPrimary =>
-      Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-  Color get textSecondary =>
-      Theme.of(context).textTheme.labelLarge?.color ?? Colors.grey;
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
 
   Future<void> _toggleStatus(String docId, bool currentStatus) async {
     await FirebaseFirestore.instance.collection('suppliers').doc(docId).update({

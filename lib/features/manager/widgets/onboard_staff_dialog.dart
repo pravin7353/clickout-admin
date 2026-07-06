@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 FIX: IMPORT ADDED
 
 import '../services/employee_service.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class OnboardStaffDialog extends ConsumerStatefulWidget {
   const OnboardStaffDialog({super.key});
@@ -26,12 +27,12 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
   bool _isLoading = false;
 
   // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   static const Color accentGreen = Color(0xFF00C853);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => context.colors.scaffoldBg;
 
   void _submitForm(String defaultBranchCode) async {
     if (_selectedRole == null) {
@@ -99,7 +100,10 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
+      labelStyle: TextStyle(
+        color: textSecondary,
+        fontSize: 13,
+      ), // 🚀 Removed const
       hintStyle: TextStyle(color: textSecondary.withOpacity(0.5), fontSize: 13),
       filled: true,
       fillColor: inputBg,
@@ -169,7 +173,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                     size: 24,
                   ),
                   const SizedBox(width: 12),
-                  const Text(
+                  Text(
+                    // 🚀 Removed const
                     "Onboard Personnel",
                     style: TextStyle(
                       fontSize: 20,
@@ -180,7 +185,10 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                   ),
                   const Spacer(),
                   IconButton(
-                    icon: const Icon(Icons.close, color: textSecondary),
+                    icon: Icon(
+                      Icons.close,
+                      color: textSecondary,
+                    ), // 🚀 Removed const
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -237,7 +245,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
+                                        Text(
+                                          // 🚀 Removed const
                                           "Deploying to Branch",
                                           style: TextStyle(
                                             color: textSecondary,
@@ -282,7 +291,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                                   const SizedBox(width: 8),
                                   Text(
                                     "Branch: $autoFetchedBranch (Locked)",
-                                    style: const TextStyle(
+                                    style: TextStyle(
+                                      // 🚀 Removed const
                                       color: textPrimary,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -324,7 +334,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                                   value: bCode,
                                   child: Text(
                                     "$bCode - $sName",
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: textPrimary,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -369,7 +379,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                           "System Designation *",
                           prefixIcon: Icons.shield_outlined,
                         ),
-                        hint: const Text(
+                        hint: Text(
+                          // 🚀 Removed const
                           "Select Role ▼",
                           style: TextStyle(color: textSecondary),
                         ),
@@ -379,7 +390,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                                 value: role,
                                 child: Text(
                                   role,
-                                  style: const TextStyle(
+                                  style: TextStyle(
+                                    // 🚀 Removed const
                                     fontWeight: FontWeight.bold,
                                     color: textPrimary,
                                   ),
@@ -397,7 +409,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                       TextFormField(
                         controller: _empIdCtrl,
                         textCapitalization: TextCapitalization.characters,
-                        style: const TextStyle(
+                        style: TextStyle(
+                          // 🚀 Removed const
                           color: textPrimary,
                           fontWeight: FontWeight.bold,
                         ),
@@ -419,7 +432,9 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
 
                       TextFormField(
                         controller: _nameCtrl,
-                        style: const TextStyle(color: textPrimary),
+                        style: TextStyle(
+                          color: textPrimary,
+                        ), // 🚀 Removed const
                         decoration: _darkInputStyle(
                           "Full Name *",
                           hint: "e.g. John Doe",
@@ -444,14 +459,18 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
 
                       TextFormField(
                         controller: _phoneCtrl,
-                        style: const TextStyle(color: textPrimary),
+                        style: TextStyle(
+                          color: textPrimary,
+                        ), // 🚀 Removed const
                         decoration:
                             _darkInputStyle(
                               "Phone (Login Credential) *",
                               prefixIcon: Icons.phone_android_outlined,
                             ).copyWith(
                               prefixText: "+91  ",
-                              prefixStyle: const TextStyle(color: textPrimary),
+                              prefixStyle: TextStyle(
+                                color: textPrimary,
+                              ), // 🚀 Removed const
                             ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -466,7 +485,9 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
 
                       TextFormField(
                         controller: _emailCtrl,
-                        style: const TextStyle(color: textPrimary),
+                        style: TextStyle(
+                          color: textPrimary,
+                        ), // 🚀 Removed const
                         decoration: _darkInputStyle(
                           _selectedRole == 'MANAGER'
                               ? "Official Email Address *"
@@ -507,7 +528,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                 children: [
                   TextButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context),
-                    child: const Text(
+                    child: Text(
+                      // 🚀 Removed const
                       "Cancel",
                       style: TextStyle(
                         color: textSecondary,
@@ -532,7 +554,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                         ? null
                         : () => _submitForm(autoFetchedBranch),
                     icon: _isLoading
-                        ? const SizedBox(
+                        ? SizedBox(
+                            // 🚀 Removed const
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(

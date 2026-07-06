@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 
 class RiskAlertStrip extends StatelessWidget {
   final List<String> alerts;
@@ -11,9 +12,11 @@ class RiskAlertStrip extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
+          color: context.colors.success.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.shade200),
+          border: Border.all(
+            color: context.colors.success.withValues(alpha: 0.3),
+          ),
         ),
         child: const Row(
           children: [
@@ -35,9 +38,9 @@ class RiskAlertStrip extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: context.colors.danger.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: context.colors.danger.withValues(alpha: 0.3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

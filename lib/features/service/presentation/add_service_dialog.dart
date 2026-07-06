@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/service_master_provider.dart'; // 🚀 NAYA SERVICE PROVIDER
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class AddServiceDialog extends ConsumerStatefulWidget {
   const AddServiceDialog({super.key});
@@ -30,12 +31,12 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
   ];
 
   // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   static const Color accentBlue = Color(0xFF2962FF); // 🚀 Service Blue Theme
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => context.colors.scaffoldBg;
 
   @override
   void initState() {
@@ -151,7 +152,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             "Add New Service",
                             style: TextStyle(
@@ -161,7 +162,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                               letterSpacing: -0.5,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             "Register a non-physical service (e.g., Hair Spa, Polishing).",
                             style: TextStyle(
@@ -174,7 +175,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: textSecondary),
+                      icon: Icon(Icons.close, color: textSecondary),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -259,7 +260,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     "Applicable GST",
                                     style: TextStyle(
                                       fontSize: 13,
@@ -284,7 +285,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                                             value: slab,
                                             child: Text(
                                               slab,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontWeight: FontWeight.w600,
                                                 color: textPrimary,
                                               ),
@@ -346,7 +347,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                       onPressed: _isLoading
                           ? null
                           : () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         "Cancel",
                         style: TextStyle(
                           color: textSecondary,
@@ -401,7 +402,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
     padding: const EdgeInsets.only(bottom: 16),
     child: Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w900,
         color: textSecondary,
@@ -432,7 +433,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
             color: textPrimary,
@@ -443,10 +444,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
           controller: controller,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            color: textPrimary,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
           decoration: _inputStyle(icon: icon, hintText: hintText),
           validator: validator,
         ),

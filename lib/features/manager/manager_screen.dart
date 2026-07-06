@@ -10,6 +10,7 @@ import '../../core/providers/access_control_provider.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../coach/widgets/mission_banner.dart';
 import '../coach/widgets/info_button.dart';
+import '../../core/theme/app_theme.dart';
 
 class ManagerScreen extends ConsumerStatefulWidget {
   const ManagerScreen({super.key});
@@ -43,9 +44,12 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
         fontSize: 14,
       ),
       filled: true,
-      fillColor: isDark ? const Color(0xFF1A221A) : Colors.grey.shade50,
+      fillColor: context.colors.scaffoldBg,
       prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, color: theme.iconTheme.color?.withOpacity(0.5))
+          ? Icon(
+              prefixIcon,
+              color: theme.iconTheme.color?.withValues(alpha: 0.5),
+            )
           : null,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
@@ -113,9 +117,7 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1A221A)
-                            : Colors.grey.shade50,
+                        color: theme.cardColor,
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(16),
                         ),
@@ -164,10 +166,10 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                               padding: const EdgeInsets.all(12),
                               margin: const EdgeInsets.only(bottom: 20),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.1),
+                                color: Colors.orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: Colors.orange.withOpacity(0.3),
+                                  color: Colors.orange.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -368,7 +370,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                       color: theme.cardColor,
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: Colors.green.withOpacity(0.3),
+                                        color: Colors.green.withValues(
+                                          alpha: 0.3,
+                                        ),
                                       ),
                                     ),
                                     child: Row(
@@ -570,9 +574,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
@@ -611,10 +615,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
 
     // Theme adaptions
     final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark; // 🚀 YE 1 LINE MISSING THI
-    final tableBg = theme.cardColor;
-    final textP = theme.textTheme.bodyLarge?.color ?? Colors.black;
+    final isDark = theme.brightness == Brightness.dark;
+    final tableBg = context.colors.cardBg;
+    final textP = context.colors.textPrimary;
 
     return Padding(
       padding: const EdgeInsets.all(32.0),
@@ -760,9 +763,7 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
             margin: const EdgeInsets.only(bottom: 20),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF1A221A)
-                  : const Color(0xFFF4F5F7), // 💎 Sequence soft input
+              color: theme.inputDecorationTheme.fillColor ?? theme.cardColor,
               border: Border.all(color: theme.dividerColor),
               borderRadius: BorderRadius.circular(8),
             ),
@@ -863,13 +864,10 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                           headingRowHeight: 56,
                                           dataRowMaxHeight: 65,
                                           dataRowMinHeight: 65,
-                                          headingRowColor: WidgetStateProperty.all(
-                                            isDark
-                                                ? const Color(0xFF1A221A)
-                                                : const Color(
-                                                    0xFFE8F5E9,
-                                                  ), // 💎 Soft Emerald Tint for Header
-                                          ),
+                                          headingRowColor:
+                                              WidgetStateProperty.all(
+                                                theme.colorScheme.surface,
+                                              ),
                                           headingTextStyle: TextStyle(
                                             fontWeight: FontWeight.w900,
                                             color: isDark
@@ -926,11 +924,15 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                                       WidgetState.hovered,
                                                     )) {
                                                       return Colors.blue
-                                                          .withOpacity(0.04);
+                                                          .withValues(
+                                                            alpha: 0.04,
+                                                          );
                                                     }
                                                     if (idx % 2 == 0) {
                                                       return Colors.grey
-                                                          .withOpacity(0.02);
+                                                          .withValues(
+                                                            alpha: 0.02,
+                                                          );
                                                     }
                                                     return tableBg;
                                                   }),
@@ -1390,7 +1392,9 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
                 decoration: InputDecoration(
                   hintText:
                       "e.g.\nEMP001, Manager, manager@clickout.com, 9876543210, MANAGER, JAI_MUM_002\nEMP002, Cashier, , 9876543211, CASHIER, JAI_MUM_002\nEMP003, Guard Bhaiya, , 9876543212, GUARD, JAI_MUM_002",
-                  hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
+                  hintStyle: TextStyle(
+                    color: Colors.grey.withValues(alpha: 0.5),
+                  ),
                   filled: true,
                   fillColor: theme.brightness == Brightness.dark
                       ? const Color(0xFF1A221A)
@@ -1463,9 +1467,11 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.withOpacity(0.3)),
+                    border: Border.all(
+                      color: Colors.red.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: ListView.builder(
                     itemCount: _errorLogs.length,
@@ -1506,9 +1512,9 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [

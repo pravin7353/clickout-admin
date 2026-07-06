@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../coach/widgets/info_button.dart';
+import '../../../core/theme/app_theme.dart';
 
 class CashReconciliationCard extends StatefulWidget {
   final double expectedCash;
@@ -24,9 +25,8 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inputBg = isDark ? const Color(0xFF1A221A) : const Color(0xFFF4F5F7);
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final inputBg = context.colors.scaffoldBg;
+    final textColor = context.colors.textPrimary;
     Color varianceColor = Colors.green;
     String varianceText = "Perfect Match ✅";
 
@@ -43,16 +43,9 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: context.colors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,15 +158,14 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
   }
 
   Widget _buildInfoTile(String title, String value, Color color) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inputBg = isDark ? const Color(0xFF1A221A) : const Color(0xFFF4F5F7);
+    final inputBg = context.colors.scaffoldBg;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: inputBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

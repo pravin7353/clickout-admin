@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 // 🚀 FUTURE PROVIDER: To safely fetch Employee details asynchronously
 final employeeNameProvider = FutureProvider.family<String, String>((
@@ -103,7 +104,7 @@ class OrderAutopsyDrawer extends ConsumerWidget {
       width: MediaQuery.of(context).size.width > 600
           ? 500
           : double.infinity, // Responsive Drawer
-      color: Colors.white,
+      color: context.colors.scaffoldBg,
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,12 +112,12 @@ class OrderAutopsyDrawer extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "Order Autopsy 🔬",
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2B3674),
+                  color: context.colors.textPrimary,
                 ),
               ),
               IconButton(
@@ -167,8 +168,9 @@ class OrderAutopsyDrawer extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: context.colors.cardBg,
               borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: context.colors.border),
             ),
             child: Column(
               children: itemRows.isNotEmpty
@@ -183,10 +185,14 @@ class OrderAutopsyDrawer extends ConsumerWidget {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               border: Border.all(
-                color: hasMismatch ? Colors.red : Colors.grey.shade300,
+                color: hasMismatch
+                    ? context.colors.danger
+                    : context.colors.border,
               ),
               borderRadius: BorderRadius.circular(12),
-              color: hasMismatch ? Colors.red.shade50 : Colors.white,
+              color: hasMismatch
+                  ? context.colors.danger.withValues(alpha: 0.1)
+                  : context.colors.cardBg,
             ),
             child: Column(
               children: [

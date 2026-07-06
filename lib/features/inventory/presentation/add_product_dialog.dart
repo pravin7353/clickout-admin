@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/product_master/product_master_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class AddProductDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic>? existingData;
@@ -38,12 +39,12 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   ];
 
   // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   static const Color accentGreen = Color(0xFF00C853);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => context.colors.scaffoldBg;
 
   @override
   void initState() {
@@ -88,7 +89,8 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
+            colorScheme: ColorScheme.dark(
+              // 🚀 Removed const
               primary: accentGreen,
               onPrimary: bgDark,
               surface: cardDark,
@@ -212,7 +214,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                         children: [
                           Text(
                             isEdit ? "Edit Master SKU" : "Add New Master SKU",
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
@@ -224,7 +226,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                             isEdit
                                 ? "Update inventory specifications & pricing."
                                 : "Register a new product into the enterprise inventory.",
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
@@ -234,7 +236,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: textSecondary),
+                      icon: Icon(Icons.close, color: textSecondary),
                       onPressed: () => Navigator.pop(context),
                       splashRadius: 24,
                     ),
@@ -342,7 +344,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   "Included GST Slab",
                                   style: TextStyle(
                                     fontSize: 13,
@@ -366,7 +368,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                       value: slab,
                                       child: Text(
                                         slab,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: textPrimary,
                                         ),
@@ -422,7 +424,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                             Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   "Expiry Date",
                                   style: TextStyle(
                                     fontSize: 13,
@@ -435,7 +437,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   controller: _expiryCtrl,
                                   readOnly: true,
                                   onTap: () => _pickDate(context),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: textPrimary,
                                   ),
@@ -444,7 +446,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                         icon: Icons.calendar_month_outlined,
                                         hintText: "Select Date (Optional)",
                                       ).copyWith(
-                                        suffixIcon: const Icon(
+                                        suffixIcon: Icon(
                                           Icons.arrow_drop_down,
                                           color: textSecondary,
                                         ),
@@ -489,7 +491,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                           vertical: 20,
                         ),
                       ),
-                      child: const Text(
+                      child: Text(
                         "Cancel",
                         style: TextStyle(
                           color: textSecondary,
@@ -502,7 +504,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                     ElevatedButton.icon(
                       onPressed: _isLoading ? null : _saveProduct,
                       icon: _isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
@@ -583,7 +585,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
             color: textPrimary,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../services/guard_service.dart';
 import '../../coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class ScannerModal extends ConsumerStatefulWidget {
   const ScannerModal({super.key});
@@ -115,15 +116,13 @@ class _ScannerModalState extends ConsumerState<ScannerModal> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        Theme.of(context).brightness ==
-        Brightness.dark; // 🚀 YE LINE ADD KI HAI
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: context.colors.scaffoldBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: SafeArea(

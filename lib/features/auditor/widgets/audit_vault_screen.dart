@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION IMPORT
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
+import '../../../core/theme/app_theme.dart';
 
 class AuditVaultScreen extends ConsumerWidget {
   const AuditVaultScreen({super.key});
@@ -27,13 +28,16 @@ class AuditVaultScreen extends ConsumerWidget {
     auditQuery = auditQuery.orderBy('timestamp', descending: true).limit(150);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF000000), // ⬛ 100% PITCH BLACK THEME
+      backgroundColor: context.colors.scaffoldBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF000000),
+        backgroundColor: context.colors.scaffoldBg,
         elevation: 0,
         // 🚪 THE 100% WORKING ESCAPE DOOR
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: context.colors.textPrimary,
+          ),
           onPressed: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
@@ -60,37 +64,40 @@ class AuditVaultScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: const [
+                children: [
                   Text(
                     "Audit Vault",
                     style: TextStyle(
-                      color: Colors.white,
+                      color: context.colors.textPrimary,
                       fontSize: 32,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.5,
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   InfoButton(
                     title: "Audit Vault",
                     en: "Every critical system action is permanently recorded here — deletions, approvals, overrides. Use this to investigate fraud or disputes.",
                     hi: "System ka koi bhi bada action yahan permanently save hota hai — delete, approve, override sab. Fraud ya dispute mein yahan se proof milega.",
-                    iconColor: Colors.white38,
+                    iconColor: context.colors.textSecondary,
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 "Immutable System Activity Logs",
-                style: TextStyle(color: Colors.white54, fontSize: 14),
+                style: TextStyle(
+                  color: context.colors.textSecondary,
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 30),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111111),
+                    color: context.colors.cardBg,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white10),
+                    border: Border.all(color: context.colors.border),
                   ),
                   child: StreamBuilder<QuerySnapshot>(
                     stream: auditQuery.snapshots(), // 🚀 SAAS INJECTION FIX

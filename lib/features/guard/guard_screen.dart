@@ -8,6 +8,7 @@ import 'widgets/scanner_modal.dart';
 import 'services/guard_service.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class GuardScreen extends ConsumerWidget {
   const GuardScreen({super.key});
@@ -26,10 +27,10 @@ class GuardScreen extends ConsumerWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            backgroundColor: context.colors.cardBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Colors.white10),
+              side: BorderSide(color: context.colors.border),
             ),
             title: const Row(
               children: [
@@ -192,9 +193,7 @@ class GuardScreen extends ConsumerWidget {
                   ? 450
                   : MediaQuery.of(context).size.width,
               height: double.infinity,
-              color: MediaQuery.of(context).size.width > 600
-                  ? const Color(0xFF1E1E1E)
-                  : Colors.white, // ⬛ PREMIUM DARK
+              color: context.colors.scaffoldBg, // ⬛ PREMIUM DARK
               padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top + 24,
                 left: 24,
@@ -237,9 +236,9 @@ class GuardScreen extends ConsumerWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF121212),
+                      color: context.colors.cardBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white10),
+                      border: Border.all(color: context.colors.border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,9 +280,9 @@ class GuardScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF121212),
+                        color: context.colors.cardBg,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white10),
+                        border: Border.all(color: context.colors.border),
                       ),
                       child: itemsList.isEmpty
                           ? const Center(

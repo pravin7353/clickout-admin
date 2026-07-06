@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/theme/app_theme.dart'; // 🚀 YE IMPORT MISSING THA
 import '../../features/auth/auth_provider.dart';
 import '../../features/invoice/invoice_rules_dialog.dart';
 import '../../core/store/providers/store_provider.dart';
@@ -8,7 +9,6 @@ import '../../features/tenant_admin/screens/edit_store_profile_dialog.dart';
 //import '../../features/tenant_admin/screens/edit_tenant_profile_dialog.dart';
 import '../../features/manager/widgets/store_entry_qr_card.dart'; // 🚀 NAYA
 import '../../core/providers/theme_provider.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/providers/access_control_provider.dart';
 import '../../core/subscription/widgets/trial_countdown_badge.dart';
 import '../../core/subscription/widgets/usage_limit_banner.dart';
@@ -19,16 +19,16 @@ const double tabletBreakpoint = 1024;
 
 // --- EXACT THEME SPEC ENFORCEMENT ---
 // (We now use Theme.of(context) dynamically, but keeping this for fallback/reference)
-const Color bgDarkTheme = AppColors.darkBg;
-const Color cardDarkTheme = AppColors.darkCard;
-const Color accentGreenTheme = AppColors.accent;
+const Color bgDarkTheme = Color(0xFF080B08);
+const Color cardDarkTheme = Color(0xFF111811);
+const Color accentGreenTheme = Color(0xFF00C853);
 
 // --- SECTION COLORS ---
-const globalCommandColor = AppColors.globalCmd;
-const tenantHqColor = AppColors.tenantHq;
-const operationsColor = AppColors.operations;
-const staffAuditColor = AppColors.staffAudit;
-const financeRiskColor = AppColors.financeRisk;
+const globalCommandColor = Color(0xFF7F77DD);
+const tenantHqColor = accentGreenTheme;
+const operationsColor = Color(0xFF378ADD);
+const staffAuditColor = Color(0xFFEF9F27);
+const financeRiskColor = Color(0xFFE24B4A);
 
 class AdminShell extends ConsumerWidget {
   final Widget child;
@@ -64,14 +64,12 @@ class AdminShell extends ConsumerWidget {
     final isManager = rawRole == 'MANAGER';
     final roleColor = _getRoleColor(rawRole);
 
-    // 🎨 STRICT THEME ENFORCEMENT
+    // 🎨 STRICT THEME ENFORCEMENT (Using context.colors extension)
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgMain = Theme.of(context).scaffoldBackgroundColor;
-    final bgSidebar = Theme.of(context).cardColor;
-    final textPrimary =
-        Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-    final textSecondary =
-        Theme.of(context).textTheme.labelLarge?.color ?? Colors.grey;
+    final bgMain = context.colors.scaffoldBg;
+    final bgSidebar = context.colors.cardBg;
+    final textPrimary = context.colors.textPrimary;
+    final textSecondary = context.colors.textSecondary;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -86,7 +84,7 @@ class AdminShell extends ConsumerWidget {
               : null,
           drawer: isMobile
               ? Drawer(
-                  backgroundColor: Theme.of(context).cardColor,
+                  backgroundColor: bgSidebar, // 💎 Clean minimal background
                   child: _buildSidebarContent(
                     true,
                     context,
@@ -111,9 +109,10 @@ class AdminShell extends ConsumerWidget {
                   duration: const Duration(milliseconds: 300),
                   width: isDesktop ? 260 : 80,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
+                    color:
+                        bgSidebar, // 💎 Removed Emerald, using semantic cardBg
                     border: Border(
-                      right: BorderSide(color: Theme.of(context).dividerColor),
+                      right: BorderSide(color: context.colors.border),
                     ),
                   ),
                   child: _buildSidebarContent(
@@ -128,8 +127,8 @@ class AdminShell extends ConsumerWidget {
                     isManager,
                     ref,
                     bgSidebar,
-                    textPrimary,
-                    textSecondary,
+                    textPrimary, // 💎 Adapts to light/dark
+                    textSecondary, // 💎 Adapts to light/dark
                   ),
                 ),
               Expanded(
@@ -457,24 +456,28 @@ class AdminShell extends ConsumerWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: accentGreenTheme.withOpacity(0.15),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.primary.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: accentGreenTheme.withOpacity(0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(0.5),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.location_on,
-                        color: accentGreenTheme,
+                        color: Theme.of(context).colorScheme.primary,
                         size: 16,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         activeStore.storeName,
-                        style: const TextStyle(
-                          color: accentGreenTheme,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.w900,
                           fontSize: 14,
                           letterSpacing: 0.5,
@@ -488,15 +491,23 @@ class AdminShell extends ConsumerWidget {
           ),
           Row(
             children: [
-              IconButton(
-                icon: Icon(
-                  isDark ? Icons.light_mode : Icons.dark_mode,
-                  color: accentGreenTheme,
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                onPressed: () {
-                  // 🚀 Ye naya function theme change bhi karega aur LocalStorage me hamesha ke liye SAVE bhi karega!
-                  ref.read(themeProvider.notifier).toggleTheme();
-                },
+                child: IconButton(
+                  tooltip: isDark
+                      ? 'Switch to Light Mode'
+                      : 'Switch to Dark Mode',
+                  icon: Icon(
+                    isDark ? Icons.wb_sunny_outlined : Icons.dark_mode_outlined,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  onPressed: () {
+                    ref.read(themeProvider.notifier).toggleTheme();
+                  },
+                ),
               ),
               const SizedBox(width: 5),
               const TrialCountdownBadge(),
@@ -1024,11 +1035,6 @@ class AdminShell extends ConsumerWidget {
     VoidCallback? onCustomTap,
   }) {
     bool isActive = false;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // 💎 Dynamic inactive color (White70 for Emerald Light Mode, Grey for Dark Mode)
-    final inactiveColor = Theme.of(context).textTheme.labelLarge?.color ?? AppColors.darkMuted;
-    final activeColor = sectionColor;
 
     if (route == '/') {
       isActive = currentPath == '/';
@@ -1036,25 +1042,26 @@ class AdminShell extends ConsumerWidget {
       isActive = currentPath.startsWith(route);
     }
 
+    // 💎 Dynamic text colors matching the clean theme
+    final inactiveColor = context.colors.textSecondary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onCustomTap ?? () => context.go(route),
         child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           padding: EdgeInsets.symmetric(
-            vertical: 15,
-            horizontal: isExpanded ? 20 : 0,
+            vertical: 12,
+            horizontal: isExpanded ? 12 : 0,
           ),
           decoration: BoxDecoration(
             color: isActive
-                ? activeColor.withOpacity(0.15)
+                ? context
+                      .colors
+                      .cardBg // Subtle active background
                 : Colors.transparent,
-            border: Border(
-              left: BorderSide(
-                color: isActive ? activeColor : Colors.transparent,
-                width: 3,
-              ),
-            ),
+            borderRadius: BorderRadius.circular(8),
           ),
           alignment: isExpanded ? Alignment.centerLeft : Alignment.center,
           child: Row(
@@ -1064,18 +1071,20 @@ class AdminShell extends ConsumerWidget {
             children: [
               Icon(
                 icon,
-                color: isActive ? activeColor : inactiveColor,
-                size: 24,
+                color: isActive ? context.colors.textPrimary : inactiveColor,
+                size: 20,
               ),
-              if (isExpanded) const SizedBox(width: 15),
+              if (isExpanded) const SizedBox(width: 12),
               if (isExpanded)
                 Expanded(
                   child: Text(
                     title,
                     style: TextStyle(
-                      color: isActive ? activeColor : inactiveColor,
+                      color: isActive
+                          ? context.colors.textPrimary
+                          : inactiveColor,
                       fontSize: 14,
-                      fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1096,9 +1105,11 @@ class AdminShell extends ConsumerWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.amber.withOpacity(0.15),
+                    color: Colors.amber.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                    border: Border.all(
+                      color: Colors.amber.withValues(alpha: 0.5),
+                    ),
                   ),
                   child: const Text(
                     'UPGRADE',
@@ -1108,6 +1119,15 @@ class AdminShell extends ConsumerWidget {
                       fontWeight: FontWeight.bold,
                       letterSpacing: 0.5,
                     ),
+                  ),
+                ),
+              if (isExpanded && isActive)
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: Colors.greenAccent.shade400, // 🟢 Premium Green Dot
+                    shape: BoxShape.circle,
                   ),
                 ),
             ],
@@ -1136,10 +1156,10 @@ class AdminShell extends ConsumerWidget {
       transitionDuration: const Duration(milliseconds: 200),
       pageBuilder: (ctx, anim1, anim2) {
         // 🚀 LINKEDIN STYLE DESIGN TOKENS
-        final bgColor = isDark ? const Color(0xFF1E1E2D) : Colors.white;
-        final borderColor = isDark ? Colors.white10 : Colors.grey.shade200;
-        final iconColor = isDark ? Colors.grey.shade400 : Colors.grey.shade600;
-        final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+        final bgColor = context.colors.cardBg;
+        final borderColor = context.colors.border;
+        final iconColor = context.colors.textSecondary;
+        final textColor = context.colors.textPrimary;
 
         return Stack(
           children: [

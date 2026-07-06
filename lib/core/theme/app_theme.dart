@@ -1,207 +1,264 @@
 import 'package:flutter/material.dart';
 
-class AppColors {
-  static const accent = Color(0xFF00C853);
-  static const accentNeon = Color(0xFF00FF88);
-
-  static const darkBg = Color(0xFF080B08);
-  static const darkCard = Color(0xFF111811);
-  static const darkCardElevated = Color(0xFF1A201A);
-  static const darkText = Color(0xFFF0F0F0);
-  static const darkMuted = Color(0xFF888888);
-  static const darkBorder = Color(0xFF1F261F);
-  static const darkInput = Color(0xFF0D110D);
-
-  static const lightBg = Color(0xFFF8FAFC);
-  static const lightCard = Color(0xFFFFFFFF);
-  static const lightCardElevated = Color(0xFFF1F5F9);
-  static const lightText = Color(0xFF0F172A);
-  static const lightMuted = Color(0xFF64748B);
-  static const lightBorder = Color(0xFFE2E8F0);
-  static const lightInput = Color(0xFFF8FAFC);
-
-  static const error = Color(0xFFE53E3E);
-  static const warning = Color(0xFFEF9F27);
-  static const success = Color(0xFF00C853);
-  static const info = Color(0xFF378ADD);
-
-  static const globalCmd = Color(0xFF7F77DD);
-  static const tenantHq = Color(0xFF00C853);
-  static const operations = Color(0xFF378ADD);
-  static const staffAudit = Color(0xFFEF9F27);
-  static const financeRisk = Color(0xFFE24B4A);
+// ==========================================
+// 🚀 1. BUILDCONTEXT EXTENSION (Clean Syntax)
+// ==========================================
+extension ThemeContext on BuildContext {
+  ClickOutColors get colors => Theme.of(this).extension<ClickOutColors>()!;
+  TextTheme get textStyles => Theme.of(this).textTheme;
 }
 
-class AppTheme {
-  static ThemeData get darkTheme {
-    return ThemeData(
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.darkBg,
-      primaryColor: AppColors.accent,
-      cardColor: AppColors.darkCard,
-      canvasColor: AppColors.darkCard,
-      dialogBackgroundColor: AppColors.darkCard,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.accent,
-        surface: AppColors.darkCard,
-        onSurface: AppColors.darkText,
-        onPrimary: Colors.black,
-        error: AppColors.error,
-        outline: AppColors.darkBorder,
-      ),
-      textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: AppColors.darkText),
-        bodyMedium: TextStyle(color: AppColors.darkText),
-        bodySmall: TextStyle(color: AppColors.darkMuted),
-        labelLarge: TextStyle(color: AppColors.darkMuted),
-        titleMedium: TextStyle(color: AppColors.darkText, fontWeight: FontWeight.w600),
-        titleLarge: TextStyle(color: AppColors.darkText, fontWeight: FontWeight.bold),
-      ),
-      iconTheme: const IconThemeData(color: AppColors.darkText),
-      dividerColor: AppColors.darkBorder,
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.darkInput,
-        hintStyle: const TextStyle(color: AppColors.darkMuted),
-        labelStyle: const TextStyle(color: AppColors.darkMuted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.darkBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.darkBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.error),
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.darkText,
-          side: const BorderSide(color: AppColors.darkBorder),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
-      cardTheme: CardThemeData(
-        color: AppColors.darkCard,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.darkBorder),
-        ),
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.darkCard,
-        foregroundColor: AppColors.darkText,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      tabBarTheme: const TabBarThemeData(indicatorColor: AppColors.accent),
-      useMaterial3: true,
+// ==========================================
+// 🎨 2. SEMANTIC THEME EXTENSION
+// ==========================================
+class ClickOutColors extends ThemeExtension<ClickOutColors> {
+  final Color scaffoldBg;
+  final Color cardBg;
+  final Color textPrimary;
+  final Color textSecondary;
+  final Color ctaBackground;
+  final Color ctaText;
+  final Color danger;
+  final Color warning;
+  final Color success;
+  final Color border;
+  final Color blogHeroBg;
+
+  const ClickOutColors({
+    required this.scaffoldBg,
+    required this.cardBg,
+    required this.textPrimary,
+    required this.textSecondary,
+    required this.ctaBackground,
+    required this.ctaText,
+    required this.danger,
+    required this.warning,
+    required this.success,
+    required this.border,
+    required this.blogHeroBg,
+  });
+
+  @override
+  ClickOutColors copyWith({
+    Color? scaffoldBg,
+    Color? cardBg,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? ctaBackground,
+    Color? ctaText,
+    Color? danger,
+    Color? warning,
+    Color? success,
+    Color? border,
+    Color? blogHeroBg,
+  }) {
+    return ClickOutColors(
+      scaffoldBg: scaffoldBg ?? this.scaffoldBg,
+      cardBg: cardBg ?? this.cardBg,
+      textPrimary: textPrimary ?? this.textPrimary,
+      textSecondary: textSecondary ?? this.textSecondary,
+      ctaBackground: ctaBackground ?? this.ctaBackground,
+      ctaText: ctaText ?? this.ctaText,
+      danger: danger ?? this.danger,
+      warning: warning ?? this.warning,
+      success: success ?? this.success,
+      border: border ?? this.border,
+      blogHeroBg: blogHeroBg ?? this.blogHeroBg,
     );
   }
 
+  @override
+  ClickOutColors lerp(ThemeExtension<ClickOutColors>? other, double t) {
+    if (other is! ClickOutColors) return this;
+    return ClickOutColors(
+      scaffoldBg: Color.lerp(scaffoldBg, other.scaffoldBg, t)!,
+      cardBg: Color.lerp(cardBg, other.cardBg, t)!,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
+      ctaBackground: Color.lerp(ctaBackground, other.ctaBackground, t)!,
+      ctaText: Color.lerp(ctaText, other.ctaText, t)!,
+      danger: Color.lerp(danger, other.danger, t)!,
+      warning: Color.lerp(warning, other.warning, t)!,
+      success: Color.lerp(success, other.success, t)!,
+      border: Color.lerp(border, other.border, t)!,
+      blogHeroBg: Color.lerp(blogHeroBg, other.blogHeroBg, t)!,
+    );
+  }
+}
+
+// ==========================================
+// 🛠️ 3. APP THEME CONFIGURATION
+// ==========================================
+class AppTheme {
+  // Shared functional colors
+  static const Color danger = Color(0xFFFF4D4D);
+  static const Color warning = Color(0xFFFFCC00);
+  static const Color success = Color(0xFF22C55E); // Standard green
+
+  // --- LIGHT MODE TOKENS ---
+  static const _lightScaffold = Color(0xFFFAF2EB); // Softer, lighter warm base
+  static const _lightCard = Color(0xFFFFFFFF); // Pure white cards
+  static const _lightTextPri = Color(0xFF1A1917); // Dark brown-black for text
+  static const _lightTextSec = Color(0xFF6B7280); // Medium grey
+  static const _lightCtaBg = Color(0xFF22C55E); // Solid bright green CTA
+  static const _lightCtaText = Color(0xFFFFFFFF); // White text on CTA
+  static const _lightBorder = Color(0xFFE5E7EB);
+  static const _lightBlogHero = Color(
+    0xFFF9F6F0,
+  ); // Very soft beige (No emerald green)
+
+  // --- DARK MODE TOKENS (Apple/Claude Premium Aesthetic) ---
+  static const _darkScaffold = Color(0xFF1A1917); // Soft dark background
+  static const _darkCard = Color(0xFF232220); // Silent floating cards
+  static const _darkTextPri = Color(0xFFEBEBF5); // Crisp primary text
+  static const _darkTextSec = Color(0xFF636366); // Calm secondary text
+  static const _darkCtaBg = Color(0xFF242426); // Muted UI elements
+  static const _darkCtaText = Color(0xFFEBEBF5); // White text
+  static const _darkBorder = Color(0xFF2C2C2E); // Barely visible borders
+  static const _darkBlogHero = Color(0xFF242426);
+
+  // ==========================================
+  // ☀️ LIGHT THEME
+  // ==========================================
   static ThemeData get lightTheme {
     return ThemeData(
+      useMaterial3: true,
       brightness: Brightness.light,
-      scaffoldBackgroundColor: AppColors.lightBg,
-      primaryColor: AppColors.accent,
-      cardColor: AppColors.lightCard,
-      canvasColor: AppColors.lightCard,
-      dialogBackgroundColor: AppColors.lightCard,
-      colorScheme: const ColorScheme.light(
-        primary: AppColors.accent,
-        surface: AppColors.lightCard,
-        onSurface: AppColors.lightText,
-        onPrimary: Colors.black,
-        error: AppColors.error,
-        outline: AppColors.lightBorder,
-      ),
+      scaffoldBackgroundColor: _lightScaffold,
+      primaryColor: _lightCtaBg,
+      cardColor: _lightCard,
+      dividerColor: _lightBorder,
+      extensions: const <ThemeExtension<dynamic>>[
+        ClickOutColors(
+          scaffoldBg: _lightScaffold,
+          cardBg: _lightCard,
+          textPrimary: _lightTextPri,
+          textSecondary: _lightTextSec,
+          ctaBackground: _lightCtaBg,
+          ctaText: _lightCtaText,
+          danger: danger,
+          warning: warning,
+          success: success,
+          border: _lightBorder,
+          blogHeroBg: _lightBlogHero,
+        ),
+      ],
       textTheme: const TextTheme(
-        bodyLarge: TextStyle(color: AppColors.lightText),
-        bodyMedium: TextStyle(color: AppColors.lightText),
-        bodySmall: TextStyle(color: AppColors.lightMuted),
-        labelLarge: TextStyle(color: AppColors.lightMuted),
-        titleMedium: TextStyle(color: AppColors.lightText, fontWeight: FontWeight.w600),
-        titleLarge: TextStyle(color: AppColors.lightText, fontWeight: FontWeight.bold),
-      ),
-      iconTheme: const IconThemeData(color: AppColors.lightMuted),
-      dividerColor: AppColors.lightBorder,
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.lightInput,
-        hintStyle: const TextStyle(color: AppColors.lightMuted),
-        labelStyle: const TextStyle(color: AppColors.lightMuted),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.lightBorder),
+        displayLarge: TextStyle(
+          color: _lightTextPri,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -1.5,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.lightBorder),
+        headlineLarge: TextStyle(
+          color: _lightTextPri,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -1.0,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+        titleLarge: TextStyle(
+          color: _lightTextPri,
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: AppColors.error),
+        bodyLarge: TextStyle(color: _lightTextPri, fontSize: 16),
+        bodyMedium: TextStyle(color: _lightTextSec, fontSize: 14),
+        labelSmall: TextStyle(
+          color: _lightTextSec,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: Colors.black,
+          backgroundColor: _lightCtaBg,
+          foregroundColor: _lightCtaText,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.lightText,
-          side: const BorderSide(color: AppColors.lightBorder),
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       cardTheme: CardThemeData(
-        color: AppColors.lightCard,
+        color: _lightCard,
         elevation: 0,
+        shadowColor: Colors.black.withOpacity(0.04), // Soft shadow
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: AppColors.lightBorder),
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: _lightBorder, width: 1),
         ),
       ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.lightCard,
-        foregroundColor: AppColors.lightText,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-      ),
-      tabBarTheme: const TabBarThemeData(indicatorColor: AppColors.accent),
+    );
+  }
+
+  // ==========================================
+  // 🌙 DARK THEME
+  // ==========================================
+  static ThemeData get darkTheme {
+    return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: _darkScaffold,
+      primaryColor: _darkCtaBg,
+      cardColor: _darkCard,
+      dividerColor: _darkBorder,
+      extensions: const <ThemeExtension<dynamic>>[
+        ClickOutColors(
+          scaffoldBg: _darkScaffold,
+          cardBg: _darkCard,
+          textPrimary: _darkTextPri,
+          textSecondary: _darkTextSec,
+          ctaBackground: _darkCtaBg,
+          ctaText: _darkCtaText,
+          danger: danger,
+          warning: warning,
+          success: success,
+          border: _darkBorder,
+          blogHeroBg: _darkBlogHero,
+        ),
+      ],
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(
+          color: _darkTextPri,
+          fontWeight: FontWeight.w900,
+          letterSpacing: -1.5,
+        ),
+        headlineLarge: TextStyle(
+          color: _darkTextPri,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -1.0,
+        ),
+        titleLarge: TextStyle(
+          color: _darkTextPri,
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+        ),
+        bodyLarge: TextStyle(color: _darkTextPri, fontSize: 16),
+        bodyMedium: TextStyle(color: _darkTextSec, fontSize: 14),
+        labelSmall: TextStyle(
+          color: _darkTextSec,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _darkCtaBg,
+          foregroundColor: _darkCtaText,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: _darkCard,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: _darkBorder, width: 1),
+        ),
+      ),
     );
   }
 }

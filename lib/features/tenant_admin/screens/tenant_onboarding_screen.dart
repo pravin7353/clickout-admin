@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 // IMPORTANT: Adjust import paths based on your actual file structure
 import '../../auth/auth_provider.dart';
@@ -200,7 +201,7 @@ class _TenantOnboardingScreenState
     }
   }
 
-  // Premium Input Style matching your project UI
+  // Premium Input Style connected to app_theme
   InputDecoration _premiumInputStyle(
     String label,
     IconData icon, {
@@ -208,26 +209,30 @@ class _TenantOnboardingScreenState
   }) {
     return InputDecoration(
       labelText: label,
+      labelStyle: TextStyle(color: context.colors.textSecondary),
       hintText: hint,
-      prefixIcon: Icon(icon, color: const Color(0xFF2B3674).withOpacity(0.5)),
+      hintStyle: TextStyle(
+        color: context.colors.textSecondary.withOpacity(0.5),
+      ),
+      prefixIcon: Icon(icon, color: context.colors.textSecondary),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: context.colors.scaffoldBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: context.colors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
+        borderSide: BorderSide(color: context.colors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF2B3674), width: 1.5),
+        borderSide: BorderSide(color: context.colors.success, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderSide: BorderSide(color: context.colors.danger, width: 1),
       ),
     );
   }

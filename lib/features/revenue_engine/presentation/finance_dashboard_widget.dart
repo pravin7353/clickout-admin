@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 // Ensure this path matches your project structure
 import '../providers/revenue_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class FinanceDashboardWidget extends ConsumerWidget {
   const FinanceDashboardWidget({super.key});
@@ -15,11 +16,8 @@ class FinanceDashboardWidget extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.colors.scaffoldBg,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
-        ],
       ),
       child: revenueState.when(
         loading: () => const Center(
@@ -54,12 +52,12 @@ class FinanceDashboardWidget extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Financial Command Center 💰",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2B3674),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 15),
@@ -80,21 +78,25 @@ class FinanceDashboardWidget extends ConsumerWidget {
                 mainAxisSpacing: 16,
                 children: [
                   _buildKPI(
+                    context,
                     "Gross Collection",
                     "₹${metrics.grossRevenue.toStringAsFixed(0)}",
                     Colors.blue,
                   ),
                   _buildKPI(
+                    context,
                     "Secured (Exited)",
                     "₹${metrics.totalRevenue.toStringAsFixed(0)}",
                     Colors.green,
                   ),
                   _buildKPI(
+                    context,
                     "Pending Clearance",
                     "₹${metrics.pendingRevenue.toStringAsFixed(0)}",
                     Colors.orange,
                   ),
                   _buildKPI(
+                    context,
                     "Rejected Leakage",
                     "₹${metrics.rejectedRevenue.toStringAsFixed(0)}",
                     Colors.redAccent,
@@ -104,12 +106,12 @@ class FinanceDashboardWidget extends ConsumerWidget {
               const SizedBox(height: 30),
 
               // 📊 HEATMAP CHART (Now entirely cost-free!)
-              const Text(
+              Text(
                 "Hourly Revenue Heatmap",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2B3674),
+                  color: context.colors.textPrimary,
                 ),
               ),
               const SizedBox(height: 15),
@@ -166,13 +168,18 @@ class FinanceDashboardWidget extends ConsumerWidget {
     );
   }
 
-  // 📈 KPI CARD BUILDER
-  Widget _buildKPI(String title, String value, Color color) {
+  // 📋 KPI CARD BUILDER
+  Widget _buildKPI(
+    BuildContext context,
+    String title,
+    String value,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: context.colors.cardBg,
+        border: Border.all(color: context.colors.border),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Column(

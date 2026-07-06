@@ -7,9 +7,11 @@ import 'package:intl/intl.dart';
 
 import '../manpower_ai/presentation/manpower_widget.dart';
 import '../revenue_engine/providers/revenue_provider.dart';
-import '../auth/auth_provider.dart'; // 🚀 SAAS INJECTION IMPORT
+import '../auth/auth_provider.dart';
+import '../../core/utils/standard_utils.dart'; // 🚀 5 Standard Rules
 import '../coach/widgets/mission_banner.dart';
 import '../coach/widgets/info_button.dart';
+import '../../core/theme/app_theme.dart'; // 🚀 Added Theme Extension
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -46,27 +48,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget build(BuildContext context) {
     final revenueState = ref.watch(revenueEngineProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryTextColor = Theme.of(context).textTheme.bodyLarge?.color;
-    final bgColor = Theme.of(context).scaffoldBackgroundColor;
+    final primaryTextColor = context.colors.textPrimary;
+    final bgColor = context.colors.scaffoldBg;
 
     return Scaffold(
       backgroundColor: bgColor,
       floatingActionButton: ScaleTransition(
         scale: _pulseAnimation,
         child: FloatingActionButton(
-          onPressed: () => ref.read(revenueEngineProvider.notifier).refresh(),
-          backgroundColor: isDark
-              ? const Color(0xFF00C853)
-              : const Color(0xFF2B3674),
+          onPressed: () {
+            ActionDebouncer().run(() {
+              // 🚀 Throttling Rule
+              ref.read(revenueEngineProvider.notifier).refresh();
+            });
+          },
+          backgroundColor: Theme.of(context).colorScheme.primary,
           tooltip: "Refresh Analytics",
           child: const Icon(Icons.refresh, color: Colors.white),
         ),
       ),
       body: revenueState.when(
-        loading: () => Center(
-          child: CircularProgressIndicator(
-            color: isDark ? const Color(0xFF00C853) : const Color(0xFF2B3674),
-          ),
+        loading: () => const Center(
+          child: SkeletonLoader(
+            width: double.infinity,
+            height: 400,
+          ), // 🚀 Skeleton Rule
         ),
         error: (err, stack) => Center(
           child: Text(
@@ -82,56 +88,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const MissionBanner(route: '/dashboard'),
-                // 💎 SEQUENCE.IO HERO BANNER
+                // 💎 SYSTEM SECURE STRIP (Moved here for clean flow)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0B6B60), // Sequence Deep Teal
-                    borderRadius: BorderRadius.circular(16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  decoration: BoxDecoration(
+                    color: Colors.greenAccent.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        "Total Revenue",
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 14,
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: Colors.greenAccent.shade400,
+                          shape: BoxShape.circle,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "₹${metrics.totalRevenue.toStringAsFixed(0)}",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                            ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          "System secure — No pending operations or fraud anomalies detected",
+                          style: TextStyle(
+                            color: Colors.green.shade400,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
-                          const SizedBox(width: 10),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text(
-                              "100.0% ↗",
-                              style: TextStyle(
-                                color: Colors.greenAccent.shade400,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
 
-                // 💎 CLEAN GRIDS (NO SECTION HEADERS)
+                // 💎 SILENT FLOATING GRIDS
                 _buildRevenueGrid(metrics),
                 const SizedBox(height: 16),
                 _buildOrderGrid(metrics),
@@ -368,8 +366,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 15,
-            mainAxisSpacing: 15,
+            crossAxisSpacing: 20, // 🚀 Increased Gap
+            mainAxisSpacing: 20, // 🚀 Increased Gap
             mainAxisExtent: 110,
           ),
           children: children,
@@ -388,44 +386,44 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     IconData icon,
     bool isAmt,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = Theme.of(context).cardColor;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final cardBg = context.colors.cardBg;
+    final textColor = context.colors.textPrimary;
+
+    // Custom subtitles mapping (Apple Style)
+    String subtitle = "";
+    if (title == "Gross Revenue")
+      subtitle = "+${pct.toStringAsFixed(1)}%";
+    else if (title == "Total Revenue")
+      subtitle = "Net amount";
+    else if (title.contains("Pending"))
+      subtitle = "Waiting";
+    else if (title.contains("Rejected"))
+      subtitle = "Blocked";
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16), // Smaller padding
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).dividerColor,
-        ), // 💎 Sequence subtle edge
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(
-              alpha: isDark ? 0.2 : 0.02,
-            ), // 💎 Sequence ultra-soft shadow
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    color: context.colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               InfoButton(
@@ -433,40 +431,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 en: _cardInfo(title)['en']!,
                 hi: _cardInfo(title)['hi']!,
               ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Icon(icon, color: color, size: 12),
+              ),
             ],
           ),
           const Spacer(),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  isAmt
-                      ? "₹${value.toStringAsFixed(0)}"
-                      : value.toInt().toString(),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                isAmt
+                    ? "₹${value.toStringAsFixed(0)}"
+                    : value.toInt().toString(),
+                style: TextStyle(
+                  fontSize: 24, // Smaller font to fit compact card
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                  letterSpacing: -0.5,
                 ),
-                if (pct > 0) ...[
-                  const SizedBox(width: 8),
-                  Padding(
+              ),
+              if (subtitle.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
-                      "${pct.toStringAsFixed(1)}% ↗",
+                      subtitle,
                       style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                        color: title == "Gross Revenue"
+                            ? Colors.green.shade400
+                            : const Color(0xFF636366),
+                        fontSize: 10,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ],
+                ),
               ],
-            ),
+            ],
           ),
         ],
       ),
@@ -480,43 +490,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     Color color,
     IconData icon,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardBg = Theme.of(context).cardColor;
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+    final cardBg = context.colors.cardBg;
+    final textColor = context.colors.textPrimary;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).dividerColor,
-        ), // 💎 Sequence subtle edge
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(
-              alpha: isDark ? 0.2 : 0.02,
-            ), // 💎 Sequence ultra-soft shadow
-            blurRadius: 15,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    color: context.colors.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
@@ -524,6 +521,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 title: title,
                 en: _cardInfo(title)['en']!,
                 hi: _cardInfo(title)['hi']!,
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Icon(icon, color: color, size: 12),
               ),
             ],
           ),
@@ -533,10 +539,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "$count Orders",
+                "$count",
                 style: TextStyle(
                   fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
                   color: textColor,
                 ),
               ),
@@ -544,9 +551,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   "Impact: ₹${amt.toStringAsFixed(0)}",
-                  style: const TextStyle(
-                    color: Colors.red,
-                    fontSize: 12,
+                  style: TextStyle(
+                    color: context.colors.danger,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -613,7 +620,10 @@ class _EnterpriseRevenueMatrixChartState
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+          ),
         ],
       ),
       child: Column(
@@ -623,7 +633,7 @@ class _EnterpriseRevenueMatrixChartState
             children: [
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -667,7 +677,7 @@ class _EnterpriseRevenueMatrixChartState
                       ),
                       decoration: BoxDecoration(
                         color: _timeFilter == f
-                            ? Colors.blue.withOpacity(0.1)
+                            ? Colors.blue.withValues(alpha: 0.1)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -694,7 +704,9 @@ class _EnterpriseRevenueMatrixChartState
                   horizontalLines: [
                     HorizontalLine(
                       y: avgY,
-                      color: Colors.blueGrey.withOpacity(0.5),
+                      color: Theme.of(
+                        context,
+                      ).dividerColor.withValues(alpha: 0.5),
                       strokeWidth: 2,
                       dashArray: [5, 5],
                       label: HorizontalLineLabel(
@@ -710,7 +722,7 @@ class _EnterpriseRevenueMatrixChartState
                     ),
                     HorizontalLine(
                       y: peakY,
-                      color: Colors.orange.withOpacity(0.5),
+                      color: Colors.orange.withValues(alpha: 0.5),
                       strokeWidth: 1,
                       label: HorizontalLineLabel(
                         show: true,
@@ -728,8 +740,12 @@ class _EnterpriseRevenueMatrixChartState
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) =>
-                      FlLine(color: Colors.grey.shade100, strokeWidth: 1),
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: Theme.of(
+                      context,
+                    ).dividerColor.withValues(alpha: 0.1),
+                    strokeWidth: 1,
+                  ),
                 ),
                 titlesData: FlTitlesData(
                   rightTitles: const AxisTitles(
@@ -809,7 +825,7 @@ class _EnterpriseRevenueMatrixChartState
                       show: true,
                       gradient: LinearGradient(
                         colors: [
-                          trendColor.withOpacity(0.4),
+                          trendColor.withValues(alpha: 0.4),
                           Colors.transparent,
                         ],
                         begin: Alignment.topCenter,
@@ -1000,11 +1016,11 @@ class _ReconciliationTableWidgetState
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isMobile = MediaQuery.of(context).size.width < 768;
-    final cardBg = Theme.of(context).cardColor;
+    final cardBg = context.colors.cardBg;
     final inputBg = isDark
-        ? const Color(0xFF1A221A)
-        : const Color(0xFFF4F5F7); // 💎 Sequence soft input
-    final textColor = Theme.of(context).textTheme.bodyLarge?.color;
+        ? context.colors.scaffoldBg
+        : const Color(0xFFF4F5F7); // Contrast for input
+    final textColor = context.colors.textPrimary;
 
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)
@@ -1031,7 +1047,7 @@ class _ReconciliationTableWidgetState
       decoration: BoxDecoration(
         color: cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: context.colors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
@@ -1522,31 +1538,37 @@ class _ReconciliationTableWidgetState
     Color text;
     switch (status) {
       case 'Clear Exit':
-        bg = isDark ? Colors.green.withOpacity(0.1) : Colors.green.shade50;
+        bg = isDark
+            ? Colors.green.withValues(alpha: 0.1)
+            : Colors.green.shade50;
         text = isDark ? Colors.greenAccent : Colors.green;
         break;
       case 'Gate Pass Pending':
-        bg = isDark ? Colors.orange.withOpacity(0.1) : Colors.orange.shade50;
+        bg = isDark
+            ? Colors.orange.withValues(alpha: 0.1)
+            : Colors.orange.shade50;
         text = isDark ? Colors.orangeAccent : Colors.orange.shade800;
         break;
       case 'Reject':
-        bg = isDark ? Colors.red.withOpacity(0.1) : Colors.red.shade50;
+        bg = isDark ? Colors.red.withValues(alpha: 0.1) : Colors.red.shade50;
         text = isDark ? Colors.redAccent : Colors.red;
         break;
       case 'Fix & Exit':
-        bg = isDark ? Colors.purple.withOpacity(0.1) : Colors.purple.shade50;
+        bg = isDark
+            ? Colors.purple.withValues(alpha: 0.1)
+            : Colors.purple.shade50;
         text = isDark ? Colors.purpleAccent : Colors.purple;
         break;
       case 'Refund':
-        bg = isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50;
+        bg = isDark ? Colors.blue.withValues(alpha: 0.1) : Colors.blue.shade50;
         text = isDark ? Colors.blueAccent : Colors.blue;
         break;
       case 'QR Expire':
-        bg = isDark ? Colors.grey.withOpacity(0.1) : Colors.grey.shade200;
+        bg = isDark ? Colors.grey.withValues(alpha: 0.1) : Colors.grey.shade200;
         text = isDark ? Colors.grey.shade300 : Colors.grey.shade800;
         break;
       default:
-        bg = isDark ? Colors.grey.withOpacity(0.1) : Colors.grey.shade100;
+        bg = isDark ? Colors.grey.withValues(alpha: 0.1) : Colors.grey.shade100;
         text = Colors.grey;
     }
     return Container(
@@ -1554,7 +1576,7 @@ class _ReconciliationTableWidgetState
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: text.withOpacity(0.3)),
+        border: Border.all(color: text.withValues(alpha: 0.3)),
       ),
       child: Text(
         status,
@@ -1573,7 +1595,7 @@ class _ReconciliationTableWidgetState
       children: [
         CircleAvatar(
           radius: 16,
-          backgroundColor: color.withOpacity(0.2),
+          backgroundColor: color.withValues(alpha: 0.2),
           child: Icon(icon, size: 16, color: color),
         ),
         const SizedBox(height: 5),
@@ -1600,7 +1622,7 @@ class _ReconciliationTableWidgetState
     return Expanded(
       child: Container(
         height: 2,
-        color: color.withOpacity(0.3),
+        color: color.withValues(alpha: 0.3),
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
       ),
     );

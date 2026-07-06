@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class EditStoreProfileDialog extends StatefulWidget {
   final String? storeId;
@@ -22,12 +23,14 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   final ScrollController _scrollController = ScrollController();
   String? _targetDocId;
 
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
-  static const Color accentBlue = Color(0xFF378ADD);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
+  Color get accentBlue => context.colors.success; // Ya ctaBackground
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => Theme.of(context).brightness == Brightness.dark
+      ? Colors.white10
+      : Colors.black12;
 
   final _storeNameCtrl = TextEditingController();
   final _branchCodeCtrl = TextEditingController();
@@ -435,7 +438,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text("Store Updated Successfully!"),
             backgroundColor: accentBlue,
           ),
@@ -466,7 +469,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       hintText: hint,
       prefixIcon: prefix,
       suffixIcon: suffix,
-      labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
+      labelStyle: TextStyle(color: textSecondary, fontSize: 13),
       hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
       filled: true,
       fillColor: isReadOnly ? inputBg.withOpacity(0.55) : inputBg,
@@ -476,7 +479,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: accentBlue, width: 1.5),
+        borderSide:  BorderSide(color: accentBlue, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -495,7 +498,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
           const SizedBox(width: 10),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: accentBlue,
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -543,7 +546,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: _isFetching
-            ? const Center(child: CircularProgressIndicator(color: accentBlue))
+            ? Center(child: CircularProgressIndicator(color: accentBlue))
             : Column(
                 children: [
                   Container(
@@ -556,7 +559,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                         Text(
                           "Update Operational Node",
                           style: TextStyle(
                             color: textPrimary,
@@ -565,7 +568,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close, color: textSecondary),
+                          icon:  Icon(Icons.close, color: textSecondary),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ],
@@ -588,7 +591,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                 color: accentBlue.withOpacity(0.2),
                               ),
                             ),
-                            child: const Row(
+                            child:  Row(
                               children: [
                                 Icon(
                                   Icons.auto_awesome,
@@ -617,7 +620,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             isMobile,
                             TextFormField(
                               controller: _storeNameCtrl,
-                              style: const TextStyle(color: textPrimary),
+                              style:  TextStyle(color: textPrimary),
                               decoration: _inputDeco(
                                 "Store / Branch Name *",
                                 hint: "e.g. Jaiswar Flour Mill",
@@ -630,10 +633,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             TextFormField(
                               controller: _branchCodeCtrl,
                               readOnly: true,
-                              style: const TextStyle(color: textSecondary),
+                              style:  TextStyle(color: textSecondary),
                               decoration: _inputDeco(
                                 "Branch Code (Protected)",
-                                prefix: const Icon(
+                                prefix:  Icon(
                                   Icons.lock,
                                   color: textSecondary,
                                   size: 16,
@@ -647,7 +650,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             isMobile,
                             TextFormField(
                               controller: _phoneControllers[0],
-                              style: const TextStyle(color: textPrimary),
+                              style:  TextStyle(color: textPrimary),
                               keyboardType: TextInputType.phone,
                               maxLength: 10,
                               inputFormatters: [
@@ -655,7 +658,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                               ],
                               decoration: _inputDeco(
                                 "Primary Mobile *",
-                                prefix: const Icon(
+                                prefix:  Icon(
                                   Icons.phone_android,
                                   size: 18,
                                   color: textSecondary,
@@ -669,11 +672,11 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             ),
                             TextFormField(
                               controller: _landlineControllers[0],
-                              style: const TextStyle(color: textPrimary),
+                              style:  TextStyle(color: textPrimary),
                               keyboardType: TextInputType.phone,
                               decoration: _inputDeco(
                                 "Primary Landline (Optional)",
-                                prefix: const Icon(
+                                prefix:  Icon(
                                   Icons.phone,
                                   size: 18,
                                   color: textSecondary,
@@ -703,7 +706,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                   children: [
                                     TextFormField(
                                       controller: _pincodeCtrl,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: textPrimary,
                                       ),
                                       keyboardType: TextInputType.number,
@@ -737,7 +740,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                     const SizedBox(height: 20),
                                     TextFormField(
                                       controller: _cityCtrl,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: textPrimary,
                                       ),
                                       decoration: _inputDeco("City *"),
@@ -749,7 +752,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                       isExpanded: true,
                                       value: _selectedState,
                                       dropdownColor: inputBg,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         color: textPrimary,
                                       ),
                                       decoration: _inputDeco("State *"),
@@ -776,7 +779,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                     Expanded(
                                       child: TextFormField(
                                         controller: _pincodeCtrl,
-                                        style: const TextStyle(
+                                        style:  TextStyle(
                                           color: textPrimary,
                                         ),
                                         keyboardType: TextInputType.number,
@@ -813,7 +816,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                     Expanded(
                                       child: TextFormField(
                                         controller: _cityCtrl,
-                                        style: const TextStyle(
+                                        style:  TextStyle(
                                           color: textPrimary,
                                         ),
                                         decoration: _inputDeco("City *"),
@@ -828,7 +831,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                         isExpanded: true,
                                         value: _selectedState,
                                         dropdownColor: inputBg,
-                                        style: const TextStyle(
+                                        style:  TextStyle(
                                           color: textPrimary,
                                         ),
                                         decoration: _inputDeco("State *"),
@@ -855,7 +858,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                           const SizedBox(height: 15),
                           TextFormField(
                             controller: _addressCtrl,
-                            style: const TextStyle(color: textPrimary),
+                            style:  TextStyle(color: textPrimary),
                             decoration: _inputDeco("Complete Store Address *"),
                             validator: (v) =>
                                 v!.trim().isEmpty ? "Required" : null,
@@ -868,7 +871,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             isMobile,
                             TextFormField(
                               controller: _managerNameCtrl,
-                              style: const TextStyle(color: textPrimary),
+                              style:  TextStyle(color: textPrimary),
                               decoration: _inputDeco("Manager Full Name *"),
                               validator: (v) =>
                                   v!.trim().isEmpty ? "Required" : null,
@@ -894,7 +897,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             isMobile,
                             TextFormField(
                               controller: _managerPhoneCtrl,
-                              style: const TextStyle(color: textPrimary),
+                              style:  TextStyle(color: textPrimary),
                               keyboardType: TextInputType.phone,
                               maxLength: 10,
                               inputFormatters: [
@@ -944,12 +947,12 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                               ),
                               TextButton.icon(
                                 onPressed: _addLicenseRow,
-                                icon: const Icon(
+                                icon:  Icon(
                                   Icons.add,
                                   color: accentBlue,
                                   size: 16,
                                 ),
-                                label: const Text(
+                                label:  Text(
                                   "Add",
                                   style: TextStyle(color: accentBlue),
                                 ),
@@ -976,7 +979,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                       ? lic['type']
                                       : 'Other',
                                   dropdownColor: inputBg,
-                                  style: const TextStyle(color: textPrimary),
+                                  style:  TextStyle(color: textPrimary),
                                   decoration: _inputDeco("Compliance Type"),
                                   items: _licenseTypes
                                       .map(
@@ -994,7 +997,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                 TextFormField(
                                   key: ValueKey("${idx}_${lic['type']}"),
                                   initialValue: val,
-                                  style: const TextStyle(color: textPrimary),
+                                  style:  TextStyle(color: textPrimary),
                                   textCapitalization:
                                       TextCapitalization.characters,
                                   maxLength: config['maxLength'],
@@ -1049,7 +1052,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                   color: accentBlue.withOpacity(0.2),
                                 ),
                               ),
-                              child: const Row(
+                              child: Row(
                                 children: [
                                   Icon(
                                     Icons.account_balance,
@@ -1118,7 +1121,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             TextFormField(
                               controller: _bankNameCtrl,
                               readOnly: true,
-                              style: const TextStyle(color: textSecondary),
+                              style:  TextStyle(color: textSecondary),
                               decoration: _inputDeco(
                                 "Resolved Branch Name",
                                 isReadOnly: true,
@@ -1185,7 +1188,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text(
+                          child:  Text(
                             "CANCEL",
                             style: TextStyle(
                               color: textSecondary,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/fraud_provider.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class LeakageKanbanBoard extends ConsumerWidget {
   const LeakageKanbanBoard({super.key});
@@ -93,9 +94,9 @@ class LeakageKanbanBoard extends ConsumerWidget {
     Color color,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final cardBgColor = isDark ? const Color(0xFF2A2A2A) : Colors.white;
-    final primaryText = isDark ? Colors.white : Colors.black87;
+    final bgColor = context.colors.scaffoldBg;
+    final cardBgColor = context.colors.cardBg;
+    final primaryText = context.colors.textPrimary;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -212,11 +213,7 @@ class LeakageKanbanBoard extends ConsumerWidget {
                         decoration: BoxDecoration(
                           color: cardBgColor,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isDark
-                                ? Colors.white10
-                                : Colors.grey.shade200,
-                          ),
+                          border: Border.all(color: context.colors.border),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.02),

@@ -6,6 +6,7 @@ import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../providers/fraud_provider.dart';
 import 'leakage_kanban_widget.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class FraudControlScreen extends ConsumerWidget {
   const FraudControlScreen({super.key});
@@ -71,7 +72,7 @@ class FraudControlScreen extends ConsumerWidget {
 
     // 🎨 THEME INJECTION
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
+    final textColor = context.colors.textPrimary;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -219,13 +220,9 @@ class FraudControlScreen extends ConsumerWidget {
                       data['status']?.toString().toUpperCase() ?? 'ACTIVE';
                   bool isSuspended = currentStatus == 'SUSPENDED';
 
-                  final cardBg = isDark
-                      ? const Color(0xFF1E1E1E)
-                      : Colors.white;
-                  final suspendedBg = isDark
-                      ? const Color(0xFF2A2A2A)
-                      : Colors.grey.shade100;
-                  final primaryText = isDark ? Colors.white : Colors.black87;
+                  final cardBg = context.colors.cardBg;
+                  final suspendedBg = context.colors.scaffoldBg;
+                  final primaryText = context.colors.textPrimary;
 
                   return Container(
                     padding: const EdgeInsets.all(16),
@@ -385,9 +382,8 @@ class FraudControlScreen extends ConsumerWidget {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: orders.length,
-                separatorBuilder: (context, index) => Divider(
-                  color: isDark ? Colors.white10 : Colors.grey.shade300,
-                ),
+                separatorBuilder: (context, index) =>
+                    Divider(color: context.colors.border),
                 itemBuilder: (context, index) {
                   final doc = orders[index];
                   final data = doc.data() as Map<String, dynamic>;
@@ -405,9 +401,7 @@ class FraudControlScreen extends ConsumerWidget {
                     ),
                     subtitle: Text(
                       "Status: ${data['exitStatus'] ?? 'UNKNOWN'}",
-                      style: TextStyle(
-                        color: isDark ? Colors.white54 : Colors.grey,
-                      ),
+                      style: TextStyle(color: context.colors.textSecondary),
                     ),
                     trailing: Text(
                       "₹${data['totalAmount'] ?? '0'}",

@@ -3,26 +3,28 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class BlockedInventoryScreen extends ConsumerWidget {
   const BlockedInventoryScreen({super.key});
 
   // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
   static const Color accentGreen = Color(0xFF00C853);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
   static const Color accentRed = Color(0xFFFE8181);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final bgDark = context.colors.scaffoldBg;
+    final cardDark = context.colors.cardBg;
+    final textPrimary = context.colors.textPrimary;
+    final textSecondary = context.colors.textSecondary;
+
     final adminData = ref.watch(adminRoleProvider).value;
     final tenantId = adminData?['tenantId'];
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
 
     if (role == 'MANAGER') {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: bgDark,
         body: Center(
           child: Text(
@@ -44,7 +46,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "Shrinkage & Blocked Audit 🛑",
               style: TextStyle(
                 fontSize: 28,
@@ -54,7 +56,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               "Cross-Branch Expiry and Damage Tracking.",
               style: TextStyle(
                 color: textSecondary,
@@ -146,9 +148,9 @@ class BlockedInventoryScreen extends ConsumerWidget {
                               physics: const BouncingScrollPhysics(),
                               child: DataTable(
                                 headingRowColor: WidgetStateProperty.all(
-                                  const Color(0xFF131A13),
+                                  context.colors.cardBg,
                                 ),
-                                headingTextStyle: const TextStyle(
+                                headingTextStyle: TextStyle(
                                   fontWeight: FontWeight.w800,
                                   color: textPrimary,
                                   fontSize: 12,
@@ -177,7 +179,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                       DataCell(
                                         Text(
                                           date,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: textSecondary,
                                             fontWeight: FontWeight.w600,
                                           ),
@@ -186,7 +188,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                       DataCell(
                                         Text(
                                           data['productId'] ?? 'N/A',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontFamily: 'monospace',
                                             color: accentGreen,
                                           ),
@@ -195,7 +197,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                       DataCell(
                                         Text(
                                           data['productName'] ?? 'N/A',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: textPrimary,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -213,7 +215,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                       DataCell(
                                         Text(
                                           data['blockedBy'] ?? 'Unknown',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: textSecondary,
                                           ),
                                         ),

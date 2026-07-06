@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tenant_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class AddTenantDialog extends ConsumerStatefulWidget {
   const AddTenantDialog({super.key});
@@ -69,12 +70,12 @@ class _AddTenantDialogState extends ConsumerState<AddTenantDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Onboard New Client 🏢",
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2B3674),
+                    color: context.colors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -162,7 +163,11 @@ class _AddTenantDialogState extends ConsumerState<AddTenantDialog> {
                     prefixIcon: Icon(Icons.email),
                   ),
                   validator: (v) =>
-                      v!.contains('@') ? null : "Enter valid email",
+                      RegExp(
+                        r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$',
+                      ).hasMatch(v?.trim() ?? '')
+                      ? null
+                      : "Enter valid email",
                 ),
                 const SizedBox(height: 25),
 
@@ -172,7 +177,8 @@ class _AddTenantDialogState extends ConsumerState<AddTenantDialog> {
                   height: 50,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2B3674),
+                      backgroundColor: context.colors.ctaBackground,
+                      foregroundColor: context.colors.ctaText,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -180,10 +186,10 @@ class _AddTenantDialogState extends ConsumerState<AddTenantDialog> {
                     onPressed: _isLoading ? null : _submit,
                     child: _isLoading
                         ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
+                        : Text(
                             "CREATE TENANT & ADMIN",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: context.colors.ctaText,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 1.5,
                             ),

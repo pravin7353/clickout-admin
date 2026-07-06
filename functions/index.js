@@ -893,33 +893,124 @@ exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
     }
 });
 
-exports.onServiceDeleted = onDocumentDeleted('services/{serviceId}', async (event) => {
-    const snap = event.data;
-    if (!snap) return; 
+// ============================================================================
+// 🏢 15. SUPER ADMIN: TENANT MANAGEMENT (SECURE SERVER-SIDE)
+// ============================================================================
+exports.onboardTenant = onCall(async (request) => {
+    // 🛡️ SECURITY CHECK: Only Super Admins
+    if (!request.auth || (request.auth.token.role !== 'SUPER_ADMIN' && request.auth.token.role !== 'super_admin')) {
+        throw new HttpsError('permission-denied', 'Unauthorized. Only Super Admins can onboard tenants.');
+    }
 
-    const serviceId = event.params.serviceId;
-    const deletedData = snap.data();
-    const barcode = deletedData.barcode;
-
-    console.log(`🧹 Service Deleted (${serviceId}). Hunting Offers...`);
-
-    const batch = db.batch();
-    let deleteCount = 0;
+    const { companyName, plan, adminName, adminPhone, adminEmail } = request.data;
+    if (!companyName || !adminEmail || !adminPhone) throw new HttpsError('invalid-argument', 'Missing required fields.');
 
     try {
-        if (barcode) {
-            const offersSnap = await db.collection('offers').where('barcode', '==', barcode).get();
-            offersSnap.forEach((doc) => {
-                batch.delete(doc.ref);
-                deleteCount++;
-            });
-        }
+        // 1. Create Auth User securely on backend
+        const userRecord = await admin.auth().createUser({
+            email: adminEmail.toLowerCase().trim(),
+            password: 'ClickOut@' + adminPhone.substring(0, 4), // Temporary Password
+            displayName: adminName.trim(),
+        });
+        const uid = userRecord.uid;
 
-        if (deleteCount > 0) {
-            await batch.commit();
-            console.log(`💥 SUCCESS: Vaporized ${deleteCount} ghost offers for Service ${serviceId}!`);
-        }
+        // 2. Generate Unique Tenant ID
+        const baseId = companyName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const tenantId = `tenant_${baseId}_${Date.now().toString().substring(8)}`;
+        const maxStores = plan === 'ENTERPRISE' ? 1000 : (plan === 'PRO' ? 50 : 5);
+
+        const batch = db.batch();
+
+        // 3. Create Tenant Document
+        const tenantRef = db.collection('tenants').doc(tenantId);
+        batch.set(tenantRef, {
+            tenantId: tenantId,
+            companyName: companyName.trim(),
+            subscriptionPlan: plan,
+            billingStatus: 'ACTIVE',
+            maxStores: maxStores,
+            maxUsers: maxStores * 20,
+            isActive: true,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // 4. Create Staff Document (This triggers assignCustomClaims automatically)
+        const staffRef = db.collection('staff').doc(uid); 
+        batch.set(staffRef, {
+            docId: uid,
+            uid: uid,
+            empId: 'ADMIN-001',
+            role: 'TENANT_ADMIN',
+            name: adminName.trim(),
+            phone: adminPhone.trim(),
+            email: adminEmail.toLowerCase().trim(),
+            branchCode: 'HQ',
+            status: 'ACTIVE',
+            isActive: true,
+            isDeleted: false,
+            tenantId: tenantId,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // 5. Secure Server-Side Audit Log
+        const auditRef = db.collection('admin_audit_logs').doc();
+        batch.set(auditRef, {
+            action: 'TENANT_ONBOARDED',
+            tenantId: tenantId,
+            companyName: companyName,
+            actor: request.auth.token.email || 'SuperAdmin',
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        await batch.commit();
+        return { success: true, tenantId: tenantId, message: "Tenant & Auth Admin created." };
     } catch (error) {
-        console.error(`🚨 ERROR cleaning up data for Service ${serviceId}:`, error);
+        console.error("Onboarding Error:", error);
+        throw new HttpsError('internal', error.message);
     }
+});
+
+exports.toggleTenantStatus = onCall(async (request) => {
+    if (!request.auth || (request.auth.token.role !== 'SUPER_ADMIN' && request.auth.token.role !== 'super_admin')) {
+        throw new HttpsError('permission-denied', 'Unauthorized.');
+    }
+    const { tenantId, companyName, suspend } = request.data;
+    
+    const batch = db.batch();
+    batch.update(db.collection('tenants').doc(tenantId), {
+        isActive: !suspend,
+        billingStatus: suspend ? 'SUSPENDED' : 'ACTIVE',
+    });
+    batch.set(db.collection('admin_audit_logs').doc(), {
+        action: suspend ? 'TENANT_SUSPENDED' : 'TENANT_REACTIVATED',
+        tenantId: tenantId,
+        companyName: companyName || 'Unknown',
+        actor: request.auth.token.email,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    return { success: true };
+});
+
+exports.changeTenantPlan = onCall(async (request) => {
+    if (!request.auth || (request.auth.token.role !== 'SUPER_ADMIN' && request.auth.token.role !== 'super_admin')) {
+        throw new HttpsError('permission-denied', 'Unauthorized.');
+    }
+    const { tenantId, companyName, newPlan, oldPlan } = request.data;
+    
+    const batch = db.batch();
+    batch.update(db.collection('tenants').doc(tenantId), {
+        subscriptionPlan: newPlan,
+        plan: newPlan,
+    });
+    batch.set(db.collection('admin_audit_logs').doc(), {
+        action: 'PLAN_CHANGED',
+        tenantId: tenantId,
+        companyName: companyName || 'Unknown',
+        details: `${oldPlan} -> ${newPlan}`,
+        actor: request.auth.token.email,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+    return { success: true };
 });

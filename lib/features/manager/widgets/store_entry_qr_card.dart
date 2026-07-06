@@ -9,6 +9,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../auth/auth_provider.dart';
 import '../../../core/store/providers/store_provider.dart';
+import '../../../core/theme/app_theme.dart';
 
 class StoreEntryQRCard extends ConsumerStatefulWidget {
   const StoreEntryQRCard({super.key});
@@ -134,7 +135,7 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
 
     if (tenantId.isEmpty || branchCode.isEmpty) {
       return Dialog(
-        backgroundColor: const Color(0xFF111811),
+        backgroundColor: context.colors.cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: const Padding(
           padding: EdgeInsets.all(24.0),
@@ -192,7 +193,7 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
                     vertical: 30,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF111811),
+                    color: context.colors.cardBg,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: const Color(0xFF00C853).withOpacity(0.5),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/service_master_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class EditServiceDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> serviceData;
@@ -30,12 +31,12 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
     '28% GST',
   ];
 
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   static const Color accentBlue = Color(0xFF2962FF);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => context.colors.scaffoldBg;
 
   @override
   void initState() {
@@ -160,7 +161,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             "Edit Service",
                             style: TextStyle(
@@ -169,7 +170,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             "Update service details. Service Code cannot be changed.",
                             style: TextStyle(
@@ -182,7 +183,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: textSecondary),
+                      icon: Icon(Icons.close, color: textSecondary),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -251,7 +252,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     "Applicable GST",
                                     style: TextStyle(
                                       fontSize: 13,
@@ -276,7 +277,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                                             value: slab,
                                             child: Text(
                                               slab,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontWeight: FontWeight.w600,
                                                 color: textPrimary,
                                               ),
@@ -335,7 +336,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                       onPressed: _isLoading
                           ? null
                           : () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         "Cancel",
                         style: TextStyle(
                           color: textSecondary,
@@ -389,7 +390,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
     padding: const EdgeInsets.only(bottom: 16),
     child: Text(
       title,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 11,
         fontWeight: FontWeight.w900,
         color: textSecondary,

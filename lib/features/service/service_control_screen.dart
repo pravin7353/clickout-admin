@@ -8,6 +8,7 @@ import 'presentation/add_service_dialog.dart';
 import 'presentation/edit_service_dialog.dart';
 import 'providers/service_master_provider.dart';
 import '../coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class ServiceControlScreen extends ConsumerStatefulWidget {
   const ServiceControlScreen({super.key});
@@ -165,20 +166,15 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color bgDark = theme.scaffoldBackgroundColor;
-    final Color cardDark = theme.cardColor;
+    final Color bgDark = context.colors.scaffoldBg;
+    final Color cardDark = context.colors.cardBg;
     final Color accentBlue = isDark
         ? const Color(0xFF2962FF)
         : const Color(0xFF1565C0);
-    final Color textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final Color textSecondary =
-        theme.textTheme.labelLarge?.color ?? Colors.grey;
-    final Color inputBg = isDark
-        ? const Color(0xFF1A221A)
-        : const Color(0xFFF4F5F7);
-    final Color tableHeaderBg = isDark
-        ? const Color(0xFF1A221A)
-        : const Color(0xFFE3F2FD);
+    final Color textPrimary = context.colors.textPrimary;
+    final Color textSecondary = context.colors.textSecondary;
+    final Color inputBg = context.colors.scaffoldBg;
+    final Color tableHeaderBg = context.colors.cardBg;
 
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)

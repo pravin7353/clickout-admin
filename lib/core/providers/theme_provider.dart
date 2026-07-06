@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/legacy.dart'; // 🚀 Tere system me ye perfect
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeNotifier extends ChangeNotifier {
-  ThemeMode currentTheme = ThemeMode.system; // By default system theme
+  ThemeMode currentTheme = ThemeMode.dark; // By default dark theme
 
   ThemeNotifier() {
     _loadTheme();
@@ -19,7 +19,7 @@ class ThemeNotifier extends ChangeNotifier {
     } else if (savedTheme == 'light') {
       currentTheme = ThemeMode.light;
     } else {
-      currentTheme = ThemeMode.system;
+      currentTheme = ThemeMode.dark;
     }
     notifyListeners(); // UI ko update karega
   }
@@ -35,7 +35,7 @@ class ThemeNotifier extends ChangeNotifier {
     } else if (mode == ThemeMode.light) {
       await prefs.setString('app_theme', 'light');
     } else {
-      await prefs.setString('app_theme', 'system');
+      await prefs.setString('app_theme', 'dark');
     }
   }
 

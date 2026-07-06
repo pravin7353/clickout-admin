@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION
 import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
+import '../../../core/theme/app_theme.dart';
 
 class AddDistributorDialog extends ConsumerStatefulWidget {
   const AddDistributorDialog({super.key});
@@ -23,11 +24,12 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
   final TextEditingController _categoryCtrl = TextEditingController();
 
   // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   static const Color accentGreen = Color(0xFF00C853);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => context.colors.scaffoldBg;
 
   @override
   void dispose() {
@@ -147,7 +149,8 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
+                            // 🚀 Removed const
                             "Add New Distributor",
                             style: TextStyle(
                               color: textPrimary,
@@ -160,7 +163,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                           Text(
                             "Register a new supplier for automated POs and tracking.",
                             style: TextStyle(
-                              color: textSecondary,
+                              color: textSecondary, // 🚀 Requires dynamic color
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -169,7 +172,10 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.close, color: textSecondary),
+                      icon: Icon(
+                        Icons.close,
+                        color: textSecondary,
+                      ), // 🚀 Removed const
                       onPressed: () => Navigator.pop(context),
                       splashRadius: 24,
                     ),
@@ -278,10 +284,11 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                       onPressed: _isLoading
                           ? null
                           : () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
+                        // 🚀 Removed const
                         "Cancel",
                         style: TextStyle(
-                          color: textSecondary,
+                          color: textSecondary, // 🚀 Uses dynamic color
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -302,11 +309,12 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                         ),
                       ),
                       icon: _isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
+                              // 🚀 Removed const
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                color: bgDark,
+                                color: bgDark, // 🚀 Uses dynamic color
                                 strokeWidth: 2,
                               ),
                             )
@@ -334,10 +342,11 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
+          // 🚀 Removed const
           fontSize: 11,
           fontWeight: FontWeight.w900,
-          color: textSecondary,
+          color: textSecondary, // 🚀 Uses dynamic color
           letterSpacing: 1.5,
         ),
       ),
@@ -350,7 +359,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: textSecondary.withOpacity(0.1),
+        color: textSecondary.withOpacity(0.1), // 🚀 Dynamic color
       ),
     );
   }
@@ -371,19 +380,21 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
+              // 🚀 Removed const
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: textPrimary,
+              color: textPrimary, // 🚀 Dynamic color
             ),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: controller,
             keyboardType: keyboardType,
-            style: const TextStyle(
+            style: TextStyle(
+              // 🚀 Removed const
               fontWeight: FontWeight.w600,
-              color: textPrimary,
+              color: textPrimary, // 🚀 Dynamic color
             ),
             decoration: InputDecoration(
               hintText: hintText,

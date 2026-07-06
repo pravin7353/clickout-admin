@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../refund/providers/refund_engine_provider.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class RefundDecisionScreen extends ConsumerStatefulWidget {
   const RefundDecisionScreen({super.key});
@@ -40,7 +41,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
-                  color: isDark ? Colors.white : const Color(0xFF2B3674),
+                  color: context.colors.textPrimary,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -68,7 +69,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
             width: double.infinity,
             constraints: const BoxConstraints(maxWidth: 650),
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: context.colors.cardBg,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -150,12 +151,10 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 60),
                   decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF1A221A)
-                        : Colors.grey.shade50,
+                    color: context.colors.scaffoldBg,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: isDark ? Colors.white10 : Colors.grey.shade200,
+                      color: context.colors.border,
                       style: BorderStyle.solid,
                     ),
                   ),
@@ -222,9 +221,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: isDark
-                              ? Colors.white
-                              : const Color(0xFF2B3674),
+                          color: context.colors.textPrimary,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -332,7 +329,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
       width: 200,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        color: context.colors.cardBg,
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: color.withValues(alpha: 0.3)),
         boxShadow: [
@@ -382,7 +379,7 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
         height: 180,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          color: context.colors.cardBg,
           borderRadius: BorderRadius.circular(15),
           border: Border.all(
             color: isRecommended ? color : Colors.grey.withValues(alpha: 0.2),
@@ -682,13 +679,9 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF1A221A)
-                          : const Color(0xFFF8FAFC),
+                      color: context.colors.scaffoldBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isDark ? Colors.white10 : Colors.grey.shade200,
-                      ),
+                      border: Border.all(color: context.colors.border),
                     ),
                     child: Column(
                       children: [
@@ -741,9 +734,7 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                         decimal: true,
                       ),
                       style: TextStyle(
-                        color: isDark
-                            ? Colors.white
-                            : Colors.black87, // 🚀 DARK MODE FIX
+                        color: context.colors.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
                       ),
@@ -751,16 +742,10 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                         hintText: "Enter amount up to ₹${widget.maxAmount}",
                         prefixIcon: const Icon(Icons.currency_rupee, size: 18),
                         filled: true,
-                        fillColor: isDark
-                            ? const Color(0xFF1E1E1E)
-                            : Colors.white,
+                        fillColor: context.colors.scaffoldBg,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: isDark
-                                ? Colors.white10
-                                : Colors.grey.shade300,
-                          ),
+                          borderSide: BorderSide(color: context.colors.border),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -784,25 +769,19 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
                   TextField(
                     controller: _reasonCtrl,
                     maxLines: 2,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black87,
-                    ), // 🚀 DARK MODE FIX
+                    style: TextStyle(color: context.colors.textPrimary),
                     decoration: InputDecoration(
                       hintText:
                           "E.g., Customer cancelled at gate, Item out of stock...",
                       hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
+                        color: context.colors.textSecondary,
                         fontSize: 13,
                       ),
                       filled: true,
-                      fillColor: isDark
-                          ? const Color(0xFF1E1E1E)
-                          : Colors.white,
+                      fillColor: context.colors.scaffoldBg,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDark ? Colors.white10 : Colors.grey.shade300,
-                        ),
+                        borderSide: BorderSide(color: context.colors.border),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -841,15 +820,11 @@ class _EnterpriseRefundDialogState extends State<EnterpriseRefundDialog> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50,
+                color: context.colors.cardBg,
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(20),
                 ),
-                border: Border(
-                  top: BorderSide(
-                    color: isDark ? Colors.white10 : Colors.grey.shade200,
-                  ),
-                ),
+                border: Border(top: BorderSide(color: context.colors.border)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,

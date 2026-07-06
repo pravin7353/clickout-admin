@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart'; // ⚡ NEW: Cloud Functions
 
 // 🏢 1. TENANT MODEL
 class TenantModel {
@@ -67,6 +68,7 @@ class TenantMasterNotifier extends AsyncNotifier<List<TenantModel>> {
 
   @override
   Future<List<TenantModel>> build() async {
+    ref.keepAlive(); // ⚡ API Optimization & Caching: Data cache me rahega
     return _fetchTenants();
   }
 
@@ -90,70 +92,33 @@ class TenantMasterNotifier extends AsyncNotifier<List<TenantModel>> {
     required String adminPhone,
     required String adminEmail,
   }) async {
+    final phoneRegex = RegExp(r'^[6-9][0-9]{9}$');
+    final emailRegex = RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+
+    if (companyName.trim().isEmpty ||
+        !phoneRegex.hasMatch(adminPhone.trim()) ||
+        !emailRegex.hasMatch(adminEmail.trim())) {
+      throw Exception(
+        "Validation Failed: Invalid input data for SaaS onboarding.",
+      );
+    }
+
     try {
-      // 1. Generate unique Tenant ID (e.g., clickout_reliance)
-      String baseId = companyName
-          .replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
-          .toLowerCase();
-      String tenantId =
-          "tenant_${baseId}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
-
-      // 2. Determine Plan Limits
-      int maxStores = plan == 'ENTERPRISE' ? 1000 : (plan == 'PRO' ? 50 : 5);
-
-      final tenantRef = _db.collection('tenants').doc(tenantId);
-      final adminStaffRef = _db.collection('staff').doc(); // First Admin
-      final auditRef = _db.collection('admin_audit_logs').doc();
-
-      // 3. ATOMIC BATCH WRITE (SaaS Best Practice)
-      final batch = _db.batch();
-
-      // A. Create Company (Tenant)
-      batch.set(tenantRef, {
-        'tenantId': tenantId,
+      // ⚡ CORE FIX: Call Secure Cloud Function instead of Client-Side Batch Write
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'onboardTenant',
+      );
+      await callable.call({
         'companyName': companyName.trim(),
-        'subscriptionPlan': plan,
-        'billingStatus': 'ACTIVE',
-        'maxStores': maxStores,
-        'maxUsers': maxStores * 20, // Avg 20 staff per store
-        'isActive': true,
-        'createdAt': FieldValue.serverTimestamp(),
+        'plan': plan,
+        'adminName': adminName.trim(),
+        'adminPhone': adminPhone.trim(),
+        'adminEmail': adminEmail.trim(),
       });
 
-      // B. Create the First Admin Account for this Company
-      batch.set(adminStaffRef, {
-        'docId': adminStaffRef.id,
-        'empId': 'ADMIN-001',
-        'role': 'TENANT_ADMIN', // 👑 Master of their own company
-        'name': adminName.trim(),
-        'phone': adminPhone.trim(),
-        'email': adminEmail.trim().toLowerCase(),
-        'branchCode': 'HQ', // Headquarters
-        'status': 'ACTIVE',
-        'isActive': true,
-        'isDeleted': false,
-        'tenantId': tenantId, // 🔒 Locked to their new company
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // C. Super Admin Audit Log
-      final superAdminEmail =
-          FirebaseAuth.instance.currentUser?.email ?? 'SuperAdmin';
-      batch.set(auditRef, {
-        'action': 'TENANT_ONBOARDED',
-        'tenantId': tenantId,
-        'companyName': companyName,
-        'adminCreated': adminEmail,
-        'actor': superAdminEmail,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
-      await batch.commit();
-
-      // Refresh the list
-      ref.invalidateSelf();
+      ref.invalidateSelf(); // Refresh the list
     } catch (e) {
-      throw "Onboarding Failed: $e";
+      throw "Onboarding Failed via Cloud Function: $e";
     }
   }
 }

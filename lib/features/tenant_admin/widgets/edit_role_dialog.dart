@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/org_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class EditRoleDialog extends ConsumerStatefulWidget {
   final CustomRole role;
@@ -85,10 +86,10 @@ class _EditRoleDialogState extends ConsumerState<EditRoleDialog> {
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: Icon(icon, color: const Color(0xFF2B3674).withOpacity(0.5)),
-      labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+      prefixIcon: Icon(icon, color: context.colors.textSecondary),
+      labelStyle: TextStyle(color: context.colors.textSecondary, fontSize: 14),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: context.colors.scaffoldBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -96,11 +97,11 @@ class _EditRoleDialogState extends ConsumerState<EditRoleDialog> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF2B3674), width: 1.5),
+        borderSide: BorderSide(color: context.colors.success, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderSide: BorderSide(color: context.colors.danger, width: 1),
       ),
     );
   }

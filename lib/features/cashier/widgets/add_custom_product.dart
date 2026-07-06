@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 
 class AddCustomProductWidget extends StatefulWidget {
   final Function(String name, double price, int qty, double gst, bool isService)
@@ -20,11 +21,8 @@ class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
 
   // Input Field Style matching your screenshot
   InputDecoration _inputStyle(String label, IconData icon) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillColor = isDark
-        ? const Color(0xFF1E293B)
-        : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? Colors.grey.shade800 : Colors.grey.shade300;
+    final fillColor = context.colors.scaffoldBg;
+    final borderColor = context.colors.border;
 
     return InputDecoration(
       labelText: label,
@@ -52,8 +50,7 @@ class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardBg = isDark ? const Color(0xFF0F172A) : Colors.white;
+    final cardBg = context.colors.cardBg;
 
     return Dialog(
       backgroundColor: cardBg,
@@ -201,7 +198,6 @@ class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
 
   // Exact Toggle UI from your Screenshot
   Widget _buildToggleBtn(String title, bool isActive) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Expanded(
       child: GestureDetector(
         onTap: () => setState(() => _isProduct = title == "Product"),
@@ -209,11 +205,11 @@ class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isActive
-                ? Colors.green.withOpacity(0.1)
-                : (isDark ? const Color(0xFF1E293B) : Colors.grey.shade100),
+                ? context.colors.success.withValues(alpha: 0.1)
+                : context.colors.scaffoldBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isActive ? Colors.green : Colors.transparent,
+              color: isActive ? context.colors.success : context.colors.border,
               width: 1.5,
             ),
           ),

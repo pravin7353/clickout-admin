@@ -18,6 +18,7 @@ import 'widgets/audit_vault_screen.dart';
 import '../invoice/invoice_rules_dialog.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 import '../auditor/service/audit_export_service.dart';
+import '../../core/theme/app_theme.dart'; // 🚀 Added Theme Extension
 
 // 🚀 INVOICE SERVICE IMPORT
 import '../invoice/pdf_invoice_service.dart';
@@ -1660,16 +1661,13 @@ class AuditorScreen extends ConsumerWidget {
     final ledgerState = ref.watch(ledgerProvider);
     final ledgerNotifier = ref.read(ledgerProvider.notifier);
 
-    // 🎨 DYNAMIC LIGHT/DARK THEME
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final Color bgColor = isDark
-        ? const Color(0xFF121212)
-        : const Color(0xFFF4F5F7);
-    final Color cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    final Color textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final Color textDimColor = isDark ? Colors.white54 : Colors.grey.shade600;
-    final Color borderColor = isDark ? Colors.white10 : Colors.grey.shade300;
+    // 🎨 DYNAMIC LIGHT/DARK THEME (Apple Premium Aesthetic)
+    final Color bgColor = context.colors.scaffoldBg;
+    final Color cardColor = context.colors.cardBg;
+    final Color textColor = context.colors.textPrimary;
+    final Color textDimColor = context.colors.textSecondary;
+    final Color borderColor = context.colors.border;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -1733,21 +1731,12 @@ class AuditorScreen extends ConsumerWidget {
                         vertical: 16,
                       ),
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.black : const Color(0xFF0F172A),
+                        color: context.colors.cardBg,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isDark
-                              ? Colors.grey.shade800
-                              : Colors.transparent,
-                          width: 2,
+                          color: context.colors.border,
+                          width: 1,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

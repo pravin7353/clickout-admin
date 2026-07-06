@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/idt_deposit_provider.dart';
 import '../../coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class IdtDepositsScreen extends ConsumerWidget {
   const IdtDepositsScreen({Key? key}) : super(key: key);
@@ -376,11 +377,11 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final cardDark = theme.cardColor;
+    final cardDark = context.colors.cardBg;
     final accentViolet = isDark
         ? const Color(0xFFB388FF)
         : const Color(0xFF6200EA);
-    final inputBg = isDark ? const Color(0xFF1A221A) : const Color(0xFFF4F5F7);
+    final inputBg = context.colors.scaffoldBg;
 
     final allItems = [..._dbItems, ..._localItems];
 
@@ -754,9 +755,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                       scrollDirection: Axis.vertical,
                       child: DataTable(
                         headingRowColor: WidgetStateProperty.all(
-                          isDark
-                              ? const Color(0xFF1A221A)
-                              : const Color(0xFFEDE7F6),
+                          context.colors.cardBg,
                         ),
                         columnSpacing: 20,
                         horizontalMargin: 16,

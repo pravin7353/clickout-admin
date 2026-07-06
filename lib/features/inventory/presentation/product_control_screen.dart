@@ -14,6 +14,7 @@ import 'edit_product_dialog.dart';
 import '../providers/product_master/product_master_provider.dart';
 import 'package:clickout_admin/features/procurement/services/stock_service.dart';
 import '../../coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class ProductControlScreen extends ConsumerStatefulWidget {
   const ProductControlScreen({super.key});
@@ -317,21 +318,16 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color bgDark = theme.scaffoldBackgroundColor;
-    final Color cardDark = theme.cardColor;
+    final Color bgDark = context.colors.scaffoldBg;
+    final Color cardDark = context.colors.cardBg;
     final Color accentGreen = isDark
         ? const Color(0xFF00C853)
         : const Color(0xFF0B6B60);
     final Color accentRed = const Color(0xFFFE8181);
-    final Color textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final Color textSecondary =
-        theme.textTheme.labelLarge?.color ?? Colors.grey;
-    final Color inputBg = isDark
-        ? const Color(0xFF1A221A)
-        : const Color(0xFFF4F5F7);
-    final Color tableHeaderBg = isDark
-        ? const Color(0xFF1A221A)
-        : const Color(0xFFE8F5E9);
+    final Color textPrimary = context.colors.textPrimary;
+    final Color textSecondary = context.colors.textSecondary;
+    final Color inputBg = context.colors.scaffoldBg;
+    final Color tableHeaderBg = context.colors.cardBg;
 
     int startIndex = _currentPage * _rowsPerPage;
     int endIndex = (startIndex + _rowsPerPage > _docs.length)

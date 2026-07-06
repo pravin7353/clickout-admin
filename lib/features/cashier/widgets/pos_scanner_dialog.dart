@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/theme/app_theme.dart';
 
 class PosScannerDialog extends StatefulWidget {
   final Function(String) onScan;
@@ -35,9 +36,9 @@ class _PosScannerDialogState extends State<PosScannerDialog> {
         height: 500,
         clipBehavior: Clip.hardEdge,
         decoration: BoxDecoration(
-          color: const Color(0xFF09090B),
+          color: context.colors.cardBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white24),
+          border: Border.all(color: context.colors.border),
         ),
         child: Stack(
           children: [

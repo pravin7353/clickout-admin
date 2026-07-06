@@ -1,73 +1,62 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// 🚀 THE FIX: Importing REAL Revenue Engine instead of fake AI provider
 import '../../revenue_engine/providers/revenue_provider.dart';
 import '../../coach/widgets/info_button.dart';
+import '../../../core/theme/app_theme.dart';
 
 class ManpowerRadarWidget extends ConsumerWidget {
   const ManpowerRadarWidget({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 🚀 Fetching REAL live data from today's orders
     final revenueState = ref.watch(revenueEngineProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final cardBg = isDark
-        ? isDark
-              ? const Color(0xFF111811)
-              : Colors.white
-        : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF2B3674);
-    final adviceTextColor = isDark ? Colors.white70 : Colors.black87;
+    final cardBg = context.colors.cardBg;
+    final textColor = context.colors.textPrimary;
+    final adviceTextColor = context.colors.textSecondary;
 
     return revenueState.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, _) => Center(
         child: Text(
           "Radar Offline: $err",
-          style: const TextStyle(color: Colors.red),
+          style: TextStyle(color: context.colors.danger),
         ),
       ),
       data: (metrics) {
-        // 🧠 THE REAL AI ALGORITHM (Based on ACTUAL Today's Orders)
         int realFootfall = metrics.totalOrders;
 
-        // Base Requirements Math
         int cashiers = (realFootfall / 20).ceil();
         if (cashiers < 1) cashiers = 1;
 
         int guards = (realFootfall / 50).ceil();
         if (guards < 1) guards = 1;
 
-        // Default: LOW RUSH
         String rushLevel = 'LOW';
         String tacticalAdvice =
             'NOMINAL: Steady flow of customers. Standard deployment is sufficient.';
-        Color threatColor = isDark ? const Color(0xFF00C853) : Colors.green;
+        Color threatColor = Colors.green.shade400; // Muted green
         IconData threatIcon = Icons.coffee;
 
-        // Dynamic Scaling based on REAL footfall
         if (realFootfall >= 100) {
           rushLevel = 'CRITICAL';
           tacticalAdvice =
               'CRITICAL RUSH: Maximum counters must be opened immediately! High risk of queue abandonment.';
-          threatColor = isDark ? Colors.purpleAccent : Colors.purple.shade700;
+          threatColor = Colors.purple.shade400;
           threatIcon = Icons.warning;
-          cashiers += 2; // Extra backup
+          cashiers += 2;
           guards += 1;
         } else if (realFootfall >= 50) {
           rushLevel = 'HIGH';
           tacticalAdvice =
               'HIGH TRAFFIC: Deploy backup cashiers to prevent queue buildup.';
-          threatColor = Colors.redAccent;
+          threatColor = context.colors.danger;
           threatIcon = Icons.local_fire_department;
           cashiers += 1;
         } else if (realFootfall >= 20) {
           rushLevel = 'MEDIUM';
           tacticalAdvice =
               'MODERATE RUSH: Monitor queues closely. Keep 1 backup cashier ready.';
-          threatColor = Colors.orange;
+          threatColor = Colors.orange.shade400;
           threatIcon = Icons.groups;
         }
 
@@ -75,13 +64,13 @@ class ManpowerRadarWidget extends ConsumerWidget {
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: cardBg,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.black.withOpacity(0.05), width: 1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: context.colors.border, width: 1),
             boxShadow: [
               BoxShadow(
-                color: threatColor.withOpacity(isDark ? 0.05 : 0.02),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
+                color: Colors.black.withValues(alpha: 0.04), // Subtle shadow
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -91,27 +80,29 @@ class ManpowerRadarWidget extends ConsumerWidget {
               // 🚀 RADAR HEADER
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Row(
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             "Tactical Staffing Radar 🤖",
                             style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
                               color: textColor,
+                              letterSpacing: -0.5,
                             ),
                             overflow: TextOverflow.ellipsis,
-                            maxLines: 2,
+                            maxLines: 1,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         const InfoButton(
                           title: 'Tactical Staffing Radar',
-                          en: 'AI-powered staffing recommendation based on real footfall. Shows how many cashiers and guards are needed right now.',
-                          hi: 'Aaj ke real orders ke hisaab se batata hai kitne cashier aur guard chahiye. Kam staff = queue jam = customer loss.',
+                          en: 'AI-powered staffing recommendation based on real footfall.',
+                          hi: 'Aaj ke real orders ke hisaab se staff deployment.',
                         ),
                       ],
                     ),
@@ -119,25 +110,29 @@ class ManpowerRadarWidget extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                      horizontal: 10,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: threatColor,
-                      borderRadius: BorderRadius.circular(20),
+                      color: threatColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: threatColor.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Text(
                       "$rushLevel RUSH",
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: threatColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // 🚀 DEPLOYMENT STATS
               LayoutBuilder(
@@ -150,26 +145,29 @@ class ManpowerRadarWidget extends ConsumerWidget {
                       children: [
                         _buildIntelCard(
                           "Expected Footfall",
-                          "$realFootfall /today",
+                          "$realFootfall",
+                          "/today",
                           Icons.directions_walk,
                           Colors.blueAccent,
-                          isDark,
+                          context,
                         ),
-                        const SizedBox(height: 15),
+                        const SizedBox(height: 12),
                         _buildIntelCard(
                           "Cashiers Needed",
                           "$cashiers",
+                          "",
                           Icons.point_of_sale,
                           threatColor,
-                          isDark,
+                          context,
                         ),
-                        const SizedBox(height: 15),
+                        const SizedBox(height: 12),
                         _buildIntelCard(
                           "Guards Needed",
                           "$guards",
+                          "",
                           Icons.security,
                           threatColor,
-                          isDark,
+                          context,
                         ),
                       ],
                     );
@@ -180,65 +178,66 @@ class ManpowerRadarWidget extends ConsumerWidget {
                       Expanded(
                         child: _buildIntelCard(
                           "Expected Footfall",
-                          "$realFootfall /today",
+                          "$realFootfall",
+                          "/today",
                           Icons.directions_walk,
                           Colors.blueAccent,
-                          isDark,
+                          context,
                         ),
                       ),
-                      const SizedBox(width: 15),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: _buildIntelCard(
                           "Cashiers Needed",
                           "$cashiers",
+                          "",
                           Icons.point_of_sale,
                           threatColor,
-                          isDark,
+                          context,
                         ),
                       ),
-                      const SizedBox(width: 15),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: _buildIntelCard(
                           "Guards Needed",
                           "$guards",
+                          "",
                           Icons.security,
                           threatColor,
-                          isDark,
+                          context,
                         ),
                       ),
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
               // 🛡️ COMMANDER'S ADVICE
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(15),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: threatColor.withOpacity(isDark ? 0.15 : 0.05),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: threatColor.withOpacity(0.2),
-                    width: 1,
-                  ),
+                  color: context.colors.scaffoldBg, // Darker inset background
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: context.colors.border),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(threatIcon, color: threatColor),
-                    const SizedBox(width: 10),
+                    Icon(threatIcon, color: threatColor, size: 20),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "COMMANDER'S ADVICE:",
+                            "COMMANDER'S ADVICE",
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: threatColor,
-                              fontSize: 12,
+                              fontSize: 10,
+                              letterSpacing: 1.0,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -246,7 +245,8 @@ class ManpowerRadarWidget extends ConsumerWidget {
                             tacticalAdvice,
                             style: TextStyle(
                               color: adviceTextColor,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              height: 1.4,
                             ),
                           ),
                         ],
@@ -265,38 +265,65 @@ class ManpowerRadarWidget extends ConsumerWidget {
   Widget _buildIntelCard(
     String title,
     String value,
+    String suffix,
     IconData icon,
     Color color,
-    bool isDark,
+    BuildContext context,
   ) {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.05 : 0.03),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: color.withOpacity(0.1), width: 1),
+        color: context.colors.scaffoldBg, // Inset effect
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: TextStyle(
-              color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title.toUpperCase(),
+                  style: TextStyle(
+                    color: context.colors.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 5),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              if (suffix.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4, left: 4),
+                  child: Text(
+                    suffix,
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),

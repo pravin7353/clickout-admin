@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http; // 🚀 Added for Real APIs
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class EditTenantProfileDialog extends StatefulWidget {
   final String tenantId;
@@ -550,16 +551,16 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Center(
-        child: CircularProgressIndicator(color: Theme.of(context).primaryColor),
+        child: CircularProgressIndicator(color: context.colors.success),
       );
     }
 
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final brandColor = theme.primaryColor;
-    final bgCol = isDark ? const Color(0xFF111811) : Colors.white;
-    final textCol = isDark ? Colors.white : const Color(0xFF0F172A);
-    final mutedCol = isDark ? Colors.white60 : Colors.black54;
+    final brandColor = context.colors.success;
+    final bgCol = context.colors.scaffoldBg;
+    final textCol = context.colors.textPrimary;
+    final mutedCol = context.colors.textSecondary;
 
     return Dialog(
       backgroundColor: bgCol,

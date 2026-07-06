@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_theme.dart';
 
 class ClientRegistrationScreen extends ConsumerStatefulWidget {
   const ClientRegistrationScreen({super.key});
@@ -50,20 +51,15 @@ class _ClientRegistrationScreenState
   final _kEmpCount = GlobalKey();
   final _kVolume = GlobalKey();
 
-  // 🎨 DYNAMIC THEME GETTERS (100% Light/Dark Mode Support)
-  Color get bgDark => Theme.of(context).scaffoldBackgroundColor;
-  Color get cardDark => Theme.of(context).cardColor;
-  Color get textPrimary =>
-      Theme.of(context).textTheme.bodyLarge?.color ??
-      (Theme.of(context).brightness == Brightness.dark
-          ? Colors.white
-          : Colors.black);
-  Color get textSecondary =>
-      Theme.of(context).textTheme.labelLarge?.color ?? Colors.grey;
+  // 🎨 DYNAMIC THEME GETTERS (Linked to app_theme.dart)
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
   Color get inputBg => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF1A221A)
-      : Colors.grey.shade100;
-  static const Color accentGreen = Color(0xFF00C853);
+      ? Colors.white10
+      : Colors.black12;
+  Color get accentGreen => context.colors.success;
 
   // --- STEP 1: Business Details ---
   final _storeNameCtrl = TextEditingController();
@@ -351,7 +347,7 @@ class _ClientRegistrationScreenState
           barrierDismissible: false,
           builder: (_) => AlertDialog(
             backgroundColor: cardDark,
-            title: const Icon(Icons.check_circle, color: accentGreen, size: 50),
+            title: Icon(Icons.check_circle, color: accentGreen, size: 50),
             content: Text(
               "Client registered successfully!\nLogin credentials will be sent to $adminEmail",
               textAlign: TextAlign.center,
@@ -363,7 +359,7 @@ class _ClientRegistrationScreenState
                   Navigator.pop(context);
                   context.go('/');
                 },
-                child: const Text(
+                child: Text(
                   "GO TO COMMAND CENTER",
                   style: TextStyle(color: accentGreen),
                 ),
@@ -474,9 +470,7 @@ class _ClientRegistrationScreenState
       labelStyle: TextStyle(color: textSecondary),
       filled: true,
       fillColor: inputBg,
-      suffixIcon: isValid
-          ? const Icon(Icons.check_circle, color: accentGreen)
-          : null,
+      suffixIcon: isValid ? Icon(Icons.check_circle, color: accentGreen) : null,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
@@ -484,16 +478,16 @@ class _ClientRegistrationScreenState
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: isValid
-            ? const BorderSide(color: accentGreen, width: 1.0)
+            ? BorderSide(color: accentGreen, width: 1.0)
             : BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: accentGreen, width: 1.5),
+        borderSide: BorderSide(color: accentGreen, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),

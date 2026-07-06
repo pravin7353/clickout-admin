@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart'; // 🚀 Neon Theme
 import '../providers/org_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class AddRoleDialog extends ConsumerStatefulWidget {
   const AddRoleDialog({super.key});
@@ -82,18 +83,16 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
     IconData icon, {
     String? hint,
   }) {
-    final theme = Theme.of(context);
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      hintStyle: TextStyle(color: Colors.grey.withOpacity(0.5)),
-      prefixIcon: Icon(icon, color: theme.primaryColor.withOpacity(0.7)),
-      labelStyle: TextStyle(
-        color: theme.textTheme.labelLarge?.color,
-        fontSize: 13,
+      hintStyle: TextStyle(
+        color: context.colors.textSecondary.withOpacity(0.5),
       ),
+      prefixIcon: Icon(icon, color: context.colors.success.withOpacity(0.7)),
+      labelStyle: TextStyle(color: context.colors.textSecondary, fontSize: 13),
       filled: true,
-      fillColor: const Color(0xFF1A221A), // 🚀 Dark Input BG
+      fillColor: context.colors.scaffoldBg, // 🚀 Connected to Theme
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
@@ -101,15 +100,15 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: theme.dividerColor),
+        borderSide: BorderSide(color: context.colors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+        borderSide: BorderSide(color: context.colors.success, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1),
+        borderSide: BorderSide(color: context.colors.danger, width: 1),
       ),
     );
   }

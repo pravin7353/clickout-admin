@@ -13,6 +13,7 @@ import 'services/pos_order_service.dart';
 import '../../core/services/cart_item.dart';
 import 'providers/cart_provider.dart';
 import '../coach/widgets/info_button.dart';
+import '../../core/theme/app_theme.dart';
 
 // ── UI DATA MODELS ──
 class CartGroup {
@@ -264,7 +265,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            backgroundColor: isDark ? const Color(0xFF09090B) : Colors.white,
+            backgroundColor: context.colors.cardBg,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -341,17 +342,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
 
     final cartState = ref.watch(posCartProvider);
-    final cartNotifier = ref.read(posCartProvider.notifier);
-
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final bgCol = isDark ? const Color(0xFF000000) : const Color(0xFFF6F6F4);
-    final cardCol = isDark ? const Color(0xFF09090B) : Colors.white;
-    final text1Col = isDark ? const Color(0xFFFAFAFA) : const Color(0xFF111111);
-    final text2Col = isDark ? const Color(0xFFA1A1AA) : const Color(0xFF6B7280);
-    final divCol = isDark ? const Color(0xFF27272A) : const Color(0xFFE5E7EB);
-
+    final bgCol = context.colors.scaffoldBg;
+    final cardCol = context.colors.cardBg;
+    final text1Col = context.colors.textPrimary;
+    final text2Col = context.colors.textSecondary;
+    final divCol = context.colors.border;
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 850;
     final rightPanelWidth = screenWidth * 0.50;
@@ -500,7 +498,10 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           ),
                         ) ??
                         false;
-                    if (confirm) cartNotifier.clearCart();
+                    if (confirm)
+                      ref
+                          .read(posCartProvider.notifier)
+                          .clearCart(); // 🚀 FIX: Used ref directly to avoid scope issues
                   },
                   child: Text("Clear All", style: TextStyle(color: _redBrand)),
                 ),
@@ -525,7 +526,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildPosCartItemCard(
                     group,
-                    cartNotifier,
+                    ref.read(
+                      posCartProvider.notifier,
+                    ), // 🚀 FIX: Used ref to pass the notifier
                     isDark,
                     cardCol,
                     bgCol,
@@ -542,7 +545,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+            color: context.colors.scaffoldBg,
             border: Border(top: BorderSide(color: divCol)),
           ),
           child: Column(
@@ -734,13 +737,13 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         (group.freeItem?.quantity ?? 0) > 0;
 
     final Color greenBg = isDark
-        ? const Color(0xFF16A34A).withOpacity(0.15)
+        ? const Color(0xFF16A34A).withValues(alpha: 0.15)
         : const Color(0xFFDCFCE7);
     final Color amberBg = isDark
-        ? const Color(0xFFF59E0B).withOpacity(0.15)
+        ? const Color(0xFFF59E0B).withValues(alpha: 0.15)
         : const Color(0xFFFEF3C7);
     final Color redBg = isDark
-        ? const Color(0xFFE53E3E).withOpacity(0.15)
+        ? const Color(0xFFE53E3E).withValues(alpha: 0.15)
         : const Color(0xFFFFEBEB);
 
     return Container(
@@ -749,7 +752,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         color: cardCol,
         borderRadius: BorderRadius.circular(10),
         border: hasOffer
-            ? Border.all(color: const Color(0xFF16A34A).withOpacity(0.3))
+            ? Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.3))
             : Border.all(color: divCol),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -925,7 +928,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 color: amberBg,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: const Color(0xFFF59E0B).withOpacity(0.3),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -958,7 +961,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 color: greenBg,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: const Color(0xFF16A34A).withOpacity(0.2),
+                  color: const Color(0xFF16A34A).withValues(alpha: 0.2),
                 ),
               ),
               child: Row(
@@ -1023,10 +1026,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: isAdd ? const Color(0xFFE53E3E).withOpacity(0.1) : bgCol,
+            color: isAdd
+                ? const Color(0xFFE53E3E).withValues(alpha: 0.1)
+                : bgCol,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isAdd ? const Color(0xFFE53E3E).withOpacity(0.3) : divCol,
+              color: isAdd
+                  ? const Color(0xFFE53E3E).withValues(alpha: 0.3)
+                  : divCol,
             ),
           ),
           child: Icon(
@@ -1069,7 +1076,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
         ),
         trailing: ElevatedButton(
           style: ElevatedButton.styleFrom(
-            backgroundColor: _redBrand.withOpacity(0.1),
+            backgroundColor: _redBrand.withValues(alpha: 0.1),
             foregroundColor: _redBrand,
             elevation: 0,
           ),
@@ -1163,9 +1170,9 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
           margin: const EdgeInsets.only(top: 8),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.1),
+            color: Colors.red.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.red.withOpacity(0.3)),
+            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

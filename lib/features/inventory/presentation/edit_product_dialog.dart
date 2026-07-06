@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../inventory/providers/product_master/product_master_provider.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class EditProductDialog extends ConsumerStatefulWidget {
   final Map<String, dynamic> productData;
@@ -30,13 +31,13 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
   DateTime? _selectedExpiry;
 
   // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color bgDark = Color(0xFF080B08);
-  static const Color cardDark = Color(0xFF111811);
+  Color get bgDark => context.colors.scaffoldBg;
+  Color get cardDark => context.colors.cardBg;
   static const Color accentGreen = Color(0xFF00C853);
   static const Color accentRed = Color(0xFFFE8181);
-  static const Color textPrimary = Color(0xFFF0F0F0);
-  static const Color textSecondary = Color(0xFF888888);
-  static const Color inputBg = Color(0xFF1A221A);
+  Color get textPrimary => context.colors.textPrimary;
+  Color get textSecondary => context.colors.textSecondary;
+  Color get inputBg => context.colors.scaffoldBg;
 
   @override
   void initState() {
@@ -173,7 +174,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           "Enterprise SKU Editor",
                           style: TextStyle(
                             fontSize: 20,
@@ -183,7 +184,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                         ),
                         Text(
                           "Modifying: ${_barcodeCtrl.text}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: textSecondary,
                             fontSize: 13,
                             fontFamily: 'monospace',
@@ -312,7 +313,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                                       value: val,
                                       child: Text(
                                         val,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: textPrimary,
                                         ),
@@ -359,7 +360,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                                   builder: (context, child) {
                                     return Theme(
                                       data: Theme.of(context).copyWith(
-                                        colorScheme: const ColorScheme.dark(
+                                        colorScheme: ColorScheme.dark(
                                           primary: accentGreen,
                                           onPrimary: bgDark,
                                           surface: cardDark,
@@ -429,7 +430,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                     onPressed: isProcessing
                         ? null
                         : () => Navigator.pop(context),
-                    child: const Text(
+                    child: Text(
                       "Cancel",
                       style: TextStyle(
                         color: textSecondary,
@@ -452,7 +453,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                     ),
                     onPressed: isProcessing ? null : _submitEdit,
                     icon: isProcessing
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(
@@ -491,7 +492,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w900,
           color: textSecondary,
@@ -516,7 +517,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
         keyboardType: isNumber
             ? const TextInputType.numberWithOptions(decimal: true)
             : TextInputType.text,
-        style: const TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
+        style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
         decoration: _inputDecoration(label, icon),
         validator: isRequired
             ? (value) => value == null || value.isEmpty ? "Required" : null

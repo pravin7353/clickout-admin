@@ -8,6 +8,7 @@ import 'package:clickout_admin/features/growth/providers/churn_engine_service.da
 import 'package:clickout_admin/features/growth/providers/offer_engine_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../coach/widgets/info_button.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class GrowthRadarScreen extends ConsumerStatefulWidget {
   const GrowthRadarScreen({super.key});
@@ -71,8 +72,8 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDark ? const Color(0xFF0A0C10) : const Color(0xFFF8FAFC);
-    final cardColor = isDark ? const Color(0xFF13161C) : Colors.white;
+    final bgColor = context.colors.scaffoldBg;
+    final cardColor = context.colors.cardBg;
     final adminData = ref.watch(adminRoleProvider).value;
     final role = adminData?['role']?.toString().toUpperCase();
 

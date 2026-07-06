@@ -4,6 +4,7 @@ import '../providers/org_provider.dart';
 import '../widgets/add_role_dialog.dart';
 import '../widgets/edit_role_dialog.dart';
 import '../widgets/org_tree_visualizer.dart';
+import 'package:clickout_admin/core/theme/app_theme.dart';
 
 class OrgStructureScreen extends ConsumerStatefulWidget {
   const OrgStructureScreen({super.key});
@@ -21,9 +22,9 @@ class _OrgStructureScreenState extends ConsumerState<OrgStructureScreen> {
     final notifier = ref.read(orgStructureProvider.notifier);
 
     final theme = Theme.of(context);
-    final textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.white;
-    final textSecondary = theme.textTheme.labelLarge?.color ?? Colors.grey;
-    final cardColor = theme.cardColor;
+    final textPrimary = context.colors.textPrimary;
+    final textSecondary = context.colors.textSecondary;
+    final cardColor = context.colors.cardBg;
 
     Color getLevelColor(int level) {
       if (level == 1) return const Color(0xFFEF9F27);

@@ -13,6 +13,7 @@ import 'presentation/add_distributor_dialog.dart';
 import 'presentation/distributor_list_screen.dart';
 import 'presentation/widgets/quantum_metrics_widget.dart';
 import '../coach/widgets/info_button.dart';
+import '../../../core/theme/app_theme.dart';
 
 class POApprovalScreen extends ConsumerStatefulWidget {
   const POApprovalScreen({super.key});
@@ -157,22 +158,15 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color bgDark = isDark
-        ? const Color(0xFF080B08)
-        : const Color(0xFFF4F5F7);
-    final Color cardDark = isDark
-        ? const Color(0xFF111811)
-        : const Color(0xFFFFFFFF);
+    final Color bgDark = context.colors.scaffoldBg;
+    final Color cardDark = context.colors.cardBg;
     final Color accentGreen = isDark
         ? const Color(0xFF00C853)
         : const Color(0xFF2E7D32);
     final Color accentOrange = const Color(0xFFFF6D00); // 🚀 Sunset Amber
-    final Color textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final Color textSecondary =
-        theme.textTheme.labelLarge?.color ?? Colors.grey;
-    final Color tableHeaderBg = isDark
-        ? const Color(0xFF1A1F1A)
-        : const Color(0xFFFFF3E0); // Light Orange Header
+    final Color textPrimary = context.colors.textPrimary;
+    final Color textSecondary = context.colors.textSecondary;
+    final Color tableHeaderBg = context.colors.cardBg;
 
     return Scaffold(
       backgroundColor: bgDark,
