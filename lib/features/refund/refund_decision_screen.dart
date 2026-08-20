@@ -25,7 +25,6 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
   @override
   Widget build(BuildContext context) {
     final refundState = ref.watch(refundEngineProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark; // 🚀 ADDED
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -324,7 +323,6 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
   }
 
   Widget _buildInfoCard(String title, String value, Color color) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: 200,
       padding: const EdgeInsets.all(20),
@@ -372,7 +370,6 @@ class _RefundDecisionScreenState extends ConsumerState<RefundDecisionScreen> {
     required bool isRecommended,
     required VoidCallback onTap,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(

@@ -52,10 +52,10 @@ class _UpgradePopupContentState extends State<_UpgradePopupContent> {
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFF00C853).withOpacity(0.3)),
+          border: Border.all(color: const Color(0xFF00C853).withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.4),
+              color: Colors.black.withValues(alpha: 0.4),
               blurRadius: 60,
               offset: const Offset(0, 20),
             ),
@@ -70,7 +70,7 @@ class _UpgradePopupContentState extends State<_UpgradePopupContent> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(28),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00C853).withOpacity(0.07),
+                  color: const Color(0xFF00C853).withValues(alpha: 0.07),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(24),
                   ),

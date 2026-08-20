@@ -566,7 +566,7 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
       backgroundColor: bgCol,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: brandColor.withOpacity(0.2)),
+        side: BorderSide(color: brandColor.withValues(alpha: 0.2)),
       ),
       child: Container(
         width: 850,
@@ -647,10 +647,10 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: brandColor.withOpacity(0.08),
+                          color: brandColor.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: brandColor.withOpacity(0.2),
+                            color: brandColor.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(
@@ -891,8 +891,8 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                                   ),
                                 ),
                                 backgroundColor: isDark
-                                    ? brandColor.withOpacity(0.15)
-                                    : brandColor.withOpacity(0.1),
+                                    ? brandColor.withValues(alpha: 0.15)
+                                    : brandColor.withValues(alpha: 0.1),
                                 deleteIconColor: brandColor,
                                 onDeleted: () {
                                   setState(
@@ -900,7 +900,7 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                                   );
                                 },
                                 side: BorderSide(
-                                  color: brandColor.withOpacity(0.3),
+                                  color: brandColor.withValues(alpha: 0.3),
                                 ),
                               ),
                             )
@@ -1120,10 +1120,10 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                         padding: const EdgeInsets.all(14),
                         margin: const EdgeInsets.only(bottom: 20),
                         decoration: BoxDecoration(
-                          color: brandColor.withOpacity(0.05),
+                          color: brandColor.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: brandColor.withOpacity(0.2),
+                            color: brandColor.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(

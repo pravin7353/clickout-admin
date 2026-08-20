@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/tenant_provider.dart';
-import '../screens/super_admin_screen.dart'; // Tokens
 import 'package:cloud_functions/cloud_functions.dart'; // ⚡ NEW: Cloud Functions
 
 class TenantDetailPanel extends StatelessWidget {
@@ -327,6 +325,8 @@ class TenantDetailPanel extends StatelessWidget {
                     stream: FirebaseFirestore.instance
                         .collection('stores')
                         .where('tenantId', isEqualTo: tenant.id)
+                        // 🚀 COST FIX: safety cap.
+                        .limit(200)
                         .snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData)
@@ -479,7 +479,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(

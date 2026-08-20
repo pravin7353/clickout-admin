@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/product_master/product_master_provider.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
@@ -162,7 +161,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       elevation: 24,
@@ -188,7 +187,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -196,7 +195,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentGreen.withOpacity(0.1),
+                        color: accentGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -475,7 +474,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                     bottom: Radius.circular(16),
                   ),
                   border: Border(
-                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -565,7 +564,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: textSecondary.withOpacity(0.1),
+        color: textSecondary.withValues(alpha: 0.1),
       ),
     );
   }
@@ -620,7 +619,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     return InputDecoration(
       hintText: hintText,
       hintStyle: TextStyle(
-        color: textSecondary.withOpacity(0.5),
+        color: textSecondary.withValues(alpha: 0.5),
         fontWeight: FontWeight.normal,
       ),
       prefixIcon: Icon(icon, color: textSecondary, size: 20),

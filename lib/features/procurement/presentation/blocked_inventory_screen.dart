@@ -72,7 +72,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                 decoration: BoxDecoration(
                   color: cardDark,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: textSecondary.withOpacity(0.1)),
+                  border: Border.all(color: textSecondary.withValues(alpha: 0.1)),
                 ),
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -80,6 +80,10 @@ class BlockedInventoryScreen extends ConsumerWidget {
                       .where('tenantId', isEqualTo: tenantId)
                       .where('reason', isEqualTo: 'EXPIRED_BATCH_BLOCKED')
                       .orderBy('createdAt', descending: true)
+                      // 🚀 COST FIX: Ledger history time ke saath badhta rehta
+                      // hai; bina limit ke ye har baar poori history stream
+                      // karta. Recent 100 records dikhana kaafi hai.
+                      .limit(100)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
@@ -110,10 +114,10 @@ class BlockedInventoryScreen extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: accentRed.withOpacity(0.1),
+                            color: accentRed.withValues(alpha: 0.1),
                             border: Border(
                               bottom: BorderSide(
-                                color: accentRed.withOpacity(0.3),
+                                color: accentRed.withValues(alpha: 0.3),
                               ),
                             ),
                           ),

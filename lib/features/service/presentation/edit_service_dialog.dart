@@ -114,7 +114,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentBlue.withOpacity(0.2), width: 1),
+        side: BorderSide(color: accentBlue.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       elevation: 24,
@@ -140,7 +140,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -148,7 +148,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentBlue.withOpacity(0.1),
+                        color: accentBlue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -326,7 +326,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
                     bottom: Radius.circular(16),
                   ),
                   border: Border(
-                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -403,7 +403,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
     child: Divider(
       height: 1,
       thickness: 1,
-      color: textSecondary.withOpacity(0.1),
+      color: textSecondary.withValues(alpha: 0.1),
     ),
   );
 
@@ -448,7 +448,7 @@ class _EditServiceDialogState extends ConsumerState<EditServiceDialog> {
     return InputDecoration(
       prefixIcon: Icon(
         icon,
-        color: isLocked ? textSecondary.withOpacity(0.5) : textSecondary,
+        color: isLocked ? textSecondary.withValues(alpha: 0.5) : textSecondary,
         size: 20,
       ),
       filled: true,

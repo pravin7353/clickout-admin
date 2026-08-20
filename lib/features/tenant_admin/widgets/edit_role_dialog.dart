@@ -120,7 +120,7 @@ class _EditRoleDialogState extends ConsumerState<EditRoleDialog> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2B3674).withOpacity(0.1),
+              color: const Color(0xFF2B3674).withValues(alpha: 0.1),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -144,7 +144,7 @@ class _EditRoleDialogState extends ConsumerState<EditRoleDialog> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2B3674).withOpacity(0.1),
+                      color: const Color(0xFF2B3674).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(

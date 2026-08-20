@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,9 +23,16 @@ class PosCartState {
 // 🚀 THE NEW PERSISTENT POS CART ENGINE (Riverpod 2.x Standard)
 class PosCartNotifier extends Notifier<PosCartState> {
   List<Map<String, dynamic>> _activeOffers = [];
+  // 🛡️ LEAK FIX: subscription store karke rakhte hain taaki dispose pe cancel ho sake.
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _offersSub;
 
   @override
   PosCartState build() {
+    // 🛡️ LEAK FIX: agar provider kabhi rebuild/invalidate ho, purana listener
+    // pehle cancel karo warna duplicate listeners + duplicate Firestore reads honge.
+    ref.onDispose(() {
+      _offersSub?.cancel();
+    });
     _initCart(); // Fire and forget
     return PosCartState(); // Initial empty state
   }
@@ -91,10 +99,16 @@ class PosCartNotifier extends Notifier<PosCartState> {
     // 🚀 NAYA FIX: Ek baar get() karne ki jagah ab ye real-time Snapshots sunega.
     // Jaise hi tu Procurement se offer badlega, POS instantly cart update kar dega!
     // Tera core calculation logic 100% UNTOUCHED hai.
-    FirebaseFirestore.instance
+    // 🛡️ LEAK FIX: purana subscription (agar kabhi dobara call ho) cancel karke
+    // naya banaya, aur subscription ko field me store kiya taaki build()'s
+    // onDispose ise properly cancel kar sake.
+    await _offersSub?.cancel();
+    _offersSub = FirebaseFirestore.instance
         .collection('products')
         .where('tenantId', isEqualTo: tenantId)
         .where('clearanceActive', isEqualTo: true)
+        // 🚀 COST FIX: Clearance offers listener pehle bina limit ke tha.
+        .limit(200)
         .snapshots()
         .listen((snap) {
           _activeOffers = snap.docs.map((d) => d.data()).toList();

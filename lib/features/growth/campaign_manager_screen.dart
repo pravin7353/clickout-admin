@@ -335,10 +335,10 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF22C55E).withOpacity(0.08),
+                  color: const Color(0xFF22C55E).withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF22C55E).withOpacity(0.3),
+                    color: const Color(0xFF22C55E).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Text(
@@ -522,7 +522,7 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
             border: Border.all(color: Colors.grey.shade200),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.06),
+                color: Colors.black.withValues(alpha: 0.06),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -535,7 +535,7 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 36),
@@ -613,7 +613,7 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF22C55E).withOpacity(0.1),
+                  color: const Color(0xFF22C55E).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -637,6 +637,8 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
                   'createdAt',
                   descending: true,
                 ) // ⚡ Restored: Native Indexing
+                // 🚀 COST FIX: List view ke liye pagination ki jagah abhi safety limit.
+                .limit(100)
                 .snapshots(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -714,7 +716,7 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: isActive
-                            ? const Color(0xFF22C55E).withOpacity(0.4)
+                            ? const Color(0xFF22C55E).withValues(alpha: 0.4)
                             : Theme.of(context).dividerColor,
                         width: isActive ? 1.5 : 1,
                       ),
@@ -741,7 +743,7 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: typeColor.withOpacity(0.1),
+                            color: typeColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -795,10 +797,10 @@ class _CampaignManagerScreenState extends ConsumerState<CampaignManagerScreen> {
                             ),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? const Color(0xFF22C55E).withOpacity(0.1)
+                                  ? const Color(0xFF22C55E).withValues(alpha: 0.1)
                                   : Theme.of(
                                       context,
-                                    ).dividerColor.withOpacity(0.4),
+                                    ).dividerColor.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(

@@ -261,7 +261,7 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
               decoration: BoxDecoration(
                 color: inputBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: textSecondary.withOpacity(0.15)),
+                border: Border.all(color: textSecondary.withValues(alpha: 0.15)),
               ),
               child: TextField(
                 controller: _searchController,
@@ -272,7 +272,7 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
                 },
                 decoration: InputDecoration(
                   hintText: "Search Service Name...",
-                  hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
                   prefixIcon: Icon(
                     Icons.search,
                     color: textSecondary,
@@ -303,7 +303,7 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
               decoration: BoxDecoration(
                 color: cardDark,
                 borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: textSecondary.withOpacity(0.15)),
+                border: Border.all(color: textSecondary.withValues(alpha: 0.15)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -339,7 +339,7 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
                         physics: const BouncingScrollPhysics(),
                         child: Theme(
                           data: Theme.of(context).copyWith(
-                            dividerColor: textSecondary.withOpacity(0.15),
+                            dividerColor: textSecondary.withValues(alpha: 0.15),
                           ),
                           child: DataTable(
                             headingRowHeight: 56,
@@ -426,7 +426,7 @@ class _ServiceControlScreenState extends ConsumerState<ServiceControlScreen> {
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: accentBlue.withOpacity(0.1),
+                                        color: accentBlue.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(

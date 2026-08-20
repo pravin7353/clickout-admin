@@ -296,6 +296,8 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                     isEqualTo: staffData['tenantId'],
                                   )
                                   .where('isDeleted', isEqualTo: false)
+                                  // 🚀 COST FIX: safety cap on branch dropdown.
+                                  .limit(200)
                                   .snapshots(),
                               builder: (context, snapshot) {
                                 if (!snapshot.hasData) {

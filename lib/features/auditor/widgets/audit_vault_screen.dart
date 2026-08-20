@@ -16,7 +16,9 @@ class AuditVaultScreen extends ConsumerWidget {
     final String? tenantId = adminData?['tenantId'];
     final String role = (adminData?['role'] ?? '').toString().toLowerCase();
 
-    Query auditQuery = FirebaseFirestore.instance.collection('audit_logs');
+    Query auditQuery = FirebaseFirestore.instance.collection(
+      'admin_audit_logs',
+    );
 
     // 🚀 SAAS ISOLATION: Filter logs by company.
     // 🛡️ FIX: Removed branchCode filter because it doesn't exist in Firestore 'audit_logs' documents.
@@ -136,14 +138,24 @@ class AuditVaultScreen extends ConsumerWidget {
                               : 'Unknown Time';
 
                           final String actionType =
-                              data['actionType'] ?? 'UNKNOWN';
+                              data['action'] ?? data['actionType'] ?? 'UNKNOWN';
                           final String actorEmail =
-                              data['actorEmail'] ?? 'SYSTEM';
+                              data['actor'] ?? data['actorEmail'] ?? 'SYSTEM';
                           final String targetCol =
-                              data['targetCollection'] ?? '';
-                          final String targetId = data['targetId'] ?? '';
-                          final String details = data['details'] ?? '';
-                          final String severity = data['severity'] ?? 'INFO';
+                              data['companyName'] ??
+                              data['targetCollection'] ??
+                              '';
+                          final String targetId =
+                              data['tenantId'] ?? data['targetId'] ?? '';
+                          final String details =
+                              data['details'] ?? data['branchCode'] ?? '';
+                          final String severity =
+                              data['severity'] ??
+                              (actionType.startsWith('FRAUD')
+                                  ? 'CRITICAL'
+                                  : actionType.contains('SUSPEND')
+                                  ? 'WARNING'
+                                  : 'INFO');
 
                           Color severityColor = Colors.blueAccent;
                           if (severity == 'WARNING') {

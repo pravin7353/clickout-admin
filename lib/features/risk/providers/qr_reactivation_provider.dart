@@ -26,6 +26,9 @@ final adminProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
   return FirebaseFirestore.instance
       .collection('staff')
       .where('email', isEqualTo: user.email)
+      // 🚀 COST FIX: sirf pehla matching doc use hota hai, isliye limit(1) lagaya
+      // taaki agar kabhi duplicate/stale staff docs ho toh bhi extra reads na ho.
+      .limit(1)
       .snapshots()
       .map((snapshot) {
         if (snapshot.docs.isEmpty) return null;
@@ -102,6 +105,9 @@ final expiredOrdersProvider =
       if (!isSuperAdmin && tenantId != null) {
         defaultQ = defaultQ.where('tenantId', isEqualTo: tenantId);
       }
+      // 🚀 COST FIX: super_admin case me ye poore platform ke 3-din ke saare
+      // orders bina limit ke stream karta tha.
+      defaultQ = defaultQ.limit(2000);
 
       return defaultQ.snapshots().map((snapshot) {
         final filteredDocs = snapshot.docs.where((doc) {

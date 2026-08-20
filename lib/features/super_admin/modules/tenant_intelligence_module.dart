@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/tenant_provider.dart';
+import '../providers/trust_score_provider.dart';
 import '../widgets/add_tenant_dialog.dart';
 import '../widgets/tenant_detail_panel.dart'; // ⚡ NEW: Panel Import
 import '../screens/super_admin_screen.dart'; // Tokens
@@ -197,12 +198,14 @@ class _TenantIntelligenceModuleState
                     margin: const EdgeInsets.only(bottom: 10),
                     height: 72,
                     decoration: BoxDecoration(
-                      color: EnterpriseColors.surfaceGlass.withOpacity(
-                        0.5 - (index * 0.1).clamp(0.0, 0.5),
+                      color: EnterpriseColors.surfaceGlass.withValues(
+                        alpha: 0.5 - (index * 0.1).clamp(0.0, 0.5),
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: EnterpriseColors.borderSubtle.withOpacity(0.2),
+                        color: EnterpriseColors.borderSubtle.withValues(
+                          alpha: 0.2,
+                        ),
                       ),
                     ),
                   ),
@@ -318,7 +321,9 @@ class _TenantIntelligenceModuleState
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: _planColor(t.plan).withOpacity(0.15),
+                                color: _planColor(
+                                  t.plan,
+                                ).withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Center(
@@ -365,7 +370,9 @@ class _TenantIntelligenceModuleState
                                 vertical: 3,
                               ),
                               decoration: BoxDecoration(
-                                color: _planColor(t.plan).withOpacity(0.12),
+                                color: _planColor(
+                                  t.plan,
+                                ).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -386,7 +393,7 @@ class _TenantIntelligenceModuleState
                               decoration: BoxDecoration(
                                 color: _billingColor(
                                   t.billingStatus,
-                                ).withOpacity(0.12),
+                                ).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -397,6 +404,132 @@ class _TenantIntelligenceModuleState
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
+                            ),
+                            const SizedBox(width: 16),
+                            Consumer(
+                              builder: (context, ref, _) {
+                                final trustAsync = ref.watch(
+                                  trustScoreProvider(t.id),
+                                );
+                                return trustAsync.when(
+                                  loading: () => const SizedBox(
+                                    width: 60,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  error: (_, __) => const SizedBox.shrink(),
+                                  data: (score) {
+                                    if (score == null)
+                                      return const SizedBox.shrink();
+                                    final Color scoreColor = score >= 90
+                                        ? const Color(0xFF00C853)
+                                        : (score >= 70
+                                              ? const Color(0xFFEF9F27)
+                                              : const Color(0xFFE53E3E));
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: scoreColor.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.verified,
+                                            color: scoreColor,
+                                            size: 11,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${score.toStringAsFixed(0)}% Trust',
+                                            style: TextStyle(
+                                              color: scoreColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                            const SizedBox(width: 16),
+                            Consumer(
+                              builder: (context, ref, _) {
+                                final trustAsync = ref.watch(
+                                  trustScoreProvider(t.id),
+                                );
+                                return trustAsync.when(
+                                  loading: () => const SizedBox(
+                                    width: 60,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  error: (_, __) => const SizedBox.shrink(),
+                                  data: (score) {
+                                    if (score == null)
+                                      return const SizedBox.shrink();
+                                    final Color scoreColor = score >= 90
+                                        ? const Color(0xFF00C853)
+                                        : (score >= 70
+                                              ? const Color(0xFFEF9F27)
+                                              : const Color(0xFFE53E3E));
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: scoreColor.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.verified,
+                                            color: scoreColor,
+                                            size: 11,
+                                          ),
+                                          const SizedBox(width: 3),
+                                          Text(
+                                            '${score.toStringAsFixed(0)}% Trust',
+                                            style: TextStyle(
+                                              color: scoreColor,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             ),
                             const SizedBox(width: 16),
                             Column(

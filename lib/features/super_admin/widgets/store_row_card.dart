@@ -83,7 +83,7 @@ class StoreRowCard extends StatelessWidget {
             decoration: BoxDecoration(
               color:
                   (isActive ? const Color(0xFF00C853) : const Color(0xFFE53E3E))
-                      .withOpacity(0.12),
+                      .withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(

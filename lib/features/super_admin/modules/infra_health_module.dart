@@ -61,7 +61,7 @@ class InfraHealthModule extends ConsumerWidget {
                   color: context.accentNeonGlow,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: context.accentNeon.withOpacity(0.3),
+                    color: context.accentNeon.withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(
@@ -312,7 +312,7 @@ class InfraHealthModule extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(

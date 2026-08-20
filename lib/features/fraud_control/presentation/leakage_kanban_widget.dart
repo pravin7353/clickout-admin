@@ -93,7 +93,6 @@ class LeakageKanbanBoard extends ConsumerWidget {
     List<PendingOrder> orders,
     Color color,
   ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgColor = context.colors.scaffoldBg;
     final cardBgColor = context.colors.cardBg;
     final primaryText = context.colors.textPrimary;
@@ -103,9 +102,9 @@ class LeakageKanbanBoard extends ConsumerWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
       child: Column(
@@ -114,7 +113,7 @@ class LeakageKanbanBoard extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -186,14 +185,14 @@ class LeakageKanbanBoard extends ConsumerWidget {
                       children: [
                         Icon(
                           Icons.check_circle,
-                          color: color.withOpacity(0.5),
+                          color: color.withValues(alpha: 0.5),
                           size: 30,
                         ),
                         const SizedBox(height: 8),
                         Text(
                           "Clear",
                           style: TextStyle(
-                            color: color.withOpacity(0.5),
+                            color: color.withValues(alpha: 0.5),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -216,7 +215,7 @@ class LeakageKanbanBoard extends ConsumerWidget {
                           border: Border.all(color: context.colors.border),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
+                              color: Colors.black.withValues(alpha: 0.02),
                               blurRadius: 4,
                             ),
                           ],

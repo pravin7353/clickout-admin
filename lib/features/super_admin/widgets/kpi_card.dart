@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:clickout_admin/core/theme/app_theme.dart';
 import '../screens/super_admin_screen.dart'; // For EnterpriseColors/Tokens
 
 class GlassKpiWidget extends StatelessWidget {
@@ -38,7 +37,7 @@ class GlassKpiWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isWarning
-                  ? mainColor.withOpacity(0.3)
+                  ? mainColor.withValues(alpha: 0.3)
                   : context.borderSubtle,
             ),
           ),

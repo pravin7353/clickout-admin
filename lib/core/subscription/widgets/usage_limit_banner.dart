@@ -51,9 +51,9 @@ class UsageLimitBanner extends ConsumerWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: bannerColor.withOpacity(0.1),
+          color: bannerColor.withValues(alpha: 0.1),
           border: Border(
-            bottom: BorderSide(color: bannerColor.withOpacity(0.3), width: 1),
+            bottom: BorderSide(color: bannerColor.withValues(alpha: 0.3), width: 1),
           ),
         ),
         child: Row(
@@ -75,7 +75,7 @@ class UsageLimitBanner extends ConsumerWidget {
                   Text(
                     subMessage,
                     style: TextStyle(
-                      color: bannerColor.withOpacity(0.7),
+                      color: bannerColor.withValues(alpha: 0.7),
                       fontSize: 11,
                     ),
                   ),

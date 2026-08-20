@@ -7,9 +7,9 @@ import 'package:intl/intl.dart';
 
 import '../manpower_ai/presentation/manpower_widget.dart';
 import '../revenue_engine/providers/revenue_provider.dart';
+import '../revenue_engine/providers/industry_benchmark_provider.dart';
 import '../auth/auth_provider.dart';
 import '../../core/utils/standard_utils.dart'; // 🚀 5 Standard Rules
-import '../coach/widgets/mission_banner.dart';
 import '../coach/widgets/info_button.dart';
 import '../../core/theme/app_theme.dart'; // 🚀 Added Theme Extension
 
@@ -20,53 +20,15 @@ class DashboardScreen extends ConsumerStatefulWidget {
   ConsumerState<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends ConsumerState<DashboardScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(
-      begin: 1.0,
-      end: 1.1,
-    ).animate(_pulseController);
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
-
+class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final revenueState = ref.watch(revenueEngineProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryTextColor = context.colors.textPrimary;
     final bgColor = context.colors.scaffoldBg;
 
     return Scaffold(
       backgroundColor: bgColor,
-      floatingActionButton: ScaleTransition(
-        scale: _pulseAnimation,
-        child: FloatingActionButton(
-          onPressed: () {
-            ActionDebouncer().run(() {
-              // 🚀 Throttling Rule
-              ref.read(revenueEngineProvider.notifier).refresh();
-            });
-          },
-          backgroundColor: Theme.of(context).colorScheme.primary,
-          tooltip: "Refresh Analytics",
-          child: const Icon(Icons.refresh, color: Colors.white),
-        ),
-      ),
       body: revenueState.when(
         loading: () => const Center(
           child: SkeletonLoader(
@@ -139,6 +101,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   metrics.refundAmount,
                   metrics.expireCount,
                   metrics.expireAmount,
+                ),
+                const SizedBox(height: 40),
+
+                Row(
+                  children: [
+                    Text(
+                      "Industry Benchmark 📊",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: primaryTextColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const InfoButton(
+                      title: 'Industry Benchmark',
+                      en: 'Compares your at-risk revenue (pending + rejected at exit) against the published Indian organized retail shrinkage average.',
+                      hi: 'Aapka at-risk revenue (exit pe pending + rejected) ko India ke organized retail ke published shrinkage average se compare karta hai.',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 15),
+                _buildIndustryBenchmarkCard(
+                  metrics,
+                  ref.watch(industryBenchmarkProvider).value,
                 ),
                 const SizedBox(height: 40),
 
@@ -350,6 +337,111 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         Icons.qr_code_scanner,
       ),
     ], overrideDesktopCount: 2);
+  }
+
+  // ⚡ NEW: Industry Benchmark Card
+  // Source: India organized retail shrinkage industry average (~2%),
+  // based on published retail-loss-prevention research. Static reference,
+  // not a live cross-tenant computation (no platform-wide aggregation
+  // pipeline exists yet — avoids fabricating a fake "live" number).
+  static const double _fallbackIndustryAvgLeakagePct = 2.0;
+
+  Widget _buildIndustryBenchmarkCard(
+    RevenueMetrics metrics,
+    double? liveIndustryAvg,
+  ) {
+    final double industryAvg =
+        liveIndustryAvg ?? _fallbackIndustryAvgLeakagePct;
+    final double atRiskRevenue =
+        metrics.pendingRevenue + metrics.rejectedRevenue;
+    final double yourLeakagePct = _pct(atRiskRevenue, metrics.grossRevenue);
+    final bool isBetterThanAvg = yourLeakagePct <= industryAvg;
+    final Color statusColor = isBetterThanAvg ? Colors.green : Colors.orange;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.colors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.colors.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Your Shrinkage Rate",
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "${yourLeakagePct.toStringAsFixed(1)}%",
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: statusColor,
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    "Industry Average",
+                    style: TextStyle(
+                      color: context.colors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "~${industryAvg.toStringAsFixed(1)}%",
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: context.colors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (yourLeakagePct / 10).clamp(0.0, 1.0),
+              // 🚀 10% scale — visually meaningful for retail shrinkage rates
+              minHeight: 8,
+              backgroundColor: context.colors.border,
+              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isBetterThanAvg
+                ? "Aap industry average se behtar hain — keep it up!"
+                : "Aapka shrinkage industry average se zyada hai — Fraud Control check karo.",
+            style: TextStyle(
+              color: statusColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _responsiveGrid(

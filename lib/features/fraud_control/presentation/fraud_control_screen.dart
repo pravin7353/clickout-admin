@@ -71,7 +71,6 @@ class FraudControlScreen extends ConsumerWidget {
     final highRiskOrdersState = ref.watch(highRiskOrdersProvider);
 
     // 🎨 THEME INJECTION
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = context.colors.textPrimary;
 
     return SingleChildScrollView(
@@ -85,7 +84,7 @@ class FraudControlScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.1),
+                  color: Colors.redAccent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -232,11 +231,11 @@ class FraudControlScreen extends ConsumerWidget {
                       border: Border.all(
                         color: isSuspended
                             ? Colors.grey.shade600
-                            : Colors.red.withOpacity(0.5),
+                            : Colors.red.withValues(alpha: 0.5),
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
+                          color: Colors.black.withValues(alpha: 0.1),
                           blurRadius: 10,
                         ),
                       ],
@@ -267,8 +266,8 @@ class FraudControlScreen extends ConsumerWidget {
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                 color: isSuspended
-                                    ? Colors.grey.withOpacity(0.2)
-                                    : Colors.red.withOpacity(0.1),
+                                    ? Colors.grey.withValues(alpha: 0.2)
+                                    : Colors.red.withValues(alpha: 0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Text(
@@ -426,9 +425,9 @@ class FraudControlScreen extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
+        color: Colors.green.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.withOpacity(0.3)),
+        border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [

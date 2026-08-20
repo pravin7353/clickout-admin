@@ -11,8 +11,9 @@ class AuditExportService {
   static Future<void> downloadSmartReport(
     BuildContext context,
     String type,
-    List<QueryDocumentSnapshot> records,
-  ) async {
+    List<QueryDocumentSnapshot> records, {
+    required bool includeVerdict,
+  }) async {
     if (records.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -204,16 +205,20 @@ class AuditExportService {
           '"Leakage Rate","${leakageRate.toStringAsFixed(1)}%","Leakage/Gross"\n';
       summary += '\n';
 
-      summary += '══ AI AUDITOR VERDICT ══\n';
-      summary += '"Risk Level","$riskLevel"\n';
-      summary += '"Verdict","$verdict"\n';
-      summary +=
-          '"Refund Rate","${refundRate.toStringAsFixed(1)}% ${refundRate > 10 ? '-- ABNORMAL (safe: <5%)' : '-- Normal'}"\n';
-      summary +=
-          '"Leakage Rate","${leakageRate.toStringAsFixed(1)}% ${leakageRate > 15 ? '-- HIGH RISK' : '-- Safe'}"\n';
-      summary +=
-          '"Guard Rejections","$rejectedCount ${rejectedCount > 5 ? '-- Review required' : '-- Normal'}"\n';
-      summary += '\n\n';
+      if (includeVerdict) {
+        summary += '══ AI AUDITOR VERDICT ══\n';
+        summary += '"Risk Level","$riskLevel"\n';
+        summary += '"Verdict","$verdict"\n';
+        summary +=
+            '"Refund Rate","${refundRate.toStringAsFixed(1)}% ${refundRate > 10 ? '-- ABNORMAL (safe: <5%)' : '-- Normal'}"\n';
+        summary +=
+            '"Leakage Rate","${leakageRate.toStringAsFixed(1)}% ${leakageRate > 15 ? '-- HIGH RISK' : '-- Safe'}"\n';
+        summary +=
+            '"Guard Rejections","$rejectedCount ${rejectedCount > 5 ? '-- Review required' : '-- Normal'}"\n';
+        summary += '\n\n';
+      } else {
+        summary += '"AI Auditor Verdict" -- Upgrade to GROWTH to unlock\n\n';
+      }
 
       summary += '== SECTION 2 -- RAW TRANSACTION LEDGER ==\n';
 

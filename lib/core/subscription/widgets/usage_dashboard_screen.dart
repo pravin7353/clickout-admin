@@ -63,10 +63,10 @@ class UsageDashboardScreen extends ConsumerWidget {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: _planColor(plan).withOpacity(0.12),
+                        color: _planColor(plan).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: _planColor(plan).withOpacity(0.5),
+                          color: _planColor(plan).withValues(alpha: 0.5),
                         ),
                       ),
                       child: Text(
@@ -138,10 +138,10 @@ class UsageDashboardScreen extends ConsumerWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00C853).withOpacity(0.06),
+                      color: const Color(0xFF00C853).withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFF00C853).withOpacity(0.2),
+                        color: const Color(0xFF00C853).withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -262,9 +262,9 @@ class _UsageCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isMaxed
-              ? Colors.redAccent.withOpacity(0.4)
+              ? Colors.redAccent.withValues(alpha: 0.4)
               : isWarning
-              ? Colors.amber.withOpacity(0.4)
+              ? Colors.amber.withValues(alpha: 0.4)
               : Colors.transparent,
           width: 1.5,
         ),
@@ -292,7 +292,7 @@ class _UsageCard extends StatelessWidget {
                     vertical: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.1),
+                    color: Colors.redAccent.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
@@ -342,7 +342,7 @@ class _UsageCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: percent,
-                backgroundColor: displayColor.withOpacity(0.1),
+                backgroundColor: displayColor.withValues(alpha: 0.1),
                 valueColor: AlwaysStoppedAnimation<Color>(displayColor),
                 minHeight: 6,
               ),

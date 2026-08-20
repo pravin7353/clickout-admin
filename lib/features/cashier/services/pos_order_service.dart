@@ -169,7 +169,20 @@ class PosOrderService {
     for (var item in items) {
       String barcode =
           item['barcode']?.toString() ?? item['id']?.toString() ?? '';
-      if (barcode.isEmpty) continue;
+      if (barcode.isEmpty) {
+        // ⚡ FIX: Pehle silently skip hota tha — ab audit log banega.
+        batch.set(_db.collection('admin_audit_logs').doc(), {
+          'timestamp': FieldValue.serverTimestamp(),
+          'actionType': 'STOCK_SYNC_SKIPPED',
+          'reason': 'Missing barcode/id on cart item',
+          'itemName': item['name']?.toString() ?? 'Unknown',
+          'orderId': orderRef.id,
+          'tenantId': tenantId,
+          'branchCode': branchCode,
+          'severity': 'WARNING',
+        });
+        continue;
+      }
 
       int qty =
           int.tryParse(
@@ -213,6 +226,19 @@ class PosOrderService {
             'soldStock': FieldValue.increment(mainItemDeduction),
           });
         }
+      } else {
+        // ⚡ FIX: Product na milne pe stock silently out-of-sync reh jata
+        // tha bina kisi trace ke — ab audit log banega.
+        batch.set(_db.collection('admin_audit_logs').doc(), {
+          'timestamp': FieldValue.serverTimestamp(),
+          'actionType': 'STOCK_SYNC_FAILED',
+          'reason': 'Product not found for barcode+tenant+branch',
+          'barcode': barcode,
+          'orderId': orderRef.id,
+          'tenantId': tenantId,
+          'branchCode': branchCode,
+          'severity': 'WARNING',
+        });
       }
 
       if (crossItemDeduction > 0) {

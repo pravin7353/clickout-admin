@@ -391,7 +391,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                           horizontal: 16,
                           vertical: 16,
                         ),
-                        side: BorderSide(color: textSecondary.withOpacity(0.3)),
+                        side: BorderSide(color: textSecondary.withValues(alpha: 0.3)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -443,10 +443,10 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.08),
+                                    color: Colors.red.withValues(alpha: 0.08),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: Colors.red.withOpacity(0.3),
+                                      color: Colors.red.withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: const Text(
@@ -507,7 +507,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                           side: BorderSide(
-                            color: textSecondary.withOpacity(0.2),
+                            color: textSecondary.withValues(alpha: 0.2),
                           ),
                         ),
                       ),
@@ -557,12 +557,12 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.red.withOpacity(0.08),
+                                          color: Colors.red.withValues(alpha: 0.08),
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
                                           border: Border.all(
-                                            color: Colors.red.withOpacity(0.3),
+                                            color: Colors.red.withValues(alpha: 0.3),
                                           ),
                                         ),
                                         child: const Text(
@@ -710,7 +710,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   decoration: BoxDecoration(
                     color: inputBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: textSecondary.withOpacity(0.15)),
+                    border: Border.all(color: textSecondary.withValues(alpha: 0.15)),
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -722,7 +722,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                     decoration: InputDecoration(
                       hintText: "Scan Barcode or Search Name...",
                       hintStyle: TextStyle(
-                        color: textSecondary.withOpacity(0.5),
+                        color: textSecondary.withValues(alpha: 0.5),
                       ),
                       prefixIcon: Icon(Icons.search, color: textSecondary),
                       suffixIcon: _searchQuery.isNotEmpty
@@ -750,7 +750,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   decoration: BoxDecoration(
                     color: inputBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: textSecondary.withOpacity(0.15)),
+                    border: Border.all(color: textSecondary.withValues(alpha: 0.15)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -822,7 +822,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                             Icon(
                               Icons.inventory_2_outlined,
                               size: 40,
-                              color: accentRed.withOpacity(0.3),
+                              color: accentRed.withValues(alpha: 0.3),
                             ),
                             const SizedBox(height: 15),
                             Text(
@@ -857,7 +857,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         physics: const BouncingScrollPhysics(),
                         child: Theme(
                           data: Theme.of(context).copyWith(
-                            dividerColor: textSecondary.withOpacity(0.15),
+                            dividerColor: textSecondary.withValues(alpha: 0.15),
                           ),
                           child: DataTable(
                             headingRowHeight: 56,
@@ -950,13 +950,13 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isLowStock
-                                            ? accentRed.withOpacity(0.1)
-                                            : accentGreen.withOpacity(0.1),
+                                            ? accentRed.withValues(alpha: 0.1)
+                                            : accentGreen.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
                                           color: isLowStock
-                                              ? accentRed.withOpacity(0.3)
-                                              : accentGreen.withOpacity(0.3),
+                                              ? accentRed.withValues(alpha: 0.3)
+                                              : accentGreen.withValues(alpha: 0.3),
                                         ),
                                       ),
                                       child: Row(
@@ -1101,7 +1101,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         IconButton(
                           icon: Icon(Icons.chevron_left, color: textPrimary),
                           onPressed: _currentPage > 0 ? _prevPage : null,
-                          disabledColor: textSecondary.withOpacity(0.3),
+                          disabledColor: textSecondary.withValues(alpha: 0.3),
                         ),
                         Text(
                           "Page ${_currentPage + 1}",
@@ -1118,7 +1118,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                       _docs.length)
                               ? _fetchNextPage
                               : null,
-                          disabledColor: textSecondary.withOpacity(0.3),
+                          disabledColor: textSecondary.withValues(alpha: 0.3),
                         ),
                       ],
                     ),

@@ -98,7 +98,7 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text("✅ Invoice Rules Saved!"),
-            backgroundColor: accentGreen.withOpacity(0.9),
+            backgroundColor: accentGreen.withValues(alpha: 0.9),
           ),
         );
       }
@@ -133,14 +133,14 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isDark
-                ? Colors.white.withOpacity(0.05)
+                ? Colors.white.withValues(alpha: 0.05)
                 : Colors.grey.shade200,
           ),
           boxShadow: [
             BoxShadow(
               color: isDark
-                  ? accentGreen.withOpacity(0.05)
-                  : Colors.black.withOpacity(0.1),
+                  ? accentGreen.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.1),
               blurRadius: 40,
               spreadRadius: -10,
             ),
@@ -171,7 +171,7 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: accentGreen.withOpacity(0.1),
+                            color: accentGreen.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
@@ -418,7 +418,7 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: isDark
-                    ? Colors.white.withOpacity(0.05)
+                    ? Colors.white.withValues(alpha: 0.05)
                     : Colors.grey.shade300,
               ),
             ),
@@ -426,7 +426,7 @@ class _InvoiceRulesDialogState extends ConsumerState<InvoiceRulesDialog> {
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
                 color: isDark
-                    ? Colors.white.withOpacity(0.05)
+                    ? Colors.white.withValues(alpha: 0.05)
                     : Colors.grey.shade300,
               ),
             ),

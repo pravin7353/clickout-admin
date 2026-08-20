@@ -19,6 +19,8 @@ import '../invoice/invoice_rules_dialog.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 import '../auditor/service/audit_export_service.dart';
 import '../../core/theme/app_theme.dart'; // 🚀 Added Theme Extension
+import '../../core/subscription/providers/subscription_provider.dart';
+import '../../core/subscription/engine/subscription_access_engine.dart';
 
 // 🚀 INVOICE SERVICE IMPORT
 import '../invoice/pdf_invoice_service.dart';
@@ -386,10 +388,10 @@ class AuditorScreen extends ConsumerWidget {
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blueAccent.withOpacity(0.1),
+                        color: Colors.blueAccent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.blueAccent.withOpacity(0.3),
+                          color: Colors.blueAccent.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -448,7 +450,7 @@ class AuditorScreen extends ConsumerWidget {
                         border: Border.all(color: Colors.white12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.4),
+                            color: Colors.black.withValues(alpha: 0.4),
                             blurRadius: 15,
                           ),
                         ],
@@ -1280,8 +1282,8 @@ class AuditorScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: fraudScore > 50
-                            ? Colors.redAccent.withOpacity(0.3)
-                            : Colors.green.withOpacity(0.3),
+                            ? Colors.redAccent.withValues(alpha: 0.3)
+                            : Colors.green.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(
@@ -1948,7 +1950,7 @@ class AuditorScreen extends ConsumerWidget {
                           boxShadow: [
                             if (!isDark)
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
+                                color: Colors.black.withValues(alpha: 0.05),
                                 blurRadius: 15,
                                 offset: const Offset(0, 4),
                               ),
@@ -2054,8 +2056,8 @@ class AuditorScreen extends ConsumerWidget {
                                         columnSpacing: 30,
                                         headingRowColor:
                                             WidgetStateProperty.all(
-                                              Colors.greenAccent.withOpacity(
-                                                0.1,
+                                              Colors.greenAccent.withValues(
+                                                alpha: 0.1,
                                               ),
                                             ),
                                         headingTextStyle: const TextStyle(
@@ -2153,7 +2155,7 @@ class AuditorScreen extends ConsumerWidget {
                                                     WidgetState.hovered,
                                                   )) {
                                                     return Colors.greenAccent
-                                                        .withOpacity(0.1);
+                                                        .withValues(alpha: 0.1);
                                                   }
                                                   if (isDark) {
                                                     return idx % 2 == 0
@@ -2218,8 +2220,9 @@ class AuditorScreen extends ConsumerWidget {
                                                         vertical: 4,
                                                       ),
                                                   decoration: BoxDecoration(
-                                                    color: modeColor
-                                                        .withOpacity(0.1),
+                                                    color: modeColor.withValues(
+                                                      alpha: 0.1,
+                                                    ),
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                           6,
@@ -2320,8 +2323,8 @@ class AuditorScreen extends ConsumerWidget {
                                                               .transparent,
                                                           border: Border.all(
                                                             color: btnColor
-                                                                .withOpacity(
-                                                                  0.5,
+                                                                .withValues(
+                                                                  alpha: 0.5,
                                                                 ),
                                                           ),
                                                           borderRadius:
@@ -2430,7 +2433,7 @@ class AuditorScreen extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -2493,7 +2496,7 @@ class AuditorScreen extends ConsumerWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Row(
@@ -2592,7 +2595,7 @@ class AuditorScreen extends ConsumerWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -2603,7 +2606,7 @@ class AuditorScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 28),
@@ -2644,7 +2647,7 @@ class AuditorScreen extends ConsumerWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      color: color.withOpacity(isDark ? 0.8 : 1.0),
+                      color: color.withValues(alpha: isDark ? 0.8 : 1.0),
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -2658,15 +2661,15 @@ class AuditorScreen extends ConsumerWidget {
   }
 }
 
-class _SmartExportButton extends StatefulWidget {
+class _SmartExportButton extends ConsumerStatefulWidget {
   final List<QueryDocumentSnapshot> records;
   const _SmartExportButton({required this.records});
 
   @override
-  State<_SmartExportButton> createState() => _SmartExportButtonState();
+  ConsumerState<_SmartExportButton> createState() => _SmartExportButtonState();
 }
 
-class _SmartExportButtonState extends State<_SmartExportButton> {
+class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
   String _selected = 'Today';
   bool _isLoading = false;
 
@@ -2742,7 +2745,7 @@ class _SmartExportButtonState extends State<_SmartExportButton> {
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: accent.withOpacity(0.2)),
+            side: BorderSide(color: accent.withValues(alpha: 0.2)),
           ),
           offset: const Offset(0, 44),
           itemBuilder: (_) => _options
@@ -2792,9 +2795,9 @@ class _SmartExportButtonState extends State<_SmartExportButton> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              border: Border.all(color: accent.withOpacity(0.5)),
+              border: Border.all(color: accent.withValues(alpha: 0.5)),
               borderRadius: BorderRadius.circular(8),
-              color: accent.withOpacity(0.05),
+              color: accent.withValues(alpha: 0.05),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -2829,11 +2832,21 @@ class _SmartExportButtonState extends State<_SmartExportButton> {
                 message: 'Download $_displayLabel Report',
                 child: InkWell(
                   onTap: () async {
+                    // ⚡ Basic ledger sabke liye; AI Verdict sirf Growth+ ke liye
+                    final plan = ref.read(subscriptionPlanProvider);
+                    final isTrial = ref.read(isTrialActiveProvider);
+                    final includeVerdict =
+                        SubscriptionAccessEngine.isRouteAllowed(
+                          route: '/auditor/ca-export',
+                          plan: plan,
+                          isTrialActive: isTrial,
+                        );
                     setState(() => _isLoading = true);
                     await AuditExportService.downloadSmartReport(
                       context,
                       _displayLabel,
                       _filtered(),
+                      includeVerdict: includeVerdict,
                     );
                     setState(() => _isLoading = false);
                   },
@@ -2841,9 +2854,9 @@ class _SmartExportButtonState extends State<_SmartExportButton> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: accent.withOpacity(0.15),
+                      color: accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: accent.withOpacity(0.3)),
+                      border: Border.all(color: accent.withValues(alpha: 0.3)),
                     ),
                     child: Icon(
                       Icons.download_rounded,

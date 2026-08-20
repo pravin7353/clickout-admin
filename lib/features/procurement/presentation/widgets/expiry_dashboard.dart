@@ -271,16 +271,13 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 768;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final tableHeaderBg = isDark
-        ? const Color(0xFF131A13)
-        : const Color(0xFFFFE0B2); // Amber 100
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
         color: cardDark,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: textSecondary.withOpacity(0.1), width: 1),
+        border: Border.all(color: textSecondary.withValues(alpha: 0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,7 +338,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                   decoration: BoxDecoration(
                     color: bgDark,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: textSecondary.withOpacity(0.2)),
+                    border: Border.all(color: textSecondary.withValues(alpha: 0.2)),
                   ),
                   child: TextField(
                     controller: _searchCtrl,
@@ -356,7 +353,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                     decoration: InputDecoration(
                       hintText: "Search Product by Name or Barcode...",
                       hintStyle: TextStyle(
-                        color: textSecondary.withOpacity(0.5),
+                        color: textSecondary.withValues(alpha: 0.5),
                       ),
                       prefixIcon: Icon(Icons.search, color: textSecondary),
                       border: InputBorder.none,
@@ -374,7 +371,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                   decoration: BoxDecoration(
                     color: bgDark,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: accentOrange.withOpacity(0.5)),
+                    border: Border.all(color: accentOrange.withValues(alpha: 0.5)),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -529,7 +526,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                         top: Radius.circular(12),
                                       ),
                                       border: Border.all(
-                                        color: textSecondary.withOpacity(0.1),
+                                        color: textSecondary.withValues(alpha: 0.1),
                                       ),
                                     ),
                                     child: Row(
@@ -688,15 +685,15 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             border: Border(
                                               bottom: BorderSide(
                                                 color: textSecondary
-                                                    .withOpacity(0.1),
+                                                    .withValues(alpha: 0.1),
                                               ),
                                               left: BorderSide(
                                                 color: textSecondary
-                                                    .withOpacity(0.1),
+                                                    .withValues(alpha: 0.1),
                                               ),
                                               right: BorderSide(
                                                 color: textSecondary
-                                                    .withOpacity(0.1),
+                                                    .withValues(alpha: 0.1),
                                               ),
                                             ),
                                           ),
@@ -1016,13 +1013,13 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                     decoration: BoxDecoration(
                                                                       color: offerGradient
                                                                           .first
-                                                                          .withOpacity(
+                                                                          .withValues(alpha: 
                                                                             0.1,
                                                                           ),
                                                                       border: Border.all(
                                                                         color: offerGradient
                                                                             .first
-                                                                            .withOpacity(
+                                                                            .withValues(alpha: 
                                                                               0.5,
                                                                             ),
                                                                         width:
@@ -1147,7 +1144,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                                 4,
                                                                               ),
                                                                               decoration: BoxDecoration(
-                                                                                color: offerGradient.first.withOpacity(
+                                                                                color: offerGradient.first.withValues(alpha: 
                                                                                   0.2,
                                                                                 ),
                                                                                 borderRadius: BorderRadius.circular(
@@ -1184,12 +1181,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                   width: 130,
                                                                   decoration: BoxDecoration(
                                                                     color: accentOrange
-                                                                        .withOpacity(
+                                                                        .withValues(alpha: 
                                                                           0.1,
                                                                         ),
                                                                     border: Border.all(
                                                                       color: accentOrange
-                                                                          .withOpacity(
+                                                                          .withValues(alpha: 
                                                                             0.5,
                                                                           ),
                                                                       width: 1,
@@ -1278,10 +1275,10 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                       width: 130,
                                                       decoration: BoxDecoration(
                                                         color: accentGreen
-                                                            .withOpacity(0.1),
+                                                            .withValues(alpha: 0.1),
                                                         border: Border.all(
                                                           color: accentGreen
-                                                              .withOpacity(0.5),
+                                                              .withValues(alpha: 0.5),
                                                           width: 1,
                                                         ),
                                                         borderRadius:
@@ -1344,7 +1341,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                         color: bgDark,
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
-                                          color: textSecondary.withOpacity(0.1),
+                                          color: textSecondary.withValues(alpha: 0.1),
                                         ),
                                       ),
                                       child: Row(

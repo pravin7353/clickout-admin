@@ -46,7 +46,7 @@ class AiInsightsModule extends ConsumerWidget {
                   Icon(
                     Icons.science,
                     size: 64,
-                    color: context.textSecondary.withOpacity(0.5),
+                    color: context.textSecondary.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 24),
                   Text(
@@ -70,10 +70,10 @@ class AiInsightsModule extends ConsumerWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.blueAccent.withOpacity(0.1),
+                      color: Colors.blueAccent.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: Colors.blueAccent.withOpacity(0.3),
+                        color: Colors.blueAccent.withValues(alpha: 0.3),
                       ),
                     ),
                     child: const Text(

@@ -9,11 +9,34 @@ final authStateProvider = StreamProvider<User?>((ref) {
 });
 
 // 2. 🛡️ ENTERPRISE SESSION & ROLE MANAGER (The Vault)
-final adminRoleProvider = StreamProvider<Map<String, dynamic>?>((ref) {
+// 🛡️ SECURITY FIX: Role/tenantId resolution ab sirf email-matched Firestore doc
+// pe blindly depend nahi karta. Cloud Function `assignCustomClaims` har staff
+// doc write pe token me role/tenantId/branchCode custom claims set karta hai —
+// wahi actual server-enforced source of truth hai (Firestore Rules bhi ussi pe
+// depend karti hain). Ab hum ID token force-refresh karke us claim ko doc ke
+// data se cross-verify karte hain, aur mismatch pe warning log karte hain taaki
+// silent drift (galat role/tenant UI me dikhna) pakda ja sake.
+// Note: naye user ke pehle login pe claims propagate hone me kuch second lag
+// sakte hain (trigger + token refresh delay), isliye hard-block nahi kiya —
+// sirf visibility di gayi hai. Agar aapko strict enforcement chahiye, mismatch
+// hone par `return null;` bhi kiya ja sakta hai.
+final adminRoleProvider = StreamProvider<Map<String, dynamic>?>((ref) async* {
   final user = ref.watch(authStateProvider).value;
-  if (user == null || user.email == null) return Stream.value(null);
+  if (user == null || user.email == null) {
+    yield null;
+    return;
+  }
 
-  return FirebaseFirestore.instance
+  // Latest custom claims fetch karo (server-enforced source of truth).
+  Map<String, dynamic> tokenClaims = {};
+  try {
+    final idTokenResult = await user.getIdTokenResult(true);
+    tokenClaims = idTokenResult.claims ?? {};
+  } catch (e) {
+    debugPrint('⚠️ Could not fetch ID token claims: $e');
+  }
+
+  yield* FirebaseFirestore.instance
       .collection('staff')
       .where('email', isEqualTo: user.email)
       .where('isActive', isEqualTo: true)
@@ -21,7 +44,23 @@ final adminRoleProvider = StreamProvider<Map<String, dynamic>?>((ref) {
       .snapshots()
       .map((snapshot) {
         if (snapshot.docs.isEmpty) return null;
-        return snapshot.docs.first.data();
+        final data = snapshot.docs.first.data();
+
+        final claimRole = (tokenClaims['role'] ?? '').toString().toLowerCase();
+        final docRole = (data['role'] ?? '').toString().toLowerCase();
+        final claimTenantId = tokenClaims['tenantId']?.toString();
+        final docTenantId = data['tenantId']?.toString();
+
+        if (claimRole.isNotEmpty &&
+            (claimRole != docRole || claimTenantId != docTenantId)) {
+          debugPrint(
+            '⚠️ SECURITY: staff doc role/tenantId ($docRole/$docTenantId) '
+            'does not match token custom claims ($claimRole/$claimTenantId). '
+            'Firestore Rules enforce access using the token claims, not this doc.',
+          );
+        }
+
+        return data;
       });
 });
 

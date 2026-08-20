@@ -92,9 +92,13 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
 
     // 🚀 SAAS INJECTION: Tenant Data Isolation
-    Query query = FirebaseFirestore.instance.collection(
-      'suppliers',
-    ); // 🚀 FIX: Removed orderBy here
+    Query query = FirebaseFirestore.instance
+        .collection('suppliers')
+        // 🚀 COST FIX: SUPER_ADMIN ke case me ye poore platform ke saare
+        // tenants ke suppliers bina limit ke real-time stream karta tha.
+        // TODO: Proper pagination (startAfterDocument) add karo jab supplier
+        // count consistently 300 se zyada rehne lage.
+        .limit(300); // 🚀 FIX: Removed orderBy here
     if (role != 'SUPER_ADMIN' &&
         role != 'SUPER ADMIN' &&
         role != 'ADMIN' &&
@@ -124,7 +128,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                       decoration: BoxDecoration(
                         color: cardDark,
                         border: Border.all(
-                          color: textSecondary.withOpacity(0.2),
+                          color: textSecondary.withValues(alpha: 0.2),
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -142,7 +146,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: accentGreen.withOpacity(0.1),
+                      color: accentGreen.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -202,7 +206,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                 ),
                 decoration: InputDecoration(
                   hintText: "Search by Supplier Name, Code, or Category...",
-                  hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+                  hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
                   prefixIcon: Icon(
                     Icons.search,
                     color: accentOrange,
@@ -213,7 +217,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: textSecondary.withOpacity(0.2),
+                      color: textSecondary.withValues(alpha: 0.2),
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
@@ -308,7 +312,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                             color: cardDark,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: textSecondary.withOpacity(0.1),
+                              color: textSecondary.withValues(alpha: 0.1),
                             ),
                           ),
                           child: Scrollbar(
@@ -397,7 +401,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                             children: [
                                               CircleAvatar(
                                                 backgroundColor: accentOrange
-                                                    .withOpacity(0.1),
+                                                    .withValues(alpha: 0.1),
                                                 child: Text(
                                                   (data['name'] ?? 'U')
                                                       .toString()[0]
@@ -430,7 +434,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                               color: bgDark,
                                               border: Border.all(
                                                 color: textSecondary
-                                                    .withOpacity(0.3),
+                                                    .withValues(alpha: 0.3),
                                               ),
                                               borderRadius:
                                                   BorderRadius.circular(6),
@@ -514,7 +518,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                     (isActive
                                                             ? accentGreen
                                                             : Colors.redAccent)
-                                                        .withOpacity(0.1),
+                                                        .withValues(alpha: 0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
                                                 border: Border.all(
@@ -523,7 +527,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                               ? accentGreen
                                                               : Colors
                                                                     .redAccent)
-                                                          .withOpacity(0.3),
+                                                          .withValues(alpha: 0.3),
                                                 ),
                                               ),
                                               child: Row(

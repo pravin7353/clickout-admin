@@ -17,9 +17,6 @@ class GuardScreen extends ConsumerWidget {
   void _handleReject(BuildContext context, String orderId, WidgetRef ref) {
     final TextEditingController reasonCtrl = TextEditingController();
     bool isRejecting = false;
-    final isDark =
-        Theme.of(context).brightness ==
-        Brightness.dark; // 🚀 YE LINE ADD KARNI HAI
 
     showDialog(
       context: context,
@@ -122,9 +119,11 @@ class GuardScreen extends ConsumerWidget {
                         final adminData = ref.read(adminRoleProvider).value;
                         final tenantId = adminData?['tenantId'];
 
+                        final branchCode = adminData?['branchCode'];
                         final success = await GuardService.rejectGatePass(
                           orderId, // 🚀 Direct pass, no 'orderId:' label
                           tenantId, // 🚀 Direct pass, no 'tenantId:' label
+                          branchCode: branchCode,
                         );
 
                         if (success) {
@@ -472,7 +471,6 @@ class GuardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final pendingState = ref.watch(pendingExitsProvider);
     final historyState = ref.watch(gateHistoryProvider);
 

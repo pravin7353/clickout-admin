@@ -27,6 +27,7 @@ import '../../features/idt/screens/idt_deposits_screen.dart'; // 🚀 NAYA: IDT 
 import '../../features/tenant_admin/screens/tenant_onboarding_screen.dart';
 import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart';
 import '../../features/tenant_admin/screens/client_registration_screen.dart';
+import '../../features/tenant_admin/screens/integrations_screen.dart';
 import '../../features/super_admin/screens/super_admin_screen.dart';
 import '../../features/onboarding/screens/retail_simulator_screen.dart';
 import '../../core/subscription/widgets/feature_lock_widget.dart';
@@ -152,6 +153,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             '/idt-deposits',
             '/guard',
             '/cashier',
+            '/integrations',
           ];
           if (!managerAllowedPaths.contains(currentPath)) {
             return '/dashboard'; // Force to Level 3 Dashboard
@@ -300,6 +302,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             path: '/tenant-onboarding',
             builder: (context, state) => const TenantOnboardingScreen(),
           ),
+          // 🔌 NAYA: INTEGRATIONS (ERP API Key)
+          GoRoute(
+            path: '/integrations',
+            builder: (context, state) => const IntegrationsScreen(),
+          ),
           GoRoute(
             path: '/tenant-dashboard/:tenantId',
             builder: (context, state) => TenantDashboardScreen(
@@ -337,12 +344,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                       color: const Color(0xFF111811),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
-                        color: Colors.amber.withOpacity(0.4),
+                        color: Colors.amber.withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           blurRadius: 60,
                         ),
                       ],
@@ -355,9 +362,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                           height: 72,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.amber.withOpacity(0.1),
+                            color: Colors.amber.withValues(alpha: 0.1),
                             border: Border.all(
-                              color: Colors.amber.withOpacity(0.4),
+                              color: Colors.amber.withValues(alpha: 0.4),
                             ),
                           ),
                           child: const Icon(
@@ -390,7 +397,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.04),
+                            color: Colors.white.withValues(alpha: 0.04),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(

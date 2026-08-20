@@ -87,9 +87,9 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
       labelText: label,
       hintText: hint,
       hintStyle: TextStyle(
-        color: context.colors.textSecondary.withOpacity(0.5),
+        color: context.colors.textSecondary.withValues(alpha: 0.5),
       ),
-      prefixIcon: Icon(icon, color: context.colors.success.withOpacity(0.7)),
+      prefixIcon: Icon(icon, color: context.colors.success.withValues(alpha: 0.7)),
       labelStyle: TextStyle(color: context.colors.textSecondary, fontSize: 13),
       filled: true,
       fillColor: context.colors.scaffoldBg, // 🚀 Connected to Theme
@@ -127,10 +127,10 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
         decoration: BoxDecoration(
           color: theme.cardColor, // 🚀 Dark Card BG
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 40,
               offset: const Offset(0, 10),
             ),
@@ -150,7 +150,7 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: theme.primaryColor.withOpacity(0.1),
+                      color: theme.primaryColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -204,10 +204,10 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
                         padding: const EdgeInsets.all(12),
                         margin: const EdgeInsets.only(bottom: 20),
                         decoration: BoxDecoration(
-                          color: theme.primaryColor.withOpacity(0.05),
+                          color: theme.primaryColor.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: theme.primaryColor.withOpacity(0.2),
+                            color: theme.primaryColor.withValues(alpha: 0.2),
                           ),
                         ),
                         child: Row(

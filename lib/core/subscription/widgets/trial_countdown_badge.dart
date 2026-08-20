@@ -25,9 +25,9 @@ class TrialCountdownBadge extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: badgeColor.withOpacity(0.12),
+          color: badgeColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: badgeColor.withOpacity(0.5)),
+          border: Border.all(color: badgeColor.withValues(alpha: 0.5)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -54,7 +54,7 @@ class TrialCountdownBadge extends ConsumerWidget {
             Text(
               '→ Upgrade',
               style: TextStyle(
-                color: badgeColor.withOpacity(0.7),
+                color: badgeColor.withValues(alpha: 0.7),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),

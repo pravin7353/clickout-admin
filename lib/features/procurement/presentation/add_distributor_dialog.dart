@@ -101,7 +101,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       elevation: 24,
@@ -127,7 +127,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -135,7 +135,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentGreen.withOpacity(0.1),
+                        color: accentGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -274,7 +274,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                     bottom: Radius.circular(16),
                   ),
                   border: Border(
-                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -359,7 +359,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: textSecondary.withOpacity(0.1), // 🚀 Dynamic color
+        color: textSecondary.withValues(alpha: 0.1), // 🚀 Dynamic color
       ),
     );
   }
@@ -399,7 +399,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(
-                color: textSecondary.withOpacity(0.5),
+                color: textSecondary.withValues(alpha: 0.5),
                 fontWeight: FontWeight.normal,
               ),
               prefixIcon: Icon(icon, color: textSecondary, size: 20),

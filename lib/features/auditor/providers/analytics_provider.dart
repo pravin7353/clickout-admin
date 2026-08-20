@@ -37,7 +37,14 @@ final timeAnalyticsProvider = StreamProvider<List<HourlyData>>((ref) {
       .where(
         'timestamp',
         isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-      );
+      )
+      // 🚀 COST FIX: Pehle ye query (especially super_admin ke liye, jahan
+      // tenantId filter hi nahi lagta) poore din ke saare orders bina kisi
+      // limit ke real-time stream karti thi. Safety cap laga diya hai.
+      // TODO: Isse ek server-side hourly rollup (Cloud Function jo
+      // 'hourly_stats' doc maintain kare) me convert karna better rahega,
+      // taaki client ko raw order docs download hi na karne padein.
+      .limit(5000);
 
   final String? branchCode = adminData?['branchCode'];
 

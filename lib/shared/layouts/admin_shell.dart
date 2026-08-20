@@ -29,6 +29,7 @@ const tenantHqColor = accentGreenTheme;
 const operationsColor = Color(0xFF378ADD);
 const staffAuditColor = Color(0xFFEF9F27);
 const financeRiskColor = Color(0xFFE24B4A);
+const settingsColor = Color(0xFF7F8C9A);
 
 class AdminShell extends ConsumerWidget {
   final Widget child;
@@ -178,7 +179,7 @@ class AdminShell extends ConsumerWidget {
                             child: Stack(
                               children: [
                                 Container(
-                                  color: Colors.black.withOpacity(0.75),
+                                  color: Colors.black.withValues(alpha: 0.75),
                                 ),
                                 // Lock card
                                 Center(
@@ -194,12 +195,16 @@ class AdminShell extends ConsumerWidget {
                                       color: const Color(0xFF111811),
                                       borderRadius: BorderRadius.circular(24),
                                       border: Border.all(
-                                        color: Colors.amber.withOpacity(0.4),
+                                        color: Colors.amber.withValues(
+                                          alpha: 0.4,
+                                        ),
                                         width: 1.5,
                                       ),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.5),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.5,
+                                          ),
                                           blurRadius: 60,
                                         ),
                                       ],
@@ -212,12 +217,12 @@ class AdminShell extends ConsumerWidget {
                                           height: 72,
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: Colors.amber.withOpacity(
-                                              0.1,
+                                            color: Colors.amber.withValues(
+                                              alpha: 0.1,
                                             ),
                                             border: Border.all(
-                                              color: Colors.amber.withOpacity(
-                                                0.4,
+                                              color: Colors.amber.withValues(
+                                                alpha: 0.4,
                                               ),
                                             ),
                                           ),
@@ -250,8 +255,8 @@ class AdminShell extends ConsumerWidget {
                                         Container(
                                           padding: const EdgeInsets.all(16),
                                           decoration: BoxDecoration(
-                                            color: Colors.white.withOpacity(
-                                              0.04,
+                                            color: Colors.white.withValues(
+                                              alpha: 0.04,
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               12,
@@ -363,7 +368,7 @@ class AdminShell extends ConsumerWidget {
   Widget _buildCriticalAlertsStrip() {
     return Container(
       width: double.infinity,
-      color: accentGreenTheme.withOpacity(0.08),
+      color: accentGreenTheme.withValues(alpha: 0.08),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: const Row(
         children: [
@@ -458,12 +463,12 @@ class AdminShell extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: Theme.of(
                       context,
-                    ).colorScheme.primary.withOpacity(0.15),
+                    ).colorScheme.primary.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: Theme.of(
                         context,
-                      ).colorScheme.primary.withOpacity(0.5),
+                      ).colorScheme.primary.withValues(alpha: 0.5),
                     ),
                   ),
                   child: Row(
@@ -586,10 +591,10 @@ class AdminShell extends ConsumerWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: planColor.withOpacity(0.15),
+                              color: planColor.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                color: planColor.withOpacity(0.5),
+                                color: planColor.withValues(alpha: 0.5),
                               ),
                             ),
                             child: Text(
@@ -664,7 +669,7 @@ class AdminShell extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                border: Border.all(color: sectionColor.withOpacity(0.4)),
+                border: Border.all(color: sectionColor.withValues(alpha: 0.4)),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -1014,6 +1019,30 @@ class AdminShell extends ConsumerWidget {
                   isReadOnly: isSuperAdmin,
                   isSubscriptionLocked: isProLocked,
                 ),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(color: dividerColor, height: 1),
+                ),
+
+                // ==========================================
+                // 🔌 6. SETTINGS
+                // ==========================================
+                if (isExpanded)
+                  _buildSectionHeader(
+                    "SETTINGS",
+                    settingsColor,
+                    showViewOnly: isSuperAdmin,
+                  ),
+                _buildNavItem(
+                  context,
+                  Icons.vpn_key,
+                  "Integrations",
+                  isExpanded,
+                  '/integrations',
+                  settingsColor,
+                  isReadOnly: isSuperAdmin,
+                ),
                 const SizedBox(height: 20),
               ], // 🚀 WRAPPER CLOSED HERE
             ],
@@ -1176,7 +1205,7 @@ class AdminShell extends ConsumerWidget {
                     border: Border.all(color: borderColor),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha: 0.12),
                         blurRadius: 24,
                         offset: const Offset(0, 8),
                       ),
@@ -1195,7 +1224,7 @@ class AdminShell extends ConsumerWidget {
                           children: [
                             CircleAvatar(
                               radius: 36,
-                              backgroundColor: roleColor.withOpacity(0.1),
+                              backgroundColor: roleColor.withValues(alpha: 0.1),
                               child: Icon(
                                 Icons.person,
                                 size: 36,

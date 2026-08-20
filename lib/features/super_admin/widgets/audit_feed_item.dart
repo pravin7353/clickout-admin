@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:clickout_admin/core/theme/app_theme.dart';
 import '../screens/super_admin_screen.dart'; // For EnterpriseTokens
 
 class ActivityFeedItem extends StatelessWidget {

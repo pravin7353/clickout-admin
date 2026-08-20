@@ -23,12 +23,16 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
       return FirebaseFirestore.instance
           .collection('products')
           .where('physicalStock', isLessThanOrEqualTo: 20)
+          // 🚀 COST FIX: Low-stock alert list pehle bina limit ke tha.
+          .limit(50)
           .snapshots();
     }
     if (double.tryParse(query) != null) {
       return FirebaseFirestore.instance
           .collection('products')
           .where('barcode', isEqualTo: query)
+          // 🚀 COST FIX: barcode ideally unique hai, safety limit lagaya.
+          .limit(5)
           .snapshots();
     }
     return FirebaseFirestore.instance
@@ -46,9 +50,9 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.withOpacity(0.3), width: 2),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 2),
         boxShadow: [
-          BoxShadow(color: Colors.orange.withOpacity(0.05), blurRadius: 10),
+          BoxShadow(color: Colors.orange.withValues(alpha: 0.05), blurRadius: 10),
         ],
       ),
       child: Column(

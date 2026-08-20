@@ -20,7 +20,6 @@ class RiskEngineScreen extends ConsumerWidget {
     // 🎨 DYNAMIC THEME SUPPORT
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final cardBgColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
 
     // 🚀 COST OPTIMIZATION: Only fetch orders that are REJECTED!
     Query riskQuery = FirebaseFirestore.instance
@@ -190,7 +189,7 @@ class RiskEngineScreen extends ConsumerWidget {
                               : const Color(0xFFFFF5F5),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.red.withOpacity(0.3),
+                            color: Colors.red.withValues(alpha: 0.3),
                           ),
                         ),
                         child: SingleChildScrollView(
@@ -311,10 +310,10 @@ class RiskEngineScreen extends ConsumerWidget {
             ? const Color(0xFF1E1E1E)
             : Colors.white, // 🎨 Dynamic Background
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(isDark ? 0.05 : 0.1),
+            color: color.withValues(alpha: isDark ? 0.05 : 0.1),
             blurRadius: 15,
           ),
         ],
@@ -324,7 +323,7 @@ class RiskEngineScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 30),

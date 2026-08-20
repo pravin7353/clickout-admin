@@ -16,17 +16,26 @@ final storeTenantFilterProvider = NotifierProvider<StoreTenantFilter, String>(
   },
 );
 
-final storesStreamProvider =
-    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
-      ref.keepAlive();
-      return FirebaseFirestore.instance
-          .collection('stores')
-          .where(
-            'isDeleted',
-            isEqualTo: false,
-          ) // ⚡ FIX: Prevents silent exclusion of documents missing this field. Ensure all your DB docs have isDeleted: false.
-          .snapshots()
-          .map(
-            (snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList(),
-          );
-    });
+final storesStreamProvider = StreamProvider.autoDispose<List<Map<String, dynamic>>>((
+  ref,
+) {
+  ref.keepAlive();
+  return FirebaseFirestore.instance
+      .collection('stores')
+      // 🚀 COST FIX: Ye pehle poore platform ke saare stores (sab tenants) real-time
+      // stream karta tha bina kisi limit ke — jaise-jaise tenants/stores badhenge
+      // billing/perf risk badhta jayega. Abhi ke liye ek safety cap laga diya hai.
+      // TODO: Isse proper pagination (startAfterDocument + "Load More") me convert
+      // karna chahiye jab store count consistently 500 se zyada rehne lage.
+      .limit(500)
+      .snapshots()
+      .map(
+        (snap) => snap.docs
+            .map((d) => {'id': d.id, ...d.data()})
+            // ⚡ FIX: isEqualTo bhi un docs ko exclude karta hai jinme
+            // field hi missing hai. Client-side filter guarantee karta
+            // hai purane docs bhi list mein aayein.
+            .where((s) => s['isDeleted'] != true)
+            .toList(),
+      );
+});

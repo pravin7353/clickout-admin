@@ -1,26 +1,42 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, HttpsError, onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-// 🚀 NAYA: onDocumentWritten aur onDocumentCreated imports add kiye hain
+// NAYA: onDocumentWritten aur onDocumentCreated imports add kiye hain
 const { onDocumentDeleted, onDocumentWritten, onDocumentCreated } = require("firebase-functions/v2/firestore");
 const admin = require("firebase-admin");
-const nodemailer = require("nodemailer"); // 🚀 ADDED NODEMAILER
+// SECURITY + DEAD-CODE FIX: 'nodemailer' aur hardcoded Gmail credentials
+// poori file me kahin bhi actually use nahi ho rahe the (dead code + secret leak
+// risk). Isliye hata diya. Agar future me email bhejna ho, to Secret Manager
+// (firebase-functions/params -> defineSecret) ke saath dobara add karna:
+// const { defineSecret } = require("firebase-functions/params");
+// const GMAIL_USER = defineSecret("GMAIL_USER");
+// const GMAIL_APP_PASSWORD = defineSecret("GMAIL_APP_PASSWORD");
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// 📧 SMTP Configuration (Testing k liye yaha apna Gmail aur App Password dalein)
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: 'YOUR_EMAIL@gmail.com', // ⚠️ ISE CHANGE KAREIN
-        pass: 'YOUR_16_DIGIT_APP_PASSWORD' // ⚠️ ISE CHANGE KAREIN
-    }
-});
-
 // ============================================================================
-// 📦 1. BULK IMPORT PRODUCTS (UPGRADED TO GEN 2 🚀 - SAAS ISOLATED)
+// 1. BULK IMPORT PRODUCTS (UPGRADED TO GEN 2 - SAAS ISOLATED)
 // ============================================================================
 exports.bulkImportProducts = onCall(async (request) => {
+ // SECURITY FIX: Pehle koi auth check hi nahi tha, isliye koi bhi caller
+ // arbitrary tenantId bhej kar kisi bhi tenant ke products overwrite kar sakta tha.
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'You must be logged in to import products.');
+    }
+
+    const callerRole = (request.auth.token.role || '').toUpperCase();
+    const callerTenantId = request.auth.token.tenantId || null;
+    const isSuperAdmin = callerRole === 'SUPER_ADMIN';
+    const allowedRoles = ['TENANT_ADMIN', 'MANAGER', 'SUPER_ADMIN'];
+
+    if (!allowedRoles.includes(callerRole)) {
+        throw new HttpsError('permission-denied', 'You do not have permission to import products.');
+    }
+
+    if (!isSuperAdmin && !callerTenantId) {
+        throw new HttpsError('failed-precondition', 'No tenant associated with this account.');
+    }
+
     const data = request.data;
     
     try {
@@ -48,8 +64,14 @@ exports.bulkImportProducts = onCall(async (request) => {
         for (const prod of products) {
             if (!prod || !prod.barcode) continue; 
 
-            // 🚀 SAAS ISOLATION: Naya Document ID Format
-            const tenantId = prod.tenantId || "RESTRICTED";
+ // SAAS ISOLATION: Naya Document ID Format
+ // SECURITY FIX: Client-provided tenantId ab sirf SUPER_ADMIN ke liye trust hota hai.
+ // Tenant-level users (TENANT_ADMIN/MANAGER) ke liye tenantId hamesha unke
+ // apne custom-claim token se lock hota hai, taaki cross-tenant writes na ho sakein.
+            const tenantId = isSuperAdmin
+                ? (prod.tenantId || "RESTRICTED")
+                : callerTenantId;
+            if (!tenantId) continue; // safety: kabhi bhi bina tenantId ke likho mat
             const branchCode = prod.branchCode || "HQ";
             const barcode = String(prod.barcode).trim();
             
@@ -80,7 +102,7 @@ exports.bulkImportProducts = onCall(async (request) => {
                 searchKey: String(prod.name || "Unknown Item").toLowerCase().trim(),
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                // 🚀 NEW: SAAS & FRAUD TRACKING FIELDS INJECTED
+ // NEW: SAAS & FRAUD TRACKING FIELDS INJECTED
                 tenantId: tenantId,
                 branchCode: branchCode,
                 addedBy: prod.addedBy || "Unknown Manager",
@@ -109,7 +131,28 @@ exports.bulkImportProducts = onCall(async (request) => {
             batches.push(currentBatch.commit());
         }
 
-        await Promise.all(batches);
+ // RELIABILITY FIX: Pehle Promise.all(batches) use hota tha, jisse agar
+ // ek bhi batch fail hota, poora import "unknown error" throw kar deta
+ // bina ye bataye ki kitne SKUs already committed ho chuke the.
+ // Ab Promise.allSettled se har batch ka result individually track hota hai.
+        const batchResults = await Promise.allSettled(batches);
+        const failedBatches = batchResults.filter(r => r.status === 'rejected');
+        const committedBatches = batchResults.length - failedBatches.length;
+ // Har batch me max 490 writes hote hain (see currentBatchCount check below),
+ // isliye committed SKUs ka rough estimate nikal sakte hain caller ko batane ke liye.
+        const estimatedCommitted = committedBatches === batchResults.length
+            ? totalImported
+            : Math.min(totalImported, committedBatches * 490);
+
+        if (failedBatches.length > 0) {
+            console.error(`PARTIAL IMPORT FAILURE: ${failedBatches.length}/${batchResults.length} batches failed.`,
+                failedBatches.map(r => r.reason?.message || r.reason));
+            throw new HttpsError(
+                'internal',
+                `Partial import failure: ${committedBatches}/${batchResults.length} batches committed successfully ` +
+                `(~${estimatedCommitted} of ${totalImported} SKUs). ${failedBatches.length} batch(es) failed — please retry the import to catch missed items.`
+            );
+        }
 
         return { success: true, message: `Mission Accomplished: ${totalImported} Master SKUs isolated & added to the Vault!` };
 
@@ -121,97 +164,20 @@ exports.bulkImportProducts = onCall(async (request) => {
 
 
 // ============================================================================
-// 🤖 2. PREDICTIVE AUTO-PO ENGINE (GEN 2 - FIXED DUPLICATES & SMART MATH)
+// 2. PREDICTIVE AUTO-PO ENGINE (GEN 2 - FIXED DUPLICATES & SMART MATH)
 // ============================================================================
-exports.runPredictivePOEngine = onSchedule("every day 00:00", async (event) => {
-    console.log("🚀 ClickOut Predictive AI Engine is currently PAUSED by Admin.");
-    return; // 🚀 NAYA FIX: Ye engine ko yahin block kar dega bina aage ka code chalaye
-    
-    try {
-        // 🚀 MEMORY FIX 1: Use .select() to only fetch required fields (saves ~90% RAM)
-        const productsSnap = await db.collection("products")
-            .where("isBlocked", "==", false)
-            .select("physicalStock", "supplierId", "avgDailySales", "supplierLeadTime", "safetyBuffer", "name", "tenantId", "branchCode", "storeId")
-            .get();
-        
-        // 🚀 MEMORY FIX 2: Only fetch productId for existing suggestions
-        const existingSuggestions = await db.collection("ai_po_suggestions")
-            .where("status", "==", "PENDING_APPROVAL")
-            .select("productId") 
-            .get();
-        const existingProductIds = new Set();
-        existingSuggestions.forEach(doc => existingProductIds.add(doc.data().productId));
-
-        let suggestionsCount = 0;
-        
-        // 🚀 BATCH LIMIT FIX PREP: Create an array for multiple batches
-        const batches = [];
-        let currentBatch = db.batch();
-        let currentBatchCount = 0;
-
-        for (const doc of productsSnap.docs) {
-            // 🚀 If already suggested and pending, skip it!
-            if (existingProductIds.has(doc.id)) continue; 
-
-            const data = doc.data();
-            const physicalStock = data.physicalStock || 0;
-            const supplierId = data.supplierId || "DEFAULT_SUPPLIER";
-            
-            const dailyVelocity = data.avgDailySales || 5; 
-            const leadTimeDays = data.supplierLeadTime || 3; 
-            const safetyBuffer = data.safetyBuffer || 20;    
-            
-            const reorderPoint = (dailyVelocity * leadTimeDays) + safetyBuffer;
-
-         if (physicalStock <= reorderPoint) {
-                let orderQty = Math.ceil((dailyVelocity * 14) - physicalStock);
-                // 🚀 FIX: Fallback to at least 10 units. Prevents null, NaN, or 0.
-                orderQty = Math.max(10, orderQty || 10); 
-                
-                const suggestionRef = db.collection("ai_po_suggestions").doc();
-                currentBatch.set(suggestionRef, {
-                    suggestionId: suggestionRef.id,
-                    productId: doc.id,
-                    productName: data.name || "Unknown Product",
-                    tenantId: data.tenantId || "default_tenant",
-                    branchCode: data.branchCode || data.storeId || "HQ",
-                    currentStock: physicalStock,
-                    recommendedQty: orderQty, // 🚀 100% Safe value
-                    supplierId: supplierId,
-                    reason: `Stock (${physicalStock}) hit Re-Order Point (${reorderPoint}). Velocity: ${dailyVelocity}/day.`,
-                    status: "PENDING_APPROVAL", // 🚀 Strict Status Enforced
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-                
-                suggestionsCount++;
-                currentBatchCount++;
-
-                // 🚀 BATCH CRASH AVOIDANCE: Commit when limit is near
-                if (currentBatchCount >= 490) {
-                    batches.push(currentBatch.commit());
-                    currentBatch = db.batch();
-                    currentBatchCount = 0;
-                }
-            }
-        }
-
-        if (currentBatchCount > 0) {
-            batches.push(currentBatch.commit());
-        }
-
-        if (batches.length > 0) {
-            await Promise.all(batches);
-            console.log(`✅ AI Engine Generated ${suggestionsCount} NEW PO Suggestions via ${batches.length} safe batches!`);
-        } else {
-            console.log("👍 Stock is perfectly healthy. No suggestions today.");
-        }
-    } catch (error) {
-        console.error("🚨 Predictive Engine Failed: ", error);
-    }
-});
+// DEAD-CODE FIX: Ye engine admin dwara intentionally PAUSED kiya gaya tha, lekin
+// function ab bhi deploy hoke roz 00:00 IST invoke ho raha tha aur sirf ek log
+// line chalakar (unreachable business logic ke saath) exit ho jaata tha.
+// Ab function hi export/deploy nahi hoga (dead code hata diya gaya), isliye koi
+// unnecessary daily invocation nahi hogi. Poora original business logic
+// /docs/archived-cloud-functions/runPredictivePOEngine.js.bak me safe rakha gaya
+// hai reference ke liye — jab feature dobara chahiye ho, wahan se restore kar dena.
+//
+// exports.runPredictivePOEngine = onSchedule("every day 00:00", async (event) => { ... });
 
 // ============================================================================
-// 🧹 3. ADMIN SDK: AUTO-DELETE AUTH USER (UPGRADED TO GEN 2 🚀)
+// 3. ADMIN SDK: AUTO-DELETE AUTH USER (UPGRADED TO GEN 2 )
 // ============================================================================
 exports.onStaffDeleted = onDocumentDeleted('staff/{staffId}', async (event) => {
     const snap = event.data;
@@ -225,7 +191,7 @@ exports.onStaffDeleted = onDocumentDeleted('staff/{staffId}', async (event) => {
         console.log(`✅ SUCCESS: Auth User deleted for Staff ID: ${uid}`);
     } catch (error) {
         if (error.code === 'auth/user-not-found') {
-            console.log(`⚠️ User ${uid} already deleted from Auth.`);
+            console.log(`⚠ User ${uid} already deleted from Auth.`);
         } else {
             console.error(`🚨 ERROR deleting auth user ${uid}:`, error);
         }
@@ -244,7 +210,7 @@ exports.onUserDeleted = onDocumentDeleted('users/{userId}', async (event) => {
         console.log(`✅ SUCCESS: Auth User deleted for Customer ID: ${uid}`);
     } catch (error) {
         if (error.code === 'auth/user-not-found') {
-            console.log(`⚠️ User ${uid} already deleted from Auth.`);
+            console.log(`⚠ User ${uid} already deleted from Auth.`);
         } else {
             console.error(`🚨 ERROR deleting auth user ${uid}:`, error);
         }
@@ -252,7 +218,7 @@ exports.onUserDeleted = onDocumentDeleted('users/{userId}', async (event) => {
 });
 
 // ============================================================================
-// 🛡️ 4. SAAS RBAC: CUSTOM CLAIMS INJECTOR
+// 4. SAAS RBAC: CUSTOM CLAIMS INJECTOR
 // ============================================================================
 exports.assignCustomClaims = onDocumentWritten("staff/{staffId}", async (event) => {
     const snapshot = event.data;
@@ -282,7 +248,7 @@ exports.assignCustomClaims = onDocumentWritten("staff/{staffId}", async (event) 
 });
 
 // ============================================================================
-// ⚡ 5. DECOUPLED ORDER PROCESSOR & FRAUD ENGINE
+// 5. DECOUPLED ORDER PROCESSOR & FRAUD ENGINE
 // ============================================================================
 exports.processNewOrder = onDocumentCreated(
     {
@@ -319,7 +285,7 @@ exports.processNewOrder = onDocumentCreated(
 );
 
 // ============================================================================
-// 📈 6. QUANTUM FINANCIAL ENGINE (O(1) DASHBOARD AGGREGATOR)
+// 6. QUANTUM FINANCIAL ENGINE (O(1) DASHBOARD AGGREGATOR)
 // ============================================================================
 exports.updateDailyStats = onDocumentWritten(
     {
@@ -337,7 +303,7 @@ exports.updateDailyStats = onDocumentWritten(
         const tenantId = doc.tenantId || "default_tenant";
         const branchCode = doc.branchCode || doc.storeId || "default_store";
 
-        // 🕒 IST Timezone Fix for Accurate Daily Reset
+ // IST Timezone Fix for Accurate Daily Reset
         let ts = doc.timestamp || doc.createdAt;
         const dateObj = ts && ts.toDate ? ts.toDate() : new Date();
         const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -375,7 +341,7 @@ exports.updateDailyStats = onDocumentWritten(
         const oldM = getMetrics(before);
         const newM = getMetrics(after);
 
-        // 🧠 DELTA MATH: Handles PENDING -> PAID transitions automatically!
+ // DELTA MATH: Handles PENDING -> PAID transitions automatically!
         const increments = {
             totalRevenue: admin.firestore.FieldValue.increment(newM.revTot - oldM.revTot),
             cashRevenue: admin.firestore.FieldValue.increment(newM.revCash - oldM.revCash),
@@ -405,15 +371,19 @@ exports.updateDailyStats = onDocumentWritten(
 );
 
 // ============================================================================
-// 🗑️ 7. DATA ARCHIVAL: 90-DAY PURGE ENGINE
+// 7. DATA ARCHIVAL: 90-DAY PURGE ENGINE
 // ============================================================================
 exports.purgeOldOrders = onSchedule("every day 02:00", async (event) => {
-    console.log("🧹 Starting 90-Day Order Purge Engine...");
-    
+    console.log("🧹 Starting 7-Year Order Purge Engine...");
+
     try {
-        const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-        const timestampLimit = admin.firestore.Timestamp.fromDate(ninetyDaysAgo);
+        // ⚡ FIX: 90 din tha pehle — GST records ka legal retention India mein
+        // 6 saal hai. Isse safe margin ke saath 7 saal (2555 din) kar diya,
+        // taaki getTenantAuditFeed (Tally/Busy) aur CA-export kabhi bhi
+        // legally-required purana data maangein toh mile.
+        const retentionDaysAgo = new Date();
+        retentionDaysAgo.setDate(retentionDaysAgo.getDate() - 2555); // 7 years
+        const timestampLimit = admin.firestore.Timestamp.fromDate(retentionDaysAgo);
 
         const oldOrdersSnap = await db.collection("orders")
             .where("timestamp", "<=", timestampLimit)
@@ -434,14 +404,14 @@ exports.purgeOldOrders = onSchedule("every day 02:00", async (event) => {
         });
 
         await batch.commit();
-        console.log(`🗑️ Successfully purged ${count} orders older than 90 days.`);
+        console.log(`🗑 Successfully purged ${count} orders older than 90 days.`);
     } catch (error) {
         console.error("🚨 Purge Engine Failed:", error);
     }
 });
 
 // ============================================================================
-// 🧠 8. CENTRALIZED COMMUNICATION BRAIN (ANTI-SPAM GATEKEEPER)
+// 8. CENTRALIZED COMMUNICATION BRAIN (ANTI-SPAM GATEKEEPER)
 // ============================================================================
 exports.processNotificationQueue = onDocumentCreated(
     {
@@ -486,7 +456,7 @@ exports.processNotificationQueue = onDocumentCreated(
             }
 
             if (!shouldSend) {
-                console.log(`🛡️ Message Throttled for ${userData.phone || userId}: ${dropReason}`);
+                console.log(`🛡 Message Throttled for ${userData.phone || userId}: ${dropReason}`);
                 return snap.ref.update({ 
                     status: 'THROTTLED', 
                     processedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -514,10 +484,10 @@ exports.processNotificationQueue = onDocumentCreated(
 );
 
 // ============================================================================
-// 🔮 9. QUANTUM PROMOTION ENGINE (BULLETPROOF DELTA & SYNC)
+// 9. QUANTUM PROMOTION ENGINE (BULLETPROOF DELTA & SYNC)
 // ============================================================================
 
-// ⚡ A. INSTANT DELTA ENGINE
+// A. INSTANT DELTA ENGINE
 exports.quantumDeltaEngine = onDocumentWritten(
     { document: "products/{productId}", concurrency: 80, memory: "256MiB" },
     async (event) => {
@@ -530,7 +500,7 @@ exports.quantumDeltaEngine = onDocumentWritten(
             if (!data) return { trv: 0, tcv: 0, pr: 0 };
             const qty = data.physicalStock || data.stock || 0;
             const mrp = data.price || 0;
-            // 🧠 SMART FALLBACK: Agar real unitCost > 0 hai toh use karo, warna 30% margin fallback
+ // SMART FALLBACK: Agar real unitCost > 0 hai toh use karo, warna 30% margin fallback
             const cost = (data.unitCost && data.unitCost > 0) ? data.unitCost : (mrp * 0.70); 
             const offerPrice = data.offerPrice || mrp;
             return { trv: qty * mrp, tcv: qty * cost, pr: qty * offerPrice };
@@ -570,12 +540,12 @@ exports.quantumDeltaEngine = onDocumentWritten(
     }
 );
 
-// 🧹 B. BULLETPROOF NIGHTLY SYNC
+// B. BULLETPROOF NIGHTLY SYNC
 exports.quantumNightlySync = onSchedule(
     { schedule: "0 0 * * *", timeZone: "Asia/Kolkata", timeoutSeconds: 540, memory: "1GiB" },
     async (event) => {
         try {
-            // 🚀 OOM CRASH FIX: Use .select() and .stream() for SaaS level data processing
+ // OOM CRASH FIX: Use .select() and .stream() for SaaS level data processing
             const productsStream = db.collection('products')
                 .select('isBlocked', 'branchCode', 'physicalStock', 'stock', 'price', 'unitCost', 'offerPrice')
                 .stream();
@@ -585,17 +555,19 @@ exports.quantumNightlySync = onSchedule(
             for await (const doc of productsStream) {
                 const data = doc.data();
                 
-                // 🧠 JS Memory Filter: Yahan block items ko ignore karo
-                if (data.isBlocked === true) return; 
+ // JS Memory Filter: Yahan block items ko ignore karo
+ // FIX: 'return' yahan poore function ko exit kar deta tha, isliye
+ // 'continue' use kiya taaki sirf ye product skip ho, baaki processing chalti rahe.
+                if (data.isBlocked === true) continue; 
 
                 const branch = data.branchCode;
-                if (!branch) return;
+                if (!branch) continue;
                 
                 if (!storeTotals[branch]) storeTotals[branch] = { trv: 0, tcv: 0, pr: 0 };
                 
                 const qty = data.physicalStock || data.stock || 0;
                 const mrp = data.price || 0;
-                // 🧠 SMART FALLBACK: Auto-assumes 30% margin if unitCost is missing or 0
+ // SMART FALLBACK: Auto-assumes 30% margin if unitCost is missing or 0
                 const cost = (data.unitCost && data.unitCost > 0) ? data.unitCost : (mrp * 0.70); 
                 const offerPrice = data.offerPrice || mrp;
                 
@@ -604,7 +576,7 @@ exports.quantumNightlySync = onSchedule(
                 storeTotals[branch].pr += (qty * offerPrice);
             };
 
-            // Har branch ka data calculate karke overwrite karo
+ // Har branch ka data calculate karke overwrite karo
             for (const [storeId, totals] of Object.entries(storeTotals)) {
                 const discountBurn = totals.trv - totals.pr;
                 const margin = totals.pr > 0 ? ((totals.pr - totals.tcv) / totals.pr) * 100 : 0;
@@ -625,70 +597,20 @@ exports.quantumNightlySync = onSchedule(
 );
 
 // ============================================================================
-// 🛒 10. AUTO-PO (PURCHASE ORDER) ENGINE
+// 10. AUTO-PO (PURCHASE ORDER) ENGINE
 // ============================================================================
 
-exports.quantumAutoPOEngine = onDocumentWritten(
-    { document: "products/{productId}", concurrency: 50, memory: "256MiB" },
-    async (event) => {
-        console.log("🚀 Quantum Auto-PO Engine is currently PAUSED by Admin.");
-        return; // 🚀 NAYA FIX: Ye turant exit kar jayega, PO draft nahi hoga
-        const after = event.data.after.exists ? event.data.after.data() : null;
-        if (!after || after.isBlocked) return;
-
-        const productId = event.params.productId;
-        const currentStock = after.physicalStock || after.stock || 0;
-        const minStock = after.minStockLevel || 10; // Default threshold
-
-        // Only trigger if stock is dangerously low
-        if (currentStock > minStock) return;
-
-        const branchCode = after.branchCode;
-        const tenantId = after.tenantId;
-        if (!branchCode || !tenantId) return;
-
-        const poRef = db.collection('purchase_orders');
-        
-        try {
-            await db.runTransaction(async (t) => {
-                // Check if a pending PO already exists for this product to avoid duplicates
-                const existingPOQuery = await t.get(
-                    poRef.where('productId', '==', productId)
-                         .where('status', '==', 'PENDING')
-                         .where('branchCode', '==', branchCode)
-                         .limit(1)
-                );
-
-                if (!existingPOQuery.empty) return; // PO already waiting for manager approval
-
-                // Draft a new automated PO
-                const autoOrderQty = (after.maxStockLevel || 50) - currentStock; 
-                if (autoOrderQty <= 0) return;
-
-                const newPODoc = poRef.doc();
-                t.set(newPODoc, {
-                    poId: `PO-${Date.now()}`,
-                    productId: productId,
-                    productName: after.name,
-                    barcode: after.barcode,
-                    branchCode: branchCode,
-                    tenantId: tenantId,
-                    currentStock: currentStock,
-                    suggestedOrderQty: autoOrderQty,
-                    unitCost: (after.unitCost && after.unitCost > 0) ? after.unitCost : ((after.price || 0) * 0.70), // Safe Fallback cost
-                    status: 'PENDING',
-                    generatedBy: 'QUANTUM_AI',
-                    createdAt: admin.firestore.FieldValue.serverTimestamp()
-                });
-            });
-            console.log(`Auto-PO Drafted for ${after.name} at branch ${branchCode}`);
-        } catch (error) {
-            console.error("Auto-PO Engine Failed:", error);
-        }
-    }
-);
+// DEAD-CODE FIX: Ye Firestore trigger admin dwara intentionally PAUSED tha,
+// lekin har product create/update pe abhi bhi invoke ho raha tha (products
+// collection ke sabse frequent write triggers me se ek) aur sirf ek log line
+// chalakar (unreachable business logic ke saath) exit ho jaata tha — har
+// invocation ki chhoti si cost accumulate ho rahi thi bina kisi fayde ke.
+// Ab function hi export/deploy nahi hoga. Poora original logic
+// /docs/archived-cloud-functions/quantumAutoPOEngine.js.bak me safe hai.
+//
+// exports.quantumAutoPOEngine = onDocumentWritten({ document: "products/{productId}", ... }, async (event) => { ... });
 // ============================================================================
-// 🔔 11. PUSH NOTIFICATION ENGINE (FCM WINBACK COUPONS)
+// 11. PUSH NOTIFICATION ENGINE (FCM WINBACK COUPONS)
 // ============================================================================
 exports.processPushNotification = onDocumentCreated(
     { document: "notifications/{docId}", concurrency: 50, memory: "256MiB" },
@@ -713,7 +635,7 @@ exports.processPushNotification = onDocumentCreated(
 
             const userData = userDoc.data();
             
-            // 🚀 BUG 1 FIX: Database me 'fcmTokens' ARRAY hai, par code 'fcmToken' STRING dhoondh raha tha
+ // BUG 1 FIX: Database me 'fcmTokens' ARRAY hai, par code 'fcmToken' STRING dhoondh raha tha
             let activeToken = userData.fcmToken; 
             if (!activeToken && Array.isArray(userData.fcmTokens) && userData.fcmTokens.length > 0) {
                 activeToken = userData.fcmTokens[userData.fcmTokens.length - 1]; // Pick latest token
@@ -739,8 +661,8 @@ exports.processPushNotification = onDocumentCreated(
             const response = await admin.messaging().send(message);
             console.log(`✅ Successfully sent message to ${targetUserId}. Message ID: ${response}`);
 
-            // 🚀 BUG 2 FIX: 'status' ko over-write mat kar! 'status' sirf Cart use karega (PENDING/USED).
-            // Notification ke track record ke liye 'pushStatus' field add kar di hai.
+ // BUG 2 FIX: 'status' ko over-write mat kar! 'status' sirf Cart use karega (PENDING/USED).
+ // Notification ke track record ke liye 'pushStatus' field add kar di hai.
             await docRef.update({
                 pushStatus: 'SENT',
                 messageId: response,
@@ -759,7 +681,7 @@ exports.processPushNotification = onDocumentCreated(
 );
 
 // ============================================================================
-// 🗑️ 12. ULTIMATE GHOST CLEANER: AUTO-DELETE OFFERS & PROCUREMENT DATA
+// 12. ULTIMATE GHOST CLEANER: AUTO-DELETE OFFERS & PROCUREMENT DATA
 // ============================================================================
 exports.onProductDeleted = onDocumentDeleted('products/{productId}', async (event) => {
     const snap = event.data;
@@ -775,7 +697,7 @@ exports.onProductDeleted = onDocumentDeleted('products/{productId}', async (even
     let deleteCount = 0;
 
     try {
-        // 🎯 1. DELETE GHOST OFFERS (Using Barcode)
+ // 1. DELETE GHOST OFFERS (Using Barcode)
         if (barcode) {
             const offersSnap = await db.collection('offers').where('barcode', '==', barcode).get();
             offersSnap.forEach((doc) => {
@@ -784,14 +706,14 @@ exports.onProductDeleted = onDocumentDeleted('products/{productId}', async (even
             });
         }
 
-        // 🎯 2. DELETE FROM AI PO SUGGESTIONS (Using Product ID)
+ // 2. DELETE FROM AI PO SUGGESTIONS (Using Product ID)
         const poSuggestionsSnap = await db.collection('ai_po_suggestions').where('productId', '==', productId).get();
         poSuggestionsSnap.forEach((doc) => {
             batch.delete(doc.ref);
             deleteCount++;
         });
 
-        // 🎯 3. DELETE FROM PURCHASE ORDERS / PROCUREMENT (Using Product ID)
+ // 3. DELETE FROM PURCHASE ORDERS / PROCUREMENT (Using Product ID)
         const purchaseOrdersSnap = await db.collection('purchase_orders').where('productId', '==', productId).get();
         purchaseOrdersSnap.forEach((doc) => {
             batch.delete(doc.ref);
@@ -799,8 +721,8 @@ exports.onProductDeleted = onDocumentDeleted('products/{productId}', async (even
         });
 
         if (deleteCount > 0) {
-            // Agar batch me 500 se zyada items hue toh Firebase fail ho sakta hai, 
-            // par ek product ke itne data nahi honge, isliye seedha commit safe hai.
+ // Agar batch me 500 se zyada items hue toh Firebase fail ho sakta hai, 
+ // par ek product ke itne data nahi honge, isliye seedha commit safe hai.
             await batch.commit();
             console.log(`💥 SUCCESS: Vaporized ${deleteCount} linked documents (Offers + Procurement) for Product ${productId}!`);
         } else {
@@ -812,7 +734,7 @@ exports.onProductDeleted = onDocumentDeleted('products/{productId}', async (even
 });
 
 // ============================================================================
-// 🗑️ 13. SERVICE GHOST CLEANER (Agar Services me bhi offers lagte hain)
+// 13. SERVICE GHOST CLEANER (Agar Services me bhi offers lagte hain)
 // ============================================================================
 exports.onServiceDeleted = onDocumentDeleted('services/{serviceId}', async (event) => {
     const snap = event.data;
@@ -845,7 +767,7 @@ exports.onServiceDeleted = onDocumentDeleted('services/{serviceId}', async (even
     }
 });
 // ============================================================================
-// 💳 14. USAGE LEDGER — TRANSACTION COUNTER (SUBSCRIPTION ENGINE)
+// 14. USAGE LEDGER — TRANSACTION COUNTER (SUBSCRIPTION ENGINE)
 // ============================================================================
 exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
     const before = event.data.before?.data();
@@ -856,7 +778,7 @@ exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
     const statusAfter = after.status || '';
     const statusBefore = before?.status || '';
 
-    // Sirf jab status PAID ya completed ho — aur pehle nahi tha
+ // Sirf jab status PAID ya completed ho — aur pehle nahi tha
     const isPaidNow =
         (statusAfter === 'PAID' || statusAfter === 'completed') &&
         (statusBefore !== 'PAID' && statusBefore !== 'completed');
@@ -865,11 +787,11 @@ exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
 
     const tenantId = after.tenantId;
     if (!tenantId) {
-        console.warn(`⚠️ Order ${event.params.orderId} has no tenantId. Skipping.`);
+        console.warn(`⚠ Order ${event.params.orderId} has no tenantId. Skipping.`);
         return;
     }
 
-    // Current month key: "2025-06"
+ // Current month key: "2025-06"
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -894,10 +816,10 @@ exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
 });
 
 // ============================================================================
-// 🏢 15. SUPER ADMIN: TENANT MANAGEMENT (SECURE SERVER-SIDE)
+// 15. SUPER ADMIN: TENANT MANAGEMENT (SECURE SERVER-SIDE)
 // ============================================================================
 exports.onboardTenant = onCall(async (request) => {
-    // 🛡️ SECURITY CHECK: Only Super Admins
+ // SECURITY CHECK: Only Super Admins
     if (!request.auth || (request.auth.token.role !== 'SUPER_ADMIN' && request.auth.token.role !== 'super_admin')) {
         throw new HttpsError('permission-denied', 'Unauthorized. Only Super Admins can onboard tenants.');
     }
@@ -906,7 +828,7 @@ exports.onboardTenant = onCall(async (request) => {
     if (!companyName || !adminEmail || !adminPhone) throw new HttpsError('invalid-argument', 'Missing required fields.');
 
     try {
-        // 1. Create Auth User securely on backend
+ // 1. Create Auth User securely on backend
         const userRecord = await admin.auth().createUser({
             email: adminEmail.toLowerCase().trim(),
             password: 'ClickOut@' + adminPhone.substring(0, 4), // Temporary Password
@@ -914,14 +836,14 @@ exports.onboardTenant = onCall(async (request) => {
         });
         const uid = userRecord.uid;
 
-        // 2. Generate Unique Tenant ID
+ // 2. Generate Unique Tenant ID
         const baseId = companyName.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
         const tenantId = `tenant_${baseId}_${Date.now().toString().substring(8)}`;
         const maxStores = plan === 'ENTERPRISE' ? 1000 : (plan === 'PRO' ? 50 : 5);
 
         const batch = db.batch();
 
-        // 3. Create Tenant Document
+ // 3. Create Tenant Document
         const tenantRef = db.collection('tenants').doc(tenantId);
         batch.set(tenantRef, {
             tenantId: tenantId,
@@ -934,7 +856,7 @@ exports.onboardTenant = onCall(async (request) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // 4. Create Staff Document (This triggers assignCustomClaims automatically)
+ // 4. Create Staff Document (This triggers assignCustomClaims automatically)
         const staffRef = db.collection('staff').doc(uid); 
         batch.set(staffRef, {
             docId: uid,
@@ -952,7 +874,7 @@ exports.onboardTenant = onCall(async (request) => {
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        // 5. Secure Server-Side Audit Log
+ // 5. Secure Server-Side Audit Log
         const auditRef = db.collection('admin_audit_logs').doc();
         batch.set(auditRef, {
             action: 'TENANT_ONBOARDED',
@@ -990,6 +912,258 @@ exports.toggleTenantStatus = onCall(async (request) => {
     });
     await batch.commit();
     return { success: true };
+});
+
+// ============================================================================
+// 16. INDUSTRY BENCHMARK ENGINE (ANONYMIZED CROSS-TENANT AGGREGATION)
+// ============================================================================
+// Har raat sab tenants ka daily_store_stats (last 30 din) aggregate karke
+// EK single anonymized number banata hai — koi tenantId ya identifiable
+// data is output doc me store nahi hota. Dashboard ka static 2.0% ab isse
+// live replace hoga.
+exports.computeIndustryBenchmark = onSchedule("every day 03:00", async (event) => {
+    console.log("📊 Starting Industry Benchmark Aggregation...");
+
+    try {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const formatter = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+        const parts = formatter.format(thirtyDaysAgo).split('/');
+        const sinceDateStr = `${parts[2]}-${parts[1]}-${parts[0]}`; // YYYY-MM-DD
+
+        const statsSnap = await db.collection("daily_store_stats")
+            .where("date", ">=", sinceDateStr)
+            .get();
+
+        if (statsSnap.empty) {
+            console.log("✅ No stats found in window. Skipping.");
+            return;
+        }
+
+        let totalRevenue = 0;
+        let totalLeakage = 0;
+
+        statsSnap.forEach((doc) => {
+            const d = doc.data();
+            totalRevenue += Number(d.totalRevenue || 0);
+            totalLeakage += Number(d.totalLeakage || 0);
+        });
+
+        const avgLeakagePct = totalRevenue > 0 ? (totalLeakage / totalRevenue) * 100 : 0;
+
+        // ⚡ ANONYMIZED: koi tenantId/branchCode/companyName store nahi ho raha
+        await db.collection("platform_fraud_patterns").doc("industry_benchmark").set({
+            avgLeakagePct: parseFloat(avgLeakagePct.toFixed(2)),
+            sampleSize: statsSnap.size,
+            periodDays: 30,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        console.log(`✅ Industry Benchmark updated: ${avgLeakagePct.toFixed(2)}% (sample: ${statsSnap.size} store-days)`);
+    } catch (error) {
+        console.error("🚨 Industry Benchmark Engine Failed:", error);
+    }
+});
+
+// ============================================================================
+// 17. MONTHLY VERIFIED SALES REPORT (AUTO-GENERATE + AUTO-EMAIL)
+// ============================================================================
+// Har mahine ki 1st tareekh ko, pichle poore mahine ka summary har active
+// tenant ke TENANT_ADMIN ko email hota hai. 'mail' collection Trigger Email
+// extension use karta hai — already installed hai (Firestore mein dikh raha tha).
+exports.sendMonthlyVerifiedSalesReport = onSchedule("1 of month 06:00", async (event) => {
+    console.log("📧 Starting Monthly Verified Sales Report...");
+
+    try {
+        const now = new Date();
+        // Pichla poora mahina nikalna (agar aaj July hai, toh June ka data)
+        const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        const fmt = (d) => d.toISOString().split("T")[0]; // YYYY-MM-DD
+        const startStr = fmt(firstDayLastMonth);
+        const endStr = fmt(lastDayLastMonth);
+        const monthLabel = firstDayLastMonth.toLocaleString("en-IN", { month: "long", year: "numeric" });
+
+        const tenantsSnap = await db.collection("tenants").where("isActive", "==", true).get();
+        console.log(`Found ${tenantsSnap.size} active tenants.`);
+
+        for (const tenantDoc of tenantsSnap.docs) {
+            const tenantId = tenantDoc.id;
+            const companyName = tenantDoc.data().companyName || "Your Store";
+
+            try {
+                // 1. Tenant Admin ka email nikalo
+                const staffSnap = await db.collection("staff")
+                    .where("tenantId", "==", tenantId)
+                    .where("role", "==", "TENANT_ADMIN")
+                    .where("isActive", "==", true)
+                    .limit(1)
+                    .get();
+
+                if (staffSnap.empty) {
+                    console.log(`⚠️ No active TENANT_ADMIN found for ${tenantId}. Skipping.`);
+                    continue;
+                }
+                const adminEmail = staffSnap.docs[0].data().email;
+                if (!adminEmail) continue;
+
+                // 2. Pichle mahine ka daily_store_stats sum karo
+                const statsSnap = await db.collection("daily_store_stats")
+                    .where("tenantId", "==", tenantId)
+                    .where("date", ">=", startStr)
+                    .where("date", "<=", endStr)
+                    .get();
+
+                if (statsSnap.empty) {
+                    console.log(`No stats for ${tenantId} in ${monthLabel}. Skipping.`);
+                    continue;
+                }
+
+                let totalRevenue = 0, totalLeakage = 0, refundAmount = 0, rejectedCount = 0;
+                statsSnap.forEach((doc) => {
+                    const d = doc.data();
+                    totalRevenue += Number(d.totalRevenue || 0);
+                    totalLeakage += Number(d.totalLeakage || 0);
+                    refundAmount += Number(d.refundAmount || 0);
+                    rejectedCount += Number(d.rejectedCount || 0);
+                });
+
+                const verifiedPct = totalRevenue > 0
+                    ? (((totalRevenue - totalLeakage) / totalRevenue) * 100).toFixed(1)
+                    : "0.0";
+
+                // 3. Email bhejo (Trigger Email extension: 'mail' collection)
+                await db.collection("mail").add({
+                    to: [adminEmail],
+                    message: {
+                        subject: `ClickOut Verified Sales Report — ${monthLabel}`,
+                        html: `
+                            <h2>Hi, ${companyName} 👋</h2>
+                            <p>Yahaan hai aapka <b>${monthLabel}</b> ka Verified Sales Report:</p>
+                            <ul>
+                                <li><b>Total Revenue:</b> ₹${totalRevenue.toFixed(0)}</li>
+                                <li><b>Verified Sales:</b> ${verifiedPct}%</li>
+                                <li><b>At-Risk (Pending/Leakage):</b> ₹${totalLeakage.toFixed(0)}</li>
+                                <li><b>Refunds:</b> ₹${refundAmount.toFixed(0)}</li>
+                                <li><b>Guard Rejections:</b> ${rejectedCount}</li>
+                            </ul>
+                            <p>Full CA-grade export ke liye Admin Panel &gt; Super Auditor check karo.</p>
+                            <p>— Team ClickOut</p>
+                        `,
+                    },
+                });
+
+                console.log(`✅ Report sent to ${adminEmail} for ${companyName}`);
+            } catch (innerErr) {
+                console.error(`🚨 Failed for tenant ${tenantId}:`, innerErr);
+            }
+        }
+
+        console.log("✅ Monthly Verified Sales Report cycle complete.");
+    } catch (error) {
+        console.error("🚨 Monthly Report Engine Failed:", error);
+    }
+});
+
+// ============================================================================
+// 18. ERP API KEY GENERATION (For Tally/Busy/3rd-party Integrations)
+// ============================================================================
+exports.generateErpApiKey = onCall(async (request) => {
+    if (!request.auth) throw new HttpsError('unauthenticated', 'Login required.');
+
+    const email = request.auth.token.email;
+    if (!email) throw new HttpsError('invalid-argument', 'No email on this account.');
+
+    // ⚡ FIX: request.auth.token.role/tenantId (custom claims) can lag behind
+    // or be unset — adminRoleProvider (client) already flags this same gap
+    // and treats the 'staff' Firestore doc as source of truth. Doing the
+    // same here instead of trusting stale/missing token claims.
+    const staffSnap = await db.collection('staff')
+        .where('email', '==', email)
+        .where('isActive', '==', true)
+        .limit(1)
+        .get();
+
+    if (staffSnap.empty) {
+        throw new HttpsError('permission-denied', 'No active staff record found.');
+    }
+
+    const staffData = staffSnap.docs[0].data();
+    const role = (staffData.role || '').toString().toUpperCase();
+    const tenantId = staffData.tenantId;
+
+    if (role !== 'TENANT_ADMIN' && role !== 'SUPER_ADMIN') {
+        throw new HttpsError('permission-denied', 'Only Tenant Admin can generate API keys.');
+    }
+    if (!tenantId) {
+        throw new HttpsError('failed-precondition', 'No tenant associated with this staff record.');
+    }
+
+    // ⚡ Simple random key — good enough for MVP. Not hashed in DB (read-only
+    // scope, low blast radius), but rotatable anytime by calling this again.
+    const newKey = `co_${tenantId.substring(0, 8)}_${Math.random().toString(36).substring(2, 15)}${Date.now().toString(36)}`;
+
+    await db.collection('tenants').doc(tenantId).update({
+        erpApiKey: newKey,
+        erpApiKeyGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return { apiKey: newKey };
+});
+
+// ============================================================================
+// 19. TALLY/BUSY/ERP READ-ONLY AUDIT FEED
+// ============================================================================
+// GET /getTenantAuditFeed?apiKey=xxx&startDate=2026-07-01&endDate=2026-07-31
+// Read-only. No write access. Rate-limited by date-range size (max 1000 rows).
+exports.getTenantAuditFeed = onRequest(async (req, res) => {
+    try {
+        const { apiKey, startDate, endDate } = req.query;
+
+        if (!apiKey || !startDate || !endDate) {
+            return res.status(400).json({ error: "Missing apiKey, startDate, or endDate." });
+        }
+
+        // 1. Authenticate via tenant API key
+        const tenantSnap = await db.collection('tenants').where('erpApiKey', '==', apiKey).limit(1).get();
+        if (tenantSnap.empty) {
+            return res.status(401).json({ error: "Invalid API key." });
+        }
+        const tenantId = tenantSnap.docs[0].id;
+
+        // 2. Parse date range
+        const start = new Date(`${startDate}T00:00:00`);
+        const end = new Date(`${endDate}T23:59:59`);
+        if (isNaN(start) || isNaN(end)) {
+            return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+        }
+
+        // 3. Fetch orders (read-only, capped at 1000 rows per call)
+        const ordersSnap = await db.collection('orders')
+            .where('tenantId', '==', tenantId)
+            .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(start))
+            .where('timestamp', '<=', admin.firestore.Timestamp.fromDate(end))
+            .limit(1000)
+            .get();
+
+        const feed = ordersSnap.docs.map((doc) => {
+            const d = doc.data();
+            return {
+                orderId: doc.id,
+                timestamp: d.timestamp ? d.timestamp.toDate().toISOString() : null,
+                totalAmount: d.totalAmount || 0,
+                paymentMode: d.paymentMode || 'UNKNOWN',
+                exitStatus: d.exitStatus || d.paymentStatus || 'PENDING',
+                branchCode: d.branchCode || 'HQ',
+                items: d.items || [],
+            };
+        });
+
+        return res.status(200).json({ tenantId, count: feed.length, orders: feed });
+    } catch (error) {
+        console.error("🚨 getTenantAuditFeed Failed:", error);
+        return res.status(500).json({ error: "Internal server error." });
+    }
 });
 
 exports.changeTenantPlan = onCall(async (request) => {

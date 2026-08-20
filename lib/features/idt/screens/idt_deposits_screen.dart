@@ -405,10 +405,10 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       return DataRow(
         color: WidgetStateProperty.all(
           isLocalRow
-              ? Colors.green.withOpacity(0.05)
+              ? Colors.green.withValues(alpha: 0.05)
               : (index % 2 == 0
                     ? Colors.transparent
-                    : accentViolet.withOpacity(0.04)),
+                    : accentViolet.withValues(alpha: 0.04)),
         ),
         cells: [
           DataCell(
@@ -551,7 +551,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       tableRows.add(
         DataRow(
           color: WidgetStateProperty.all(
-            isDark ? Colors.blue.withOpacity(0.1) : Colors.blue.shade50,
+            isDark ? Colors.blue.withValues(alpha: 0.1) : Colors.blue.shade50,
           ),
           cells: [
             const DataCell(SizedBox.shrink()),

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../modules/global_overview_module.dart';
@@ -202,7 +201,7 @@ class _SuperAdminScreenState extends ConsumerState<SuperAdminScreen> {
                   color: context.accentNeonGlow,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: context.accentNeon.withOpacity(0.5),
+                    color: context.accentNeon.withValues(alpha: 0.5),
                   ),
                 ),
                 child: Icon(Icons.blur_on, color: context.accentNeon, size: 24),
@@ -331,7 +330,7 @@ class _SuperAdminScreenState extends ConsumerState<SuperAdminScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(

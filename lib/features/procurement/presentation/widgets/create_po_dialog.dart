@@ -96,7 +96,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: textSecondary.withOpacity(0.2), width: 1),
+        side: BorderSide(color: textSecondary.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       elevation: 24,
@@ -123,7 +123,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -131,7 +131,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentGreen.withOpacity(0.1),
+                        color: accentGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
@@ -172,7 +172,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.1),
+                        color: Colors.redAccent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
@@ -267,7 +267,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Divider(
-                            color: textSecondary.withOpacity(0.1),
+                            color: textSecondary.withValues(alpha: 0.1),
                             height: 1,
                             thickness: 1,
                           ),
@@ -416,7 +416,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                     bottom: Radius.circular(16),
                   ),
                   border: Border(
-                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -542,7 +542,7 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
 
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
       prefixIcon: Icon(icon, color: textSecondary, size: 20),
       filled: true,
       fillColor: inputBg,

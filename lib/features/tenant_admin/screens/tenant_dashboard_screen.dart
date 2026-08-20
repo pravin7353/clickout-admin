@@ -34,7 +34,6 @@ class TenantDashboardScreen extends ConsumerWidget {
     required VoidCallback onConfirm,
   }) {
     final ctrl = TextEditingController();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final dialogBg = context.colors.cardBg;
     final inputBg = context.colors.scaffoldBg;
     final textCol = context.colors.textPrimary;
@@ -64,7 +63,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                 filled: true,
                 fillColor: inputBg,
                 hintText: actionKeyword,
-                hintStyle: TextStyle(color: textMuted.withOpacity(0.5)),
+                hintStyle: TextStyle(color: textMuted.withValues(alpha: 0.5)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -102,9 +101,6 @@ class TenantDashboardScreen extends ConsumerWidget {
     final staffCountState = ref.watch(tenantStaffCountProvider(tenantId));
     final activeTodayState = ref.watch(tenantActiveTodayProvider(tenantId));
     final pendingAlertsState = ref.watch(tenantPendingAlertsProvider(tenantId));
-
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     final bgDark = context.colors.scaffoldBg;
     final cardDark = context.colors.cardBg;
@@ -214,10 +210,10 @@ class TenantDashboardScreen extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.redAccent.withOpacity(0.1),
+                          color: Colors.redAccent.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: Colors.redAccent.withOpacity(0.4),
+                            color: Colors.redAccent.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Row(
@@ -264,10 +260,10 @@ class TenantDashboardScreen extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blueAccent.withOpacity(0.1),
+                          color: Colors.blueAccent.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: Colors.blueAccent.withOpacity(0.4),
+                            color: Colors.blueAccent.withValues(alpha: 0.4),
                           ),
                         ),
                         child: Row(
@@ -305,10 +301,10 @@ class TenantDashboardScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.amber.withOpacity(0.1),
+                        color: Colors.amber.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: Colors.amber.withOpacity(0.4),
+                          color: Colors.amber.withValues(alpha: 0.4),
                         ),
                       ),
                       child: Row(
@@ -348,16 +344,16 @@ class TenantDashboardScreen extends ConsumerWidget {
                     margin: const EdgeInsets.only(bottom: 20),
                     padding: const EdgeInsets.all(15),
                     decoration: BoxDecoration(
-                      color: accentGreen.withOpacity(0.05),
+                      color: accentGreen.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accentGreen.withOpacity(0.3)),
+                      border: Border.all(color: accentGreen.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: accentGreen.withOpacity(0.2),
+                            color: accentGreen.withValues(alpha: 0.2),
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
@@ -426,7 +422,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                               height: 50,
                               width: 50,
                               decoration: BoxDecoration(
-                                color: accentGreen.withOpacity(0.1),
+                                color: accentGreen.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: borderColor),
                               ),
@@ -461,12 +457,12 @@ class TenantDashboardScreen extends ConsumerWidget {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.amber.withOpacity(0.1),
+                                          color: Colors.amber.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(
                                             6,
                                           ),
                                           border: Border.all(
-                                            color: Colors.amber.withOpacity(
+                                            color: Colors.amber.withValues(alpha: 
                                               0.3,
                                             ),
                                           ),
@@ -583,7 +579,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                           height: 60,
                           width: 60,
                           decoration: BoxDecoration(
-                            color: accentGreen.withOpacity(0.1),
+                            color: accentGreen.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: borderColor),
                           ),
@@ -618,10 +614,10 @@ class TenantDashboardScreen extends ConsumerWidget {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.withOpacity(0.1),
+                                      color: Colors.amber.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: Colors.amber.withOpacity(0.3),
+                                        color: Colors.amber.withValues(alpha: 0.3),
                                       ),
                                     ),
                                     child: const Text(
@@ -820,7 +816,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                 Icon(
                                   Icons.store_mall_directory_outlined,
                                   size: 60,
-                                  color: textSecondary.withOpacity(0.3),
+                                  color: textSecondary.withValues(alpha: 0.3),
                                 ),
                                 const SizedBox(height: 15),
                                 Text(
@@ -835,7 +831,7 @@ class TenantDashboardScreen extends ConsumerWidget {
                                 Text(
                                   "Click 'Add Store' to begin mapping your branches.",
                                   style: TextStyle(
-                                    color: textSecondary.withOpacity(0.8),
+                                    color: textSecondary.withValues(alpha: 0.8),
                                   ),
                                 ),
                               ],
@@ -941,13 +937,13 @@ class TenantDashboardScreen extends ConsumerWidget {
                                       ),
                                       decoration: BoxDecoration(
                                         color: isActive
-                                            ? accentGreen.withOpacity(0.1)
-                                            : Colors.redAccent.withOpacity(0.1),
+                                            ? accentGreen.withValues(alpha: 0.1)
+                                            : Colors.redAccent.withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: isActive
-                                              ? accentGreen.withOpacity(0.3)
-                                              : Colors.redAccent.withOpacity(
+                                              ? accentGreen.withValues(alpha: 0.3)
+                                              : Colors.redAccent.withValues(alpha: 
                                                   0.3,
                                                 ),
                                         ),
@@ -1264,7 +1260,7 @@ class TenantDashboardScreen extends ConsumerWidget {
         ? const Color(0xFF888888)
         : const Color(0xFF6B7280);
     final borderColor = isDark
-        ? Theme.of(context).primaryColor.withOpacity(0.15)
+        ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
         : const Color(0xFFE5E7EB);
 
     return Container(
@@ -1280,9 +1276,9 @@ class TenantDashboardScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: color.withOpacity(0.2)),
+              border: Border.all(color: color.withValues(alpha: 0.2)),
             ),
             child: Icon(icon, color: color, size: 24),
           ),

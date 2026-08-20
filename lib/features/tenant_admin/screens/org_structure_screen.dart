@@ -73,10 +73,10 @@ class _OrgStructureScreenState extends ConsumerState<OrgStructureScreen> {
                   children: [
                     Container(
                       decoration: BoxDecoration(
-                        color: theme.primaryColor.withOpacity(0.1),
+                        color: theme.primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: theme.primaryColor.withOpacity(0.3),
+                          color: theme.primaryColor.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Row(
@@ -216,10 +216,10 @@ class _OrgStructureScreenState extends ConsumerState<OrgStructureScreen> {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: levelColor.withOpacity(0.3)),
+          border: Border.all(color: levelColor.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: levelColor.withOpacity(0.05),
+              color: levelColor.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -262,10 +262,10 @@ class _OrgStructureScreenState extends ConsumerState<OrgStructureScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: levelColor.withOpacity(0.1),
+                          color: levelColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                            color: levelColor.withOpacity(0.3),
+                            color: levelColor.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Text(

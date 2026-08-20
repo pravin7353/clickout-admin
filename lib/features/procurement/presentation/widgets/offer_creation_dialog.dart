@@ -214,7 +214,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                   top: Radius.circular(20),
                 ),
                 border: Border(
-                  bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                 ),
               ),
               child: Row(
@@ -222,7 +222,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: accentOrange.withOpacity(0.1),
+                      color: accentOrange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
@@ -285,7 +285,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                         color: const Color(0xFF1A221A),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: textSecondary.withOpacity(0.2),
+                          color: textSecondary.withValues(alpha: 0.2),
                         ),
                       ),
                       child: DropdownButtonHideUnderline(
@@ -436,7 +436,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                   bottom: Radius.circular(20),
                 ),
                 border: Border(
-                  top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                 ),
               ),
               child: Row(
@@ -519,9 +519,9 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -598,7 +598,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.5),
+                                  color: Colors.black.withValues(alpha: 0.5),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -619,7 +619,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                                         bottom: BorderSide(
                                           color: const Color(
                                             0xFF888888,
-                                          ).withOpacity(0.1),
+                                          ).withValues(alpha: 0.1),
                                         ),
                                       ),
                                     ),
@@ -678,7 +678,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
                             decoration: InputDecoration(
                               hintText: "E.g., Type 'Surf' or 'Harpic'...",
                               hintStyle: TextStyle(
-                                color: const Color(0xFF888888).withOpacity(0.5),
+                                color: const Color(0xFF888888).withValues(alpha: 0.5),
                               ),
                               prefixIcon: const Icon(
                                 Icons.search,
@@ -767,7 +767,7 @@ class _OfferCreationDialogState extends ConsumerState<OfferCreationDialog> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(
-              color: const Color(0xFF888888).withOpacity(0.5),
+              color: const Color(0xFF888888).withValues(alpha: 0.5),
             ),
             prefixIcon: Icon(icon, size: 18, color: const Color(0xFF888888)),
             filled: true,

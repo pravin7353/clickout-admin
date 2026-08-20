@@ -90,7 +90,10 @@ final pendingOrdersStreamProvider = StreamProvider<List<PendingOrder>>((ref) {
   Query query = FirebaseFirestore.instance
       .collection('orders')
       .where('paymentStatus', isEqualTo: 'PAID')
-      .where('exitStatus', whereIn: ['PENDING', 'READY_FOR_EXIT']);
+      .where('exitStatus', whereIn: ['PENDING', 'READY_FOR_EXIT'])
+      // 🚀 COST FIX: super_admin case me (no tenant filter) ye poore platform
+      // ke pending-exit orders bina limit ke stream karta tha.
+      .limit(500);
 
   // 🚀 SAAS ISOLATION (Level 1 & 2): Stops global read explosion
   if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {

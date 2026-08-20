@@ -22,7 +22,6 @@ class CreateStoreDialog extends StatefulWidget {
 
 class _CreateStoreDialogState extends State<CreateStoreDialog> {
   bool _isLoading = false;
-  bool _isFetchingTenant = true;
   final _formKey = GlobalKey<FormState>();
   final ScrollController _scrollController = ScrollController();
 
@@ -62,7 +61,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
         }
       }
     } finally {
-      if (mounted) setState(() => _isFetchingTenant = false);
+      // no-op: _isFetchingTenant was write-only and has been removed
     }
   }
 
@@ -632,7 +631,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
       prefixIcon: prefix,
       suffixIcon: suffix,
       labelStyle: const TextStyle(color: textSecondary, fontSize: 13),
-      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
       filled: true,
       fillColor: inputBg,
       border: OutlineInputBorder(
@@ -752,7 +751,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: accentGreen.withOpacity(0.2)),
+          side: BorderSide(color: accentGreen.withValues(alpha: 0.2)),
         ),
         child: Container(
           width: isMobile ? double.infinity : 850,
@@ -767,7 +766,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   border: Border(
-                    bottom: BorderSide(color: accentGreen.withOpacity(0.15)),
+                    bottom: BorderSide(color: accentGreen.withValues(alpha: 0.15)),
                   ),
                 ),
                 child: Row(
@@ -801,10 +800,10 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                         padding: const EdgeInsets.all(16),
                         margin: const EdgeInsets.only(bottom: 10),
                         decoration: BoxDecoration(
-                          color: accentGreen.withOpacity(0.08),
+                          color: accentGreen.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: accentGreen.withOpacity(0.2),
+                            color: accentGreen.withValues(alpha: 0.2),
                           ),
                         ),
                         child: const Row(
@@ -1422,7 +1421,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                 ),
                 decoration: BoxDecoration(
                   border: Border(
-                    top: BorderSide(color: accentGreen.withOpacity(0.15)),
+                    top: BorderSide(color: accentGreen.withValues(alpha: 0.15)),
                   ),
                 ),
                 child: Row(

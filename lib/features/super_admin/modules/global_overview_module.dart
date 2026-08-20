@@ -5,6 +5,7 @@ import '../screens/super_admin_screen.dart'; // Tokens
 import '../widgets/kpi_card.dart';
 import '../widgets/audit_feed_item.dart';
 import '../providers/fraud_feed_provider.dart'; // ⚡ NEW: Real threat provider
+import '../providers/revenue_provider.dart'; // ⚡ NEW: Real MRR provider
 
 final saasTenantsProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
@@ -12,6 +13,10 @@ final saasTenantsProvider =
       return FirebaseFirestore.instance
           .collection('tenants')
           .orderBy('createdAt', descending: true)
+          // 🚀 COST FIX: Poore platform ke saare tenants bina limit ke stream
+          // ho rahe the. TODO: pagination add karo jab tenant count 1000 se
+          // zyada rehne lage.
+          .limit(1000)
           .snapshots()
           .map((snapshot) {
             return snapshot.docs
@@ -30,6 +35,9 @@ class GlobalOverviewModule extends ConsumerWidget {
     final alertsAsync = ref.watch(
       fraudAlertsProvider,
     ); // ⚡ NEW: Fetch live threats
+    final revenueAsync = ref.watch(
+      revenueMetricsProvider,
+    ); // ⚡ NEW: Fetch live MRR
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
@@ -60,10 +68,10 @@ class GlobalOverviewModule extends ConsumerWidget {
                     margin: EdgeInsets.only(right: i == 3 ? 0 : 16),
                     height: 110,
                     decoration: BoxDecoration(
-                      color: context.surfaceGlass.withOpacity(0.5),
+                      color: context.surfaceGlass.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: context.borderSubtle.withOpacity(0.2),
+                        color: context.borderSubtle.withValues(alpha: 0.2),
                       ),
                     ),
                   ),
@@ -118,13 +126,35 @@ class GlobalOverviewModule extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  const Expanded(
-                    child: GlassKpiWidget(
-                      title: "Platform MRR",
-                      value: "₹4.2M",
-                      trend: "+5.2% vs last month",
-                      icon: Icons.currency_rupee,
-                      isGood: true,
+                  Expanded(
+                    child: revenueAsync.when(
+                      loading: () => const GlassKpiWidget(
+                        title: "Platform MRR",
+                        value: "...",
+                        trend: "Calculating",
+                        icon: Icons.currency_rupee,
+                        isGood: true,
+                      ),
+                      error: (_, __) => const GlassKpiWidget(
+                        title: "Platform MRR",
+                        value: "Error",
+                        trend: "Check connection",
+                        icon: Icons.currency_rupee,
+                        isGood: false,
+                      ),
+                      data: (metrics) {
+                        final int mrr = (metrics['mrr'] as num?)?.toInt() ?? 0;
+                        final String display = mrr >= 100000
+                            ? "₹${(mrr / 100000).toStringAsFixed(1)}L"
+                            : "₹$mrr";
+                        return GlassKpiWidget(
+                          title: "Platform MRR",
+                          value: display,
+                          trend: "${metrics['activeSubs'] ?? 0} active subs",
+                          icon: Icons.currency_rupee,
+                          isGood: true,
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -178,7 +208,7 @@ class GlobalOverviewModule extends ConsumerWidget {
                           "[ ENTERPRISE LINE CHART PLUG-IN HERE ]\nShows UPI vs Card vs Cash splits",
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: context.textSecondary.withOpacity(0.5),
+                            color: context.textSecondary.withValues(alpha: 0.5),
                           ),
                         ),
                       ),

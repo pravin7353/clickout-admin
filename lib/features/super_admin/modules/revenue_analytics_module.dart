@@ -144,7 +144,7 @@ class RevenueAnalyticsModule extends ConsumerWidget {
                           ),
                           height: 56,
                           decoration: BoxDecoration(
-                            color: context.surfaceGlass.withOpacity(0.5),
+                            color: context.surfaceGlass.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
@@ -285,7 +285,7 @@ class RevenueAnalyticsModule extends ConsumerWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: trendColor.withOpacity(0.1),
+                    color: trendColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

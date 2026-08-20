@@ -22,11 +22,13 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
   String _searchQuery = '';
   final ValueNotifier<Set<String>> _selectedUserIds =
       ValueNotifier<Set<String>>({});
+  final ScrollController _horizontalController = ScrollController();
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     _selectedUserIds.dispose();
+    _horizontalController.dispose();
     super.dispose();
   }
 
@@ -343,7 +345,9 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
     Query query = FirebaseFirestore.instance
         .collection('carts')
         .where('tenantId', isEqualTo: tenantId)
-        .where('branchCode', isEqualTo: branchCode);
+        .where('branchCode', isEqualTo: branchCode)
+        // 🚀 COST FIX: Live cart listener pehle bina limit ke tha.
+        .limit(200);
 
     return StreamBuilder<QuerySnapshot>(
       stream: query.snapshots(),
@@ -392,13 +396,11 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
               } else {
                 newSet.remove(userId);
               }
-              setState(() {
-                _selectedUserIds.value = newSet;
-              });
+              _selectedUserIds.value = newSet;
             },
             color: isStuck
                 ? WidgetStateProperty.all(
-                    Colors.redAccent.withOpacity(isDark ? 0.05 : 0.05),
+                    Colors.redAccent.withValues(alpha: isDark ? 0.05 : 0.05),
                   )
                 : null,
             cells: [
@@ -451,13 +453,13 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: isStuck
-                        ? Colors.redAccent.withOpacity(0.1)
-                        : const Color(0xFF10B981).withOpacity(0.1),
+                        ? Colors.redAccent.withValues(alpha: 0.1)
+                        : const Color(0xFF10B981).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isStuck
-                          ? Colors.redAccent.withOpacity(0.3)
-                          : const Color(0xFF10B981).withOpacity(0.3),
+                          ? Colors.redAccent.withValues(alpha: 0.3)
+                          : const Color(0xFF10B981).withValues(alpha: 0.3),
                     ),
                   ),
                   child: Text(
@@ -491,7 +493,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
   // TAB 2: GHOST VISITORS (EXIT LOOP FIXED)
   // ==========================================
   Widget _buildGhostVisitorsTab(bool isDark, Color cardColor) {
-    final adminData = ref.watch(adminRoleProvider).value;
+    final adminData = ref.read(adminRoleProvider).value;
     final String userTenantId = adminData?['tenantId'] ?? '';
     final String userBranchCode = adminData?['branchCode'] ?? '';
 
@@ -501,6 +503,8 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
           .where('tenantId', isEqualTo: userTenantId)
           .where('branchCode', isEqualTo: userBranchCode)
           .where('activeSessionId', isNotEqualTo: null)
+          // 🚀 COST FIX: Ghost-session listener pehle bina limit ke tha.
+          .limit(200)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting)
@@ -656,9 +660,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
                       } else {
                         newSet.remove(doc.id);
                       }
-                      setState(() {
-                        _selectedUserIds.value = newSet;
-                      });
+                      _selectedUserIds.value = newSet;
                     },
                     cells: [
                       DataCell(
@@ -782,13 +784,11 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
               } else {
                 newSet.remove(customer.id);
               }
-              setState(() {
-                _selectedUserIds.value = newSet;
-              });
+              _selectedUserIds.value = newSet;
             },
             color: customer.riskLevel == 'HIGH'
                 ? WidgetStateProperty.all(
-                    Colors.redAccent.withOpacity(isDark ? 0.05 : 0.03),
+                    Colors.redAccent.withValues(alpha: isDark ? 0.05 : 0.03),
                   )
                 : null,
             cells: [
@@ -892,7 +892,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -902,13 +902,13 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
         borderRadius: BorderRadius.circular(20),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final ScrollController horizontalController = ScrollController();
             return Scrollbar(
-              controller: horizontalController,
+              controller: _horizontalController,
               thumbVisibility: true,
               thickness: 8,
               child: SingleChildScrollView(
-                controller: horizontalController,
+                primary: false,
+                controller: _horizontalController,
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
                 child: ConstrainedBox(
@@ -921,6 +921,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
                     thumbVisibility: true,
                     thickness: 8,
                     child: SingleChildScrollView(
+                      primary: false,
                       scrollDirection: Axis.vertical,
                       physics: const BouncingScrollPhysics(),
                       child: StatefulBuilder(
@@ -958,9 +959,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
                                     } else {
                                       newSet.removeAll(allIds);
                                     }
-                                    setState(() {
-                                      _selectedUserIds.value = newSet;
-                                    });
+                                    _selectedUserIds.value = newSet;
                                     setTableState(() {
                                       allSelected = val ?? false;
                                     });
@@ -998,9 +997,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
                                         } else {
                                           newSet.remove(currentId);
                                         }
-                                        setState(() {
-                                          _selectedUserIds.value = newSet;
-                                        });
+                                        _selectedUserIds.value = newSet;
                                         setTableState(() {
                                           allSelected =
                                               _selectedUserIds.value.length ==
@@ -1045,9 +1042,9 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: chipColor.withOpacity(0.1),
+        color: chipColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: chipColor.withOpacity(0.3)),
+        border: Border.all(color: chipColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1077,8 +1074,8 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: isDark
-                  ? Colors.white.withOpacity(0.03)
-                  : Colors.black.withOpacity(0.03),
+                  ? Colors.white.withValues(alpha: 0.03)
+                  : Colors.black.withValues(alpha: 0.03),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -1143,7 +1140,7 @@ class _GrowthRadarScreenState extends ConsumerState<GrowthRadarScreen> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1610,10 +1607,10 @@ class _ShopGrowthSetupDialogState extends ConsumerState<ShopGrowthSetupDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF10B981).withOpacity(0.3),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.3),
                   ),
                 ),
                 child: Row(

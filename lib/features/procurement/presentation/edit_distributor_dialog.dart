@@ -121,7 +121,7 @@ class _EditDistributorDialogState extends ConsumerState<EditDistributorDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentOrange.withOpacity(0.2), width: 1),
+        side: BorderSide(color: accentOrange.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       elevation: 24,
@@ -147,7 +147,7 @@ class _EditDistributorDialogState extends ConsumerState<EditDistributorDialog> {
                     top: Radius.circular(16),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -155,7 +155,7 @@ class _EditDistributorDialogState extends ConsumerState<EditDistributorDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentOrange.withOpacity(0.1),
+                        color: accentOrange.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
@@ -290,7 +290,7 @@ class _EditDistributorDialogState extends ConsumerState<EditDistributorDialog> {
                     bottom: Radius.circular(16),
                   ),
                   border: Border(
-                    top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                   ),
                 ),
                 child: Row(
@@ -375,7 +375,7 @@ class _EditDistributorDialogState extends ConsumerState<EditDistributorDialog> {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: textSecondary.withOpacity(0.1),
+        color: textSecondary.withValues(alpha: 0.1),
       ),
     );
   }

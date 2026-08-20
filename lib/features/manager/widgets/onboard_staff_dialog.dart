@@ -104,7 +104,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
         color: textSecondary,
         fontSize: 13,
       ), // 🚀 Removed const
-      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5), fontSize: 13),
+      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5), fontSize: 13),
       filled: true,
       fillColor: inputBg,
       prefixIcon: prefixIcon != null
@@ -147,7 +147,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       insetPadding: EdgeInsets.all(isMobile ? 15 : 20),
@@ -197,7 +197,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
             Divider(
               height: 1,
               thickness: 1,
-              color: textSecondary.withOpacity(0.1),
+              color: textSecondary.withValues(alpha: 0.1),
             ),
 
             // --- FORM CONTENT ---
@@ -218,6 +218,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                               isEqualTo: adminData?['tenantId'],
                             )
                             .where('isDeleted', isEqualTo: false)
+                            // 🚀 COST FIX: safety cap on branch dropdown.
+                            .limit(200)
                             .snapshots(),
                         builder: (context, snapshot) {
                           // 🛡️ Agar Manager hai, toh purana non-editable Wall chip dikhao
@@ -229,7 +231,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                                 color: cardDark,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
-                                  color: accentGreen.withOpacity(0.3),
+                                  color: accentGreen.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -278,7 +280,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                                 color: cardDark,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: accentGreen.withOpacity(0.3),
+                                  color: accentGreen.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
@@ -517,7 +519,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
             Divider(
               height: 1,
               thickness: 1,
-              color: textSecondary.withOpacity(0.1),
+              color: textSecondary.withValues(alpha: 0.1),
             ),
 
             // --- FOOTER BUTTONS ---

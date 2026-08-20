@@ -148,7 +148,7 @@ class _AssignStaffDialogState extends State<AssignStaffDialog> {
       backgroundColor: cardDark,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: accentGreen.withOpacity(0.2)),
+        side: BorderSide(color: accentGreen.withValues(alpha: 0.2)),
       ),
       title: Row(
         children: [

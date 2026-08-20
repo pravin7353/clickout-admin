@@ -129,7 +129,7 @@ class FraudSecurityModule extends ConsumerWidget {
                           ),
                           height: 56,
                           decoration: BoxDecoration(
-                            color: context.surfaceGlass.withOpacity(0.5),
+                            color: context.surfaceGlass.withValues(alpha: 0.5),
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
@@ -180,7 +180,7 @@ class FraudSecurityModule extends ConsumerWidget {
                                 vertical: 8,
                               ),
                               leading: CircleAvatar(
-                                backgroundColor: color.withOpacity(0.1),
+                                backgroundColor: color.withValues(alpha: 0.1),
                                 child: Icon(
                                   Icons.warning_rounded,
                                   color: color,
@@ -211,9 +211,36 @@ class FraudSecurityModule extends ConsumerWidget {
                                   side: BorderSide(color: context.borderSubtle),
                                   elevation: 0,
                                 ),
-                                onPressed: () {
-                                  // Action logic here
-                                },
+                                onPressed: () => showDialog(
+                                  context: context,
+                                  builder: (ctx) => AlertDialog(
+                                    backgroundColor: context.bgBase,
+                                    title: Text(
+                                      alert['title'] ?? 'Suspicious Activity',
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                      ),
+                                    ),
+                                    content: SingleChildScrollView(
+                                      child: Text(
+                                        alert.entries
+                                            .map((e) => '${e.key}: ${e.value}')
+                                            .join('\n'),
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                          fontFamily: 'monospace',
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Close'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 child: Text(
                                   'Investigate',
                                   style: TextStyle(

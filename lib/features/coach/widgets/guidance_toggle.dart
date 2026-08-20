@@ -29,12 +29,12 @@ class GuidanceToggle extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: isOn
-              ? const Color(0xFF00C853).withOpacity(0.12)
+              ? const Color(0xFF00C853).withValues(alpha: 0.12)
               : Colors.white10,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isOn
-                ? const Color(0xFF00C853).withOpacity(0.4)
+                ? const Color(0xFF00C853).withValues(alpha: 0.4)
                 : Colors.white24,
           ),
         ),

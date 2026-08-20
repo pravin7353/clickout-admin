@@ -162,7 +162,7 @@ class CaLevelMatrixChart extends StatelessWidget {
                 horizontalLines: [
                   HorizontalLine(
                     y: avgRev,
-                    color: Colors.amber.withOpacity(0.5),
+                    color: Colors.amber.withValues(alpha: 0.5),
                     strokeWidth: 2,
                     dashArray: [5, 5],
                     label: HorizontalLineLabel(

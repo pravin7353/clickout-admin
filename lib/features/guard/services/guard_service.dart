@@ -66,12 +66,16 @@ class GuardService {
       // 2. NAYI COLLECTION: 'gate_authorized' me full details
       final authorizedRef = _db.collection('gate_authorized').doc();
       batch.set(authorizedRef, {
+        'gatePassSchemaVersion':
+            1, // ⚡ STANDARDIZED SCHEMA — future-proof for audit/insurance use
         'orderId': cleanId,
         'guardId': guardId,
         'guardEmail': guardEmail,
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'APPROVED',
         'totalAmount': data['totalAmount'] ?? 0,
+        'paymentMode': data['paymentMode'] ?? 'UNKNOWN',
+        'itemsVerifiedCount': (data['items'] as List?)?.length ?? 0,
         'tenantId': tenantId,
         'branchCode': branchCode ?? 'UNKNOWN', // 🚀 BRANCH ISOLATION LOCKED
       });
@@ -100,18 +104,46 @@ class GuardService {
   }
 
   // 🔴 REJECT GATE PASS (Wapas laya gaya method)
-  static Future<bool> rejectGatePass(String orderId, String? tenantId) async {
+  static Future<bool> rejectGatePass(
+    String orderId,
+    String? tenantId, {
+    String? branchCode,
+  }) async {
     try {
       final String guardEmail = _auth.currentUser?.email ?? 'UNKNOWN_EMAIL';
-      final DocumentReference orderRef = _db
-          .collection('orders')
-          .doc(orderId.trim());
+      final String guardId = _auth.currentUser?.uid ?? 'UNKNOWN_GUARD';
+      final String cleanId = orderId.trim();
+      final DocumentReference orderRef = _db.collection('orders').doc(cleanId);
 
-      await orderRef.update({
+      final orderDoc = await orderRef.get();
+      final data = orderDoc.data() as Map<String, dynamic>? ?? {};
+
+      final WriteBatch batch = _db.batch();
+
+      batch.update(orderRef, {
         'exitStatus': 'REJECTED',
         'verifiedByGuardId': guardEmail,
         'verifiedAt': FieldValue.serverTimestamp(),
       });
+
+      // ⚡ FIX: Ab REJECTED gate passes ka bhi 'gate_authorized' mein
+      // permanent audit trail banega — same standardized schema.
+      final authorizedRef = _db.collection('gate_authorized').doc();
+      batch.set(authorizedRef, {
+        'gatePassSchemaVersion': 1,
+        'orderId': cleanId,
+        'guardId': guardId,
+        'guardEmail': guardEmail,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'REJECTED',
+        'totalAmount': data['totalAmount'] ?? 0,
+        'paymentMode': data['paymentMode'] ?? 'UNKNOWN',
+        'itemsVerifiedCount': (data['items'] as List?)?.length ?? 0,
+        'tenantId': tenantId,
+        'branchCode': branchCode ?? 'UNKNOWN',
+      });
+
+      await batch.commit();
       return true;
     } catch (e) {
       print("Failed to reject gate pass: $e");

@@ -196,7 +196,7 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _phases[_currentIndex].themeColor.withOpacity(0.05),
+                color: _phases[_currentIndex].themeColor.withValues(alpha: 0.05),
                 backgroundBlendMode: BlendMode.screen,
               ),
             ),
@@ -308,7 +308,7 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: phase.themeColor.withOpacity(0.1),
+                color: phase.themeColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -390,20 +390,20 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  phase.themeColor.withOpacity(0.2),
-                  phase.themeColor.withOpacity(0.05),
+                  phase.themeColor.withValues(alpha: 0.2),
+                  phase.themeColor.withValues(alpha: 0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: phase.themeColor.withOpacity(0.3)),
+              border: Border.all(color: phase.themeColor.withValues(alpha: 0.3)),
             ),
             child: Center(
               child: Icon(
                 phase.scenarioIcon,
                 size: isMobile ? 120 : 180,
-                color: phase.themeColor.withOpacity(0.8),
+                color: phase.themeColor.withValues(alpha: 0.8),
               ),
             ),
           ),
@@ -489,14 +489,14 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
               width: 320,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Theme.of(context).cardColor.withOpacity(0.8),
+                color: Theme.of(context).cardColor.withValues(alpha: 0.8),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: _phases[_currentIndex].themeColor.withOpacity(0.3),
+                  color: _phases[_currentIndex].themeColor.withValues(alpha: 0.3),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 20,
                     offset: const Offset(0, 10),
                   ),
@@ -508,7 +508,7 @@ class _RetailSimulatorScreenState extends ConsumerState<RetailSimulatorScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _phases[_currentIndex].themeColor.withOpacity(0.1),
+                      color: _phases[_currentIndex].themeColor.withValues(alpha: 0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(

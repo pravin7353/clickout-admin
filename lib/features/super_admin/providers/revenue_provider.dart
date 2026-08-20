@@ -18,7 +18,15 @@ final recentTransactionsProvider =
 final revenueMetricsProvider = StreamProvider.autoDispose<Map<String, dynamic>>(
   (ref) {
     ref.keepAlive();
-    return FirebaseFirestore.instance.collection('tenants').snapshots().map((
+    return FirebaseFirestore.instance
+        .collection('tenants')
+        // 🚀 COST FIX: MRR aggregation poore tenants collection ko bina limit
+        // ke stream karta tha. Safety cap laga diya; agar tenants 2000 se
+        // zyada ho jayein, isse server-side aggregation (Cloud Function jo
+        // 'platform_metrics' doc maintain kare) me convert karna better hoga.
+        .limit(2000)
+        .snapshots()
+        .map((
       snap,
     ) {
       int mrr = 0;

@@ -212,7 +212,7 @@ class _TenantOnboardingScreenState
       labelStyle: TextStyle(color: context.colors.textSecondary),
       hintText: hint,
       hintStyle: TextStyle(
-        color: context.colors.textSecondary.withOpacity(0.5),
+        color: context.colors.textSecondary.withValues(alpha: 0.5),
       ),
       prefixIcon: Icon(icon, color: context.colors.textSecondary),
       filled: true,
@@ -259,7 +259,7 @@ class _TenantOnboardingScreenState
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),

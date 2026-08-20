@@ -137,7 +137,7 @@ class _CashReconciliationCardState extends State<CashReconciliationCard> {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: varianceColor.withOpacity(0.1),
+                    color: varianceColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

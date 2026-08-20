@@ -104,10 +104,10 @@ class StoreNetworkModule extends ConsumerWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   height: 64,
                   decoration: BoxDecoration(
-                    color: EnterpriseColors.surfaceGlass.withOpacity(0.5),
+                    color: EnterpriseColors.surfaceGlass.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: EnterpriseColors.borderSubtle.withOpacity(0.2),
+                      color: EnterpriseColors.borderSubtle.withValues(alpha: 0.2),
                     ),
                   ),
                 ),

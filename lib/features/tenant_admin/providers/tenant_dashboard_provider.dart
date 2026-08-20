@@ -35,6 +35,9 @@ final tenantStoresProvider =
       return FirebaseFirestore.instance
           .collection('stores')
           .where('tenantId', isEqualTo: tenantId)
+          // 🚀 COST FIX: safety cap; per-tenant store list generally small
+          // but was unbounded before.
+          .limit(200)
           .snapshots()
           .map(
             (snapshot) => snapshot.docs.map((doc) {
@@ -106,6 +109,11 @@ final tenantActiveTodayProvider = StreamProvider.family<int, String>((
       .collection('stores')
       .where('tenantId', isEqualTo: tenantId)
       .where('status', isEqualTo: 'ACTIVE')
+      // 🚀 COST FIX: pehle poore matching docs download karke .length nikalta
+      // tha. Safety cap laga diya; better fix aage chal ke .count().get()
+      // (Firestore aggregation query) me migrate karna hoga taaki poore docs
+      // download hi na karne padein, sirf count aaye.
+      .limit(500)
       .snapshots()
       .map((snap) => snap.docs.length);
 });
@@ -120,6 +128,9 @@ final tenantPendingAlertsProvider = StreamProvider.family<int, String>((
       .collection('alerts')
       .where('tenantId', isEqualTo: tenantId)
       .where('status', isEqualTo: 'PENDING')
+      // 🚀 COST FIX: same as above — safety cap; migrate to .count().get()
+      // aggregation query for accurate, cheap counting at scale.
+      .limit(500)
       .snapshots()
       .map((snap) => snap.docs.length);
 });

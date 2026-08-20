@@ -95,7 +95,7 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
 
         final blob = html.Blob([pngBytes]);
         final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
+        html.AnchorElement(href: url)
           ..setAttribute("download", "ClickOut_QR_$storeName.png")
           ..click();
         html.Url.revokeObjectUrl(url);
@@ -196,7 +196,7 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
                     color: context.colors.cardBg,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0xFF00C853).withOpacity(0.5),
+                      color: const Color(0xFF00C853).withValues(alpha: 0.5),
                       width: 2,
                     ),
                   ),

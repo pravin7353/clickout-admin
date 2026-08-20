@@ -269,12 +269,12 @@ class QuantumMetricsWidget extends StatelessWidget {
 
   Widget _buildStatusBadge(double burn) {
     String text = "OPTIMAL PROMOTIONS";
-    Color bgColor = Colors.green.withOpacity(0.1);
+    Color bgColor = Colors.green.withValues(alpha: 0.1);
     Color textColor = Colors.green;
 
     if (burn > 5000) {
       text = "HIGH DISCOUNT BURN";
-      bgColor = Colors.red.withOpacity(0.1);
+      bgColor = Colors.red.withValues(alpha: 0.1);
       textColor = Colors.redAccent;
     }
 
@@ -283,7 +283,7 @@ class QuantumMetricsWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: bgColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: textColor.withOpacity(0.3)),
+        border: Border.all(color: textColor.withValues(alpha: 0.3)),
       ),
       child: Text(
         text,
@@ -304,7 +304,7 @@ class QuantumMetricsWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textSecondary.withOpacity(0.1)),
+        border: Border.all(color: textSecondary.withValues(alpha: 0.1)),
       ),
       child: Center(child: CircularProgressIndicator(color: accent)),
     );
@@ -318,7 +318,7 @@ class QuantumMetricsWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textSecondary.withOpacity(0.2), width: 1),
+        border: Border.all(color: textSecondary.withValues(alpha: 0.2), width: 1),
       ),
       child: Center(
         child: Text(

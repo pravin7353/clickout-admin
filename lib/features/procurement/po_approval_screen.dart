@@ -148,7 +148,9 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isEngineRunning = ref.watch(poEngineProvider);
+    // 🚀 Watch kept (without storing) so this screen still rebuilds when the
+    // PO engine status changes, even though the value itself isn't read here.
+    ref.watch(poEngineProvider);
     final isMobile = MediaQuery.of(context).size.width < 900;
     final adminData = ref.watch(adminRoleProvider).value;
     final realStoreId =
@@ -189,7 +191,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: accentOrange.withOpacity(0.1),
+                          color: accentOrange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -244,7 +246,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                           foregroundColor: textPrimary,
                           elevation: 0,
                           side: BorderSide(
-                            color: textSecondary.withOpacity(0.2),
+                            color: textSecondary.withValues(alpha: 0.2),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
@@ -281,7 +283,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                           foregroundColor: textPrimary,
                           elevation: 0,
                           side: BorderSide(
-                            color: textSecondary.withOpacity(0.2),
+                            color: textSecondary.withValues(alpha: 0.2),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
@@ -343,7 +345,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                 child: ExpiryAlertDashboard(),
               ),
               const SizedBox(height: 40),
-              Divider(color: textSecondary.withOpacity(0.2)),
+              Divider(color: textSecondary.withValues(alpha: 0.2)),
               const SizedBox(height: 20),
 
               SingleChildScrollView(
@@ -480,7 +482,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                         color: cardDark,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: textSecondary.withOpacity(0.2),
+                          color: textSecondary.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
@@ -491,7 +493,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                 ? Icons.inventory_2_outlined
                                 : Icons.history,
                             size: 60,
-                            color: Colors.grey.withOpacity(0.5),
+                            color: Colors.grey.withValues(alpha: 0.5),
                           ),
                           const SizedBox(height: 10),
                           Text(
@@ -529,7 +531,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                               color: cardDark,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
-                                color: textSecondary.withOpacity(0.1),
+                                color: textSecondary.withValues(alpha: 0.1),
                               ),
                             ),
                             child: Scrollbar(
@@ -826,14 +828,14 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                         ),
                                                     decoration: BoxDecoration(
                                                       color: accentGreen
-                                                          .withOpacity(0.1),
+                                                          .withValues(alpha: 0.1),
                                                       borderRadius:
                                                           BorderRadius.circular(
                                                             20,
                                                           ),
                                                       border: Border.all(
                                                         color: accentGreen
-                                                            .withOpacity(0.3),
+                                                            .withValues(alpha: 0.3),
                                                       ),
                                                     ),
                                                     child: Row(
@@ -881,7 +883,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                 color: cardDark,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: textSecondary.withOpacity(0.1),
+                                  color: textSecondary.withValues(alpha: 0.1),
                                 ),
                               ),
                               child: Row(
@@ -915,7 +917,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                           vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: accentOrange.withOpacity(0.1),
+                                          color: accentOrange.withValues(alpha: 0.1),
                                           borderRadius: BorderRadius.circular(
                                             6,
                                           ),
@@ -981,13 +983,13 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? themeColor.withOpacity(0.1)
+              ? themeColor.withValues(alpha: 0.1)
               : const Color(0xFF111811),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
                 ? themeColor
-                : const Color(0xFF888888).withOpacity(0.2),
+                : const Color(0xFF888888).withValues(alpha: 0.2),
             width: isSelected ? 2 : 1,
           ),
         ),

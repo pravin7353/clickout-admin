@@ -71,7 +71,7 @@ class _PoExportDialogState extends State<PoExportDialog> {
       backgroundColor: bgDark,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentOrange.withOpacity(0.5), width: 1.5),
+        side: BorderSide(color: accentOrange.withValues(alpha: 0.5), width: 1.5),
       ),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500),
@@ -85,10 +85,10 @@ class _PoExportDialogState extends State<PoExportDialog> {
               padding: const EdgeInsets.all(16),
               width: double.infinity,
               decoration: BoxDecoration(
-                color: accentOrange.withOpacity(0.15),
+                color: accentOrange.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: accentOrange.withOpacity(0.5),
+                  color: accentOrange.withValues(alpha: 0.5),
                   width: 1.5,
                 ),
               ),
@@ -125,7 +125,7 @@ class _PoExportDialogState extends State<PoExportDialog> {
                     style: TextStyle(
                       color: const Color(
                         0xFFF0F0F0,
-                      ).withOpacity(0.8), // 🚀 FIX: Direct Color Code
+                      ).withValues(alpha: 0.8), // 🚀 FIX: Direct Color Code
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -169,7 +169,7 @@ class _PoExportDialogState extends State<PoExportDialog> {
               decoration: BoxDecoration(
                 color: cardDark,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.withOpacity(0.2)),
+                border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
               ),
               child: SelectableText(
                 messageText,

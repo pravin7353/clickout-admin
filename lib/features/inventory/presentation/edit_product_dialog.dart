@@ -141,7 +141,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withOpacity(0.2), width: 1),
+        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
       ),
       backgroundColor: bgDark,
       insetPadding: const EdgeInsets.all(16),
@@ -163,7 +163,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                   top: Radius.circular(16),
                 ),
                 border: Border(
-                  bottom: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                 ),
               ),
               child: Row(
@@ -201,9 +201,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: accentRed.withOpacity(0.1),
+                        color: accentRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: accentRed.withOpacity(0.3)),
+                        border: Border.all(color: accentRed.withValues(alpha: 0.3)),
                       ),
                       child: const Text(
                         "Low Stock",
@@ -223,13 +223,13 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ),
                       decoration: BoxDecoration(
                         color: isExpired
-                            ? accentRed.withOpacity(0.1)
-                            : accentGreen.withOpacity(0.1),
+                            ? accentRed.withValues(alpha: 0.1)
+                            : accentGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: isExpired
-                              ? accentRed.withOpacity(0.3)
-                              : accentGreen.withOpacity(0.3),
+                              ? accentRed.withValues(alpha: 0.3)
+                              : accentGreen.withValues(alpha: 0.3),
                         ),
                       ),
                       child: Text(
@@ -276,7 +276,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(color: textSecondary.withOpacity(0.1)),
+                        child: Divider(color: textSecondary.withValues(alpha: 0.1)),
                       ),
 
                       _buildSectionLabel("PRICING & TAX"),
@@ -328,7 +328,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(color: textSecondary.withOpacity(0.1)),
+                        child: Divider(color: textSecondary.withValues(alpha: 0.1)),
                       ),
 
                       _buildSectionLabel("INVENTORY & LIFECYCLE"),
@@ -420,7 +420,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                   bottom: Radius.circular(16),
                 ),
                 border: Border(
-                  top: BorderSide(color: textSecondary.withOpacity(0.1)),
+                  top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
                 ),
               ),
               child: Row(
@@ -530,7 +530,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-        color: textSecondary.withOpacity(0.8),
+        color: textSecondary.withValues(alpha: 0.8),
         fontWeight: FontWeight.bold,
       ),
       prefixIcon: Icon(icon, color: textSecondary, size: 20),

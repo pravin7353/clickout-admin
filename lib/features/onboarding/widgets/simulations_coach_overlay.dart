@@ -54,16 +54,16 @@ class _SimulationCoachOverlayState extends State<SimulationCoachOverlay>
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: isDark
-                          ? const Color(0xFF111811).withOpacity(0.85)
-                          : Colors.white.withOpacity(0.9),
+                          ? const Color(0xFF111811).withValues(alpha: 0.85)
+                          : Colors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: widget.themeColor.withOpacity(0.4),
+                        color: widget.themeColor.withValues(alpha: 0.4),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: widget.themeColor.withOpacity(0.15),
+                          color: widget.themeColor.withValues(alpha: 0.15),
                           blurRadius: 30,
                           offset: const Offset(0, 10),
                         ),
@@ -79,7 +79,7 @@ class _SimulationCoachOverlayState extends State<SimulationCoachOverlay>
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: widget.themeColor.withOpacity(0.15),
+                                color: widget.themeColor.withValues(alpha: 0.15),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(

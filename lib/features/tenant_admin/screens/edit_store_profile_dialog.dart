@@ -470,9 +470,9 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       prefixIcon: prefix,
       suffixIcon: suffix,
       labelStyle: TextStyle(color: textSecondary, fontSize: 13),
-      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
       filled: true,
-      fillColor: isReadOnly ? inputBg.withOpacity(0.55) : inputBg,
+      fillColor: isReadOnly ? inputBg.withValues(alpha: 0.55) : inputBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
@@ -536,7 +536,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentBlue.withOpacity(0.2)),
+        side: BorderSide(color: accentBlue.withValues(alpha: 0.2)),
       ),
       child: Container(
         width: isMobile ? double.infinity : 850,
@@ -553,7 +553,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       border: Border(
-                        bottom: BorderSide(color: accentBlue.withOpacity(0.15)),
+                        bottom: BorderSide(color: accentBlue.withValues(alpha: 0.15)),
                       ),
                     ),
                     child: Row(
@@ -585,10 +585,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                             padding: const EdgeInsets.all(16),
                             margin: const EdgeInsets.only(bottom: 10),
                             decoration: BoxDecoration(
-                              color: accentBlue.withOpacity(0.08),
+                              color: accentBlue.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: accentBlue.withOpacity(0.2),
+                                color: accentBlue.withValues(alpha: 0.2),
                               ),
                             ),
                             child:  Row(
@@ -1046,10 +1046,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                               padding: const EdgeInsets.all(12),
                               margin: const EdgeInsets.only(bottom: 20),
                               decoration: BoxDecoration(
-                                color: accentBlue.withOpacity(0.08),
+                                color: accentBlue.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: accentBlue.withOpacity(0.2),
+                                  color: accentBlue.withValues(alpha: 0.2),
                                 ),
                               ),
                               child: Row(
@@ -1180,7 +1180,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                     ),
                     decoration: BoxDecoration(
                       border: Border(
-                        top: BorderSide(color: accentBlue.withOpacity(0.15)),
+                        top: BorderSide(color: accentBlue.withValues(alpha: 0.15)),
                       ),
                     ),
                     child: Row(

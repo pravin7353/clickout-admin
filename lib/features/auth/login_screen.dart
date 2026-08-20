@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth/unified_auth_service.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/standard_utils.dart'; // 🚀 5 Standard Rules
+import '../../core/utils/standard_utils.dart'; // needed for parseBackendError
 import 'auth_provider.dart';
 import '../../core/providers/theme_provider.dart';
 
@@ -23,9 +23,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _linkSent = false;
-  final ActionDebouncer _authDebouncer = ActionDebouncer(
-    milliseconds: 1500,
-  ); // 🚀 Debouncing Rule
 
   @override
   void initState() {

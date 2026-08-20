@@ -466,7 +466,7 @@ class _ClientRegistrationScreenState
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      hintStyle: TextStyle(color: textSecondary.withOpacity(0.5)),
+      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
       labelStyle: TextStyle(color: textSecondary),
       filled: true,
       fillColor: inputBg,
@@ -597,7 +597,7 @@ class _ClientRegistrationScreenState
                     decoration: BoxDecoration(
                       color: cardDark,
                       border: Border(
-                        top: BorderSide(color: accentGreen.withOpacity(0.15)),
+                        top: BorderSide(color: accentGreen.withValues(alpha: 0.15)),
                       ),
                     ),
                     child: formContent,
@@ -614,7 +614,7 @@ class _ClientRegistrationScreenState
                     decoration: BoxDecoration(
                       color: cardDark,
                       border: Border(
-                        left: BorderSide(color: accentGreen.withOpacity(0.15)),
+                        left: BorderSide(color: accentGreen.withValues(alpha: 0.15)),
                       ),
                     ),
                     child: SingleChildScrollView(
