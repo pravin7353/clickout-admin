@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,9 +27,13 @@ class _TenantOnboardingScreenState
   // Controllers
   final _companyNameCtrl = TextEditingController();
   final _hoAddressCtrl = TextEditingController();
+  final _hoPincodeCtrl = TextEditingController();
   final _hoCityCtrl = TextEditingController();
   final _contactNameCtrl = TextEditingController();
   final _contactPhoneCtrl = TextEditingController();
+
+  bool _isFetchingPincode = false;
+  bool _isPincodeVerified = false;
 
   // Dynamic GSTIN Controllers
   final List<TextEditingController> _gstinControllers = [
@@ -119,10 +125,60 @@ class _TenantOnboardingScreenState
     });
   }
 
+  /// Same pincode -> city/state auto-fetch used in the store creation
+  /// dialog. This was previously missing here entirely (not a broken API -
+  /// there simply was no pincode field or lookup wired up on this screen).
+  Future<void> _onPincodeChanged(String val) async {
+    if (val.length == 6) {
+      setState(() {
+        _isFetchingPincode = true;
+        _isPincodeVerified = false;
+      });
+      try {
+        final response = await http
+            .get(Uri.parse('https://api.postalpincode.in/pincode/$val'))
+            .timeout(const Duration(seconds: 3));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          if (data[0]['Status'] == 'Success') {
+            final postOffice = data[0]['PostOffice'][0];
+            if (mounted) {
+              setState(() {
+                _hoCityCtrl.text =
+                    postOffice['District'] ?? postOffice['Block'];
+                String fetchedState = postOffice['State'];
+                _selectedState = _indianStates.contains(fetchedState)
+                    ? fetchedState
+                    : null;
+                _isPincodeVerified = true;
+                _isFetchingPincode = false;
+              });
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        debugPrint("Pincode API Fallback: $e");
+      }
+      if (mounted) {
+        setState(() {
+          _isFetchingPincode = false;
+          _isPincodeVerified = false;
+        });
+      }
+    } else {
+      setState(() {
+        _isPincodeVerified = false;
+        _isFetchingPincode = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _companyNameCtrl.dispose();
     _hoAddressCtrl.dispose();
+    _hoPincodeCtrl.dispose();
     _hoCityCtrl.dispose();
     _contactNameCtrl.dispose();
     _contactPhoneCtrl.dispose();
@@ -172,6 +228,7 @@ class _TenantOnboardingScreenState
         'isOnboardingComplete': true,
         'companyName': _companyNameCtrl.text.trim(),
         'hoAddress': _hoAddressCtrl.text.trim(),
+        'hoPincode': _hoPincodeCtrl.text.trim(),
         'hoCity': _hoCityCtrl.text.trim(),
         'hoState': _selectedState,
         'gstins': validGstins,
@@ -247,15 +304,16 @@ class _TenantOnboardingScreenState
       );
     }
 
+    final c = context.colors;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6F8),
+      backgroundColor: c.scaffoldBg,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Container(
             width: 700, // Constrained width for web form
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: c.cardBg,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -274,7 +332,7 @@ class _TenantOnboardingScreenState
                   Container(
                     padding: const EdgeInsets.all(30),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2B3674),
+                      color: c.ctaBackground,
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(20),
                       ),
@@ -383,37 +441,77 @@ class _TenantOnboardingScreenState
                           children: [
                             Expanded(
                               child: TextFormField(
+                                controller: _hoPincodeCtrl,
+                                keyboardType: TextInputType.number,
+                                maxLength: 6,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                onChanged: _onPincodeChanged,
+                                decoration:
+                                    _premiumInputStyle(
+                                      "Pincode *",
+                                      Icons.pin_drop_outlined,
+                                    ).copyWith(
+                                      counterText: "",
+                                      suffixIcon: _isFetchingPincode
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(14),
+                                              child: SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
+                                            )
+                                          : (_isPincodeVerified
+                                                ? Icon(
+                                                    Icons.check_circle,
+                                                    color:
+                                                        context.colors.success,
+                                                  )
+                                                : null),
+                                    ),
+                                validator: (v) => (v == null || v.length != 6)
+                                    ? "6-digit Pincode"
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: TextFormField(
                                 controller: _hoCityCtrl,
                                 decoration: _premiumInputStyle(
                                   "City *",
                                   Icons.location_city,
+                                  hint: "Auto-fills from Pincode",
                                 ),
                                 validator: (v) =>
                                     v!.isEmpty ? "Required" : null,
                               ),
                             ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: DropdownButtonFormField<String>(
-                                initialValue: _selectedState,
-                                decoration: _premiumInputStyle(
-                                  "State *",
-                                  Icons.map_outlined,
-                                ),
-                                items: _indianStates
-                                    .map(
-                                      (st) => DropdownMenuItem(
-                                        value: st,
-                                        child: Text(st),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (val) =>
-                                    setState(() => _selectedState = val),
-                                validator: (v) => v == null ? "Required" : null,
-                              ),
-                            ),
                           ],
+                        ),
+                        const SizedBox(height: 20),
+                        DropdownButtonFormField<String>(
+                          initialValue: _selectedState,
+                          decoration: _premiumInputStyle(
+                            "State *",
+                            Icons.map_outlined,
+                          ),
+                          items: _indianStates
+                              .map(
+                                (st) => DropdownMenuItem(
+                                  value: st,
+                                  child: Text(st),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (val) =>
+                              setState(() => _selectedState = val),
+                          validator: (v) => v == null ? "Required" : null,
                         ),
                         const SizedBox(height: 30),
 
@@ -488,14 +586,11 @@ class _TenantOnboardingScreenState
                         if (_gstinControllers.length < 5)
                           TextButton.icon(
                             onPressed: _addGstinField,
-                            icon: const Icon(
-                              Icons.add,
-                              color: Color(0xFF2B3674),
-                            ),
-                            label: const Text(
+                            icon: Icon(Icons.add, color: c.ctaBackground),
+                            label: Text(
                               "Add Another GSTIN",
                               style: TextStyle(
-                                color: Color(0xFF2B3674),
+                                color: c.ctaBackground,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -557,22 +652,18 @@ class _TenantOnboardingScreenState
                           height: 55,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(
-                                0xFF10B981,
-                              ), // Premium Green
+                              backgroundColor: c.ctaBackground,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             onPressed: _isLoading ? null : _submitSetup,
                             child: _isLoading
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white,
-                                  )
-                                : const Text(
+                                ? CircularProgressIndicator(color: c.ctaText)
+                                : Text(
                                     "COMPLETE SETUP & GO TO DASHBOARD",
                                     style: TextStyle(
-                                      color: Colors.white,
+                                      color: c.ctaText,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 1.2,

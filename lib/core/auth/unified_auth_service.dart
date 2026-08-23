@@ -1,6 +1,7 @@
 // lib/core/auth/unified_auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -92,36 +93,35 @@ class UnifiedAuthService {
   // 📧 2. ADMIN MAGIC LINK (Passwordless - Ultra Secure)
   // ==========================================================
 
+  static DateTime? _lastMagicLinkAttempt;
+
   static Future<void> sendAdminMagicLink(String email, String bundleId) async {
+    final now = DateTime.now();
+    // 🛑 1. Debouncing & Throttling (Spam Protection)
+    if (_lastMagicLinkAttempt != null &&
+        now.difference(_lastMagicLinkAttempt!).inSeconds < 10) {
+      throw "Please wait 10 seconds before sending another link.";
+    }
+    _lastMagicLinkAttempt = now;
+
     try {
-      // 🚀 SAAS UPDATE: Allow link delivery for both new (Signup) and existing (Login) users
-      final query = await _db
-          .collection('staff')
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
+      // 🔒 2. Server-side check with Timeout & Auto-Retry (Fixes 429 Cold Start Error)
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'checkMagicLinkEligibility',
+        options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+      );
 
-      if (query.docs.isNotEmpty) {
-        final userData = query.docs.first.data();
-        if (userData['isActive'] == false || userData['isDeleted'] == true) {
-          throw "Account Suspended: Please contact support.";
-        }
-
-        final role = (userData['role'] ?? '').toString().toLowerCase();
-        final allowedWebRoles = [
-          'super_admin',
-          'tenant_admin',
-          'delegated_admin',
-          'admin',
-          'owner',
-          'manager',
-        ];
-
-        if (!allowedWebRoles.contains(role)) {
-          throw "Access Denied: You do not have Command Center privileges.";
-        }
+      try {
+        await callable.call({'email': email});
+      } catch (e) {
+        // 🔄 Agar GCP instance ready nahi hai (429), toh 2 second wait karke retry karo
+        debugPrint(
+          "⚠️ First attempt failed, retrying for cold start... Error: $e",
+        );
+        await Future.delayed(const Duration(seconds: 2));
+        await callable.call({'email': email});
       }
-      // If query is empty, it's a new signup! They bypass the role check to receive the magic link.
+      // If this throws, the catch block below surfaces the server's message.
 
       // final String redirectUrl = kDebugMode
       //     ? 'http://localhost:50000/'
@@ -174,6 +174,11 @@ class UnifiedAuthService {
       try {
         await _auth.signInWithEmailLink(email: email, emailLink: emailLink);
         await prefs.remove('emailForSignIn');
+
+        // 🔄 FIX: Force refresh ID token!
+        // Backend assignCustomClaims trigger hone ke baad client ko turant
+        // naye claims (tenantId, role) fetch karne chahiye warna Firestore 403 dega.
+        await _auth.currentUser?.getIdToken(true);
       } catch (e) {
         throw "Error signing in with link: $e";
       }

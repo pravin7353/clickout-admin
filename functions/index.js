@@ -818,6 +818,50 @@ exports.onOrderPaid = onDocumentWritten('orders/{orderId}', async (event) => {
 // ============================================================================
 // 15. SUPER ADMIN: TENANT MANAGEMENT (SECURE SERVER-SIDE)
 // ============================================================================
+// Pre-login magic-link eligibility check. Runs with Admin SDK privileges so
+// the client never needs direct unauthenticated Firestore access to `staff`.
+exports.checkMagicLinkEligibility = onCall({ concurrency: 80, memory: "256MiB" }, async (request) => {
+    const { email } = request.data;
+    if (!email) throw new HttpsError('invalid-argument', 'Email required.');
+
+    const query = await db.collection('staff')
+        .where('email', '==', email.toLowerCase().trim())
+        .limit(1)
+        .get();
+
+    if (query.empty) {
+        return { allowed: true, isNewSignup: true };
+    }
+
+    const userData = query.docs[0].data();
+    if (userData.isActive === false || userData.isDeleted === true) {
+        throw new HttpsError('permission-denied', 'Account Suspended: Please contact support.');
+    }
+
+    const role = (userData.role || '').toString().toLowerCase();
+    const allowedWebRoles = ['super_admin', 'tenant_admin', 'delegated_admin', 'admin', 'owner', 'manager'];
+    if (!allowedWebRoles.includes(role)) {
+        throw new HttpsError('permission-denied', 'Access Denied: You do not have Command Center privileges.');
+    }
+
+    // 🛠️ AUTO-HEAL FIX: Sync claims before sending Magic Link
+    // Ye "stale token" aur 403 error ko hamesha ke liye resolve kar dega
+    try {
+        const userRecord = await admin.auth().getUserByEmail(email.toLowerCase().trim());
+        await admin.auth().setCustomUserClaims(userRecord.uid, {
+            role: role,
+            tenantId: userData.tenantId || "default_tenant",
+            storeId: userData.storeId || "default_store",
+            branchCode: userData.branchCode || ""
+        });
+        console.log(`🔧 Auto-healed claims for ${email} -> Tenant: ${userData.tenantId}`);
+    } catch (e) {
+        // Ignore if auth user is not created yet
+    }
+
+    return { allowed: true, isNewSignup: false };
+});
+
 exports.onboardTenant = onCall(async (request) => {
  // SECURITY CHECK: Only Super Admins
     if (!request.auth || (request.auth.token.role !== 'SUPER_ADMIN' && request.auth.token.role !== 'super_admin')) {

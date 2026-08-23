@@ -346,7 +346,9 @@ class TenantDashboardScreen extends ConsumerWidget {
                     decoration: BoxDecoration(
                       color: accentGreen.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: accentGreen.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: accentGreen.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -425,12 +427,26 @@ class TenantDashboardScreen extends ConsumerWidget {
                                 color: accentGreen.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: borderColor),
+                                // 🖼️ UI FIX: Show Logo if available
+                                image:
+                                    profileState.value?['companyLogoUrl'] !=
+                                        null
+                                    ? DecorationImage(
+                                        image: NetworkImage(
+                                          profileState.value!['companyLogoUrl'],
+                                        ),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : null,
                               ),
-                              child: Icon(
-                                Icons.business_rounded,
-                                color: accentGreen,
-                                size: 28,
-                              ),
+                              child:
+                                  profileState.value?['companyLogoUrl'] == null
+                                  ? Icon(
+                                      Icons.business_rounded,
+                                      color: accentGreen,
+                                      size: 28,
+                                    )
+                                  : null,
                             ),
                             const SizedBox(width: 15),
                             Expanded(
@@ -457,13 +473,15 @@ class TenantDashboardScreen extends ConsumerWidget {
                                           vertical: 2,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: Colors.amber.withValues(alpha: 0.1),
+                                          color: Colors.amber.withValues(
+                                            alpha: 0.1,
+                                          ),
                                           borderRadius: BorderRadius.circular(
                                             6,
                                           ),
                                           border: Border.all(
-                                            color: Colors.amber.withValues(alpha: 
-                                              0.3,
+                                            color: Colors.amber.withValues(
+                                              alpha: 0.3,
                                             ),
                                           ),
                                         ),
@@ -614,10 +632,14 @@ class TenantDashboardScreen extends ConsumerWidget {
                                       vertical: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.withValues(alpha: 0.1),
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.1,
+                                      ),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: Colors.amber.withValues(alpha: 0.3),
+                                        color: Colors.amber.withValues(
+                                          alpha: 0.3,
+                                        ),
                                       ),
                                     ),
                                     child: const Text(
@@ -938,13 +960,17 @@ class TenantDashboardScreen extends ConsumerWidget {
                                       decoration: BoxDecoration(
                                         color: isActive
                                             ? accentGreen.withValues(alpha: 0.1)
-                                            : Colors.redAccent.withValues(alpha: 0.1),
+                                            : Colors.redAccent.withValues(
+                                                alpha: 0.1,
+                                              ),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: isActive
-                                              ? accentGreen.withValues(alpha: 0.3)
-                                              : Colors.redAccent.withValues(alpha: 
-                                                  0.3,
+                                              ? accentGreen.withValues(
+                                                  alpha: 0.3,
+                                                )
+                                              : Colors.redAccent.withValues(
+                                                  alpha: 0.3,
                                                 ),
                                         ),
                                       ),
@@ -1045,53 +1071,69 @@ class TenantDashboardScreen extends ConsumerWidget {
       );
     }
 
-    Future<void> _deleteStoreCascade(String storeId) async {
-      final db = FirebaseFirestore.instance;
-      final batch = db.batch();
-
-      // 🚀 1. PURE CASCADE DELETE: Hard delete records across all operational collections
-      final collectionsToCascade = [
-        'staff',
-        'products',
-        'carts',
-        'idt_deposits',
-        'logs',
-        'audit_logs',
-        'notifications',
-        'invoices',
-        'analytics',
-        'customer_sessions',
-        'orders',
-        'store_metrics',
-      ];
-
-      for (String collectionName in collectionsToCascade) {
-        final querySnap = await db
-            .collection(collectionName)
-            .where('storeId', isEqualTo: storeId)
-            .get();
-        for (var doc in querySnap.docs) {
-          batch.delete(doc.reference); // 🔥 PERMANENT WIPE (NO FLAGS)
-        }
-      }
-
-      // 🚀 2. PURE CASCADE DELETE: Delete the store document LAST
-      final storeRef = db.collection('stores').doc(storeId);
-      batch.delete(storeRef); // 🔥 WIPE STORE FROM FIRESTORE
-
-      await batch.commit();
-    }
-
+    // ⚖️ DPDP COMPLIANCE: Hard Delete.
+    // Client sirf Store doc delete karega. Backend Trigger baaki data wipe karega.
     void promptDelete() {
-      _showStoreActionDialog(
+      showDialog(
         context: context,
-        title: "Delete Store?",
-        actionKeyword: "DELETE",
-        storeName: store['storeName'] ?? 'Store',
-        actionColor: Colors.redAccent,
-        onConfirm: () async {
-          await _deleteStoreCascade(storeId);
-        },
+        builder: (ctx) => AlertDialog(
+          backgroundColor: cardDark,
+          title: const Text(
+            "Permanent Delete?",
+            style: TextStyle(
+              color: Colors.redAccent,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            "DPDP COMPLIANCE: Are you sure you want to hard-delete '${store['storeName']}'? This will trigger a backend wipe of all associated data.",
+            style: TextStyle(color: textPrimary, height: 1.5),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text("CANCEL", style: TextStyle(color: textSecondary)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  // 1. Client deletes ONLY the store document (bypasses 403 error)
+                  await FirebaseFirestore.instance
+                      .collection('stores')
+                      .doc(storeId)
+                      .delete();
+
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Store permanently wiped from database!"),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text("Error: $e"),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text(
+                "DELETE",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
       );
     }
 

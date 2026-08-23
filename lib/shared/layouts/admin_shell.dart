@@ -5,9 +5,12 @@ import '../../core/theme/app_theme.dart'; // 🚀 YE IMPORT MISSING THA
 import '../../features/auth/auth_provider.dart';
 import '../../features/invoice/invoice_rules_dialog.dart';
 import '../../core/store/providers/store_provider.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../features/tenant_admin/screens/create_store_dialog.dart';
+import 'package:image_picker/image_picker.dart'; // 🛠️ Auto Compression ke liye wapas image_picker
 import '../../features/tenant_admin/screens/edit_store_profile_dialog.dart';
-//import '../../features/tenant_admin/screens/edit_tenant_profile_dialog.dart';
-import '../../features/manager/widgets/store_entry_qr_card.dart'; // 🚀 NAYA
+import '../../features/tenant_admin/screens/edit_tenant_profile_dialog.dart';
 import '../../core/providers/theme_provider.dart';
 import '../../core/providers/access_control_provider.dart';
 import '../../core/subscription/widgets/trial_countdown_badge.dart';
@@ -155,6 +158,7 @@ class AdminShell extends ConsumerWidget {
                                 textSecondary,
                                 isDark,
                                 activeStore,
+                                adminData, // 🛠️ FIX: Passed adminData here
                               ),
 
                             _buildCriticalAlertsStrip(),
@@ -428,7 +432,8 @@ class AdminShell extends ConsumerWidget {
     Color textPrimary,
     Color textSecondary,
     bool isDark,
-    ActiveStoreState? activeStore, // 🚀 NAYA: Store state accepted
+    ActiveStoreState? activeStore,
+    Map<String, dynamic>? adminData, // 🛠️ FIX: Added adminData parameter
   ) {
     return Container(
       height: 70,
@@ -540,11 +545,12 @@ class AdminShell extends ConsumerWidget {
                 },
                 child: CircleAvatar(
                   backgroundColor: roleColor,
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 18,
-                  ),
+                  backgroundImage: adminData?['companyLogoUrl'] != null
+                      ? NetworkImage(adminData!['companyLogoUrl'])
+                      : null,
+                  child: adminData?['companyLogoUrl'] == null
+                      ? const Icon(Icons.person, color: Colors.white, size: 18)
+                      : null,
                 ),
               ),
               const SizedBox(width: 10),
@@ -1166,7 +1172,7 @@ class AdminShell extends ConsumerWidget {
     );
   }
 
-  // 💎 PROFESSIONAL LINKEDIN-STYLE PROFILE MENU
+  // 💎 PREMIUM MODERN PROFILE MENU (With Add/Edit/Logo options)
   void _showGlassProfileMenu({
     required BuildContext context,
     required String name,
@@ -1182,13 +1188,16 @@ class AdminShell extends ConsumerWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: "ProfileMenu",
-      transitionDuration: const Duration(milliseconds: 200),
+      transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (ctx, anim1, anim2) {
-        // 🚀 LINKEDIN STYLE DESIGN TOKENS
         final bgColor = context.colors.cardBg;
         final borderColor = context.colors.border;
         final iconColor = context.colors.textSecondary;
         final textColor = context.colors.textPrimary;
+        final String tId = tenantId.isNotEmpty
+            ? tenantId
+            : (adminData?['tenantId'] ?? '');
+        final String companyName = adminData?['companyName'] ?? 'Your Company';
 
         return Stack(
           children: [
@@ -1198,75 +1207,124 @@ class AdminShell extends ConsumerWidget {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: 280,
+                  width: 320,
                   decoration: BoxDecoration(
                     color: bgColor,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: borderColor),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.12),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
+                        color: Colors.black.withValues(alpha: 0.3),
+                        blurRadius: 30,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ── HEADER SECTION ──
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 24,
-                          horizontal: 20,
+                      // ── HEADER ──
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: roleColor.withValues(alpha: 0.05),
+                          borderRadius: const BorderRadius.vertical(
+                            top: Radius.circular(16),
+                          ),
                         ),
                         child: Column(
                           children: [
                             CircleAvatar(
                               radius: 36,
-                              backgroundColor: roleColor.withValues(alpha: 0.1),
+                              backgroundColor: roleColor.withValues(alpha: 0.2),
                               child: Icon(
                                 Icons.person,
                                 size: 36,
                                 color: roleColor,
                               ),
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 12),
                             Text(
                               name,
                               style: TextStyle(
                                 color: textColor,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: -0.3,
                               ),
-                              textAlign: TextAlign.center,
                             ),
-                            const SizedBox(height: 4),
                             Text(
                               roleUI,
                               style: TextStyle(
                                 color: roleColor,
                                 fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1,
                               ),
                             ),
                           ],
                         ),
                       ),
-
                       Divider(color: borderColor, height: 1, thickness: 1),
 
-                      // ── MENU ITEMS ──
-                      if (rawRole == 'MANAGER') ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Column(
-                            children: [
+                      // ── MENUS ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          children: [
+                            if (rawRole == 'TENANT_ADMIN' ||
+                                rawRole == 'SUPER_ADMIN') ...[
                               _buildMenuTile(
-                                icon: Icons.edit_note,
-                                title: "Edit Profile",
+                                icon: Icons.business,
+                                title: "Company Profile",
+                                iconColor: iconColor,
+                                textColor: textColor,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) =>
+                                        EditTenantProfileDialog(tenantId: tId),
+                                  );
+                                },
+                              ),
+                              _buildMenuTile(
+                                icon: Icons.add_business,
+                                title: "Add New Store",
+                                iconColor: iconColor,
+                                textColor: textColor,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => CreateStoreDialog(
+                                      tenantId: tId,
+                                      companyName: companyName,
+                                    ),
+                                  );
+                                },
+                              ),
+                              _buildMenuTile(
+                                icon: Icons.image,
+                                title: "Upload Brand Logos",
+                                iconColor: Colors.blueAccent,
+                                textColor: textColor,
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) =>
+                                        LogoUploadDialog(tenantId: tId),
+                                  );
+                                },
+                              ),
+                              Divider(color: borderColor, height: 16),
+                            ],
+
+                            if (activeStore != null ||
+                                rawRole == 'MANAGER') ...[
+                              _buildMenuTile(
+                                icon: Icons.edit_location_alt,
+                                title: "Edit Store Profile",
                                 iconColor: iconColor,
                                 textColor: textColor,
                                 onTap: () {
@@ -1294,41 +1352,10 @@ class AdminShell extends ConsumerWidget {
                                   );
                                 },
                               ),
-                              _buildMenuTile(
-                                icon: Icons.campaign_rounded,
-                                title: "Campaign Manager",
-                                iconColor: iconColor,
-                                textColor: textColor,
-                                onTap: () {
-                                  if (MediaQuery.of(context).size.width <
-                                      1024) {
-                                    if (Navigator.canPop(context))
-                                      Navigator.pop(context);
-                                  } else {
-                                    Navigator.pop(
-                                      ctx,
-                                    ); // Close desktop dropdown
-                                  }
-                                  context.go('/campaign-manager');
-                                },
-                              ),
-                              _buildMenuTile(
-                                icon: Icons.qr_code_2,
-                                title: "Store Entry QR",
-                                iconColor: iconColor,
-                                textColor: textColor,
-                                onTap: () {
-                                  Navigator.pop(ctx);
-                                  showDialog(
-                                    context: context,
-                                    builder: (_) => const StoreEntryQRCard(),
-                                  );
-                                },
-                              ),
                             ],
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
@@ -1340,7 +1367,6 @@ class AdminShell extends ConsumerWidget {
     );
   }
 
-  // 💎 SLIM & PROFESSIONAL MENU TILE WIDGET
   Widget _buildMenuTile({
     required IconData icon,
     required String title,
@@ -1367,6 +1393,137 @@ class AdminShell extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// 🖼️ NAYA: LOGO UPLOAD WIDGET (File Picker & Firebase Storage)
+// 🛠️ FIX: Changed to ConsumerStatefulWidget to access Riverpod ref
+class LogoUploadDialog extends ConsumerStatefulWidget {
+  final String tenantId;
+  const LogoUploadDialog({super.key, required this.tenantId});
+
+  @override
+  ConsumerState<LogoUploadDialog> createState() => _LogoUploadDialogState();
+}
+
+class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
+  bool _isUploading = false;
+
+  Future<void> _uploadLogo(String type) async {
+    final picker = ImagePicker();
+    // 🛠️ COMPRESSION: 512x512 resolution aur 60% quality set karne se
+    // logo 2MB se automatically compress hoke 30-50KB me convert ho jayega.
+    final XFile? image = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 60,
+    );
+    if (image == null) return;
+
+    setState(() => _isUploading = true);
+    try {
+      final bytes = await image.readAsBytes();
+      final fileName = type == 'company'
+          ? 'company_logo.png'
+          : 'store_logo.png';
+
+      // 🛠️ FIX: Renamed Firebase variable to 'storageRef' so it doesn't clash with Riverpod's 'ref'
+      final storageRef = FirebaseStorage.instance.ref(
+        'logos/${widget.tenantId}/$fileName',
+      );
+      await storageRef.putData(
+        bytes,
+        SettableMetadata(contentType: 'image/png'),
+      );
+      final url = await storageRef.getDownloadURL();
+
+      final fieldName = type == 'company' ? 'companyLogoUrl' : 'storeLogoUrl';
+      await FirebaseFirestore.instance
+          .collection('tenants')
+          .doc(widget.tenantId)
+          .update({fieldName: url});
+
+      // 🔄 FIX: Invalidate global state to instantly refresh UI headers/tables
+      ref.invalidate(adminRoleProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("$type Logo Uploaded successfully!"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Upload Failed: $e"),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
+    return AlertDialog(
+      backgroundColor: c.cardBg,
+      title: Text(
+        "Upload Brand Assets",
+        style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.bold),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (_isUploading)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(),
+            ),
+          if (!_isUploading) ...[
+            ListTile(
+              leading: const Icon(Icons.business, color: Colors.blueAccent),
+              title: Text(
+                "Company Logo",
+                style: TextStyle(color: c.textPrimary),
+              ),
+              subtitle: Text(
+                "Main HQ Brand Logo",
+                style: TextStyle(color: c.textSecondary, fontSize: 12),
+              ),
+              trailing: ElevatedButton(
+                onPressed: () => _uploadLogo('company'),
+                child: const Text("UPLOAD"),
+              ),
+            ),
+            Divider(color: c.border),
+            ListTile(
+              leading: const Icon(Icons.storefront, color: Colors.green),
+              title: Text("Store Logo", style: TextStyle(color: c.textPrimary)),
+              subtitle: Text(
+                "Invoice/Receipt Logo",
+                style: TextStyle(color: c.textSecondary, fontSize: 12),
+              ),
+              trailing: ElevatedButton(
+                onPressed: () => _uploadLogo('store'),
+                child: const Text("UPLOAD"),
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text("CLOSE", style: TextStyle(color: c.textSecondary)),
+        ),
+      ],
     );
   }
 }

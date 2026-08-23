@@ -34,6 +34,9 @@
 
   <title>clickout_admin</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- 🛠️ FIX: Explicitly force Firebase JS SDK version to clear the console warning -->
+  <script>window.flutterfire_web_sdk_version = '12.17.0';</script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
