@@ -11,11 +11,11 @@ class PosOrderService {
     required double totalAmount,
     required double gstTotal,
     required String paymentMode,
-    required String
-    tenantId, // 🚀 FIXED: Directly receiving from Cashier Screen
-    required String
-    branchCode, // 🚀 FIXED: Directly receiving from Cashier Screen
+    required String tenantId,
+    required String branchCode,
     String? customerPhone,
+    String? companyLogoUrl, // 🖼️ NEW: Accept Company Logo
+    String? storeLogoUrl, // 🖼️ NEW: Accept Store Logo
   }) async {
     final user = _auth.currentUser;
     if (user == null) throw Exception("Cashier not logged in");
@@ -27,10 +27,15 @@ class PosOrderService {
     // 🧠 1. THE SMART INVOICE ENGINE (Admin Configured)
     // ==========================================================
     String prefix = "INV/";
+    String fetchedCompanyName = "Retail Store"; // 🏢 ADDED: Fallback
+
     if (tenantId.isNotEmpty && tenantId != 'ALL' && tenantId != 'GLOBAL') {
       try {
         var tSnap = await _db.collection('tenants').doc(tenantId).get();
         if (tSnap.exists) {
+          fetchedCompanyName =
+              tSnap.data()?['companyName']?.toString() ??
+              "Retail Store"; // 🏢 ADDED: Fetch Name
           var config =
               tSnap.data()?['invoiceConfig'] as Map<String, dynamic>? ?? {};
           String adminPrefix = config['invoicePrefix']?.toString().trim() ?? '';
@@ -70,6 +75,21 @@ class PosOrderService {
 
     String finalInvoiceNo =
         "$prefix$fyStr/$dateStr-${seq.toString().padLeft(2, '0')}";
+
+    // 🏢 ADDED: Fetch Store Name for PDF
+    String fetchedStoreName = fetchedCompanyName;
+    try {
+      var sSnap = await _db
+          .collection('stores')
+          .where('branchCode', isEqualTo: branchCode)
+          .limit(1)
+          .get();
+      if (sSnap.docs.isNotEmpty) {
+        fetchedStoreName =
+            sSnap.docs.first.data()['storeName']?.toString() ??
+            fetchedCompanyName;
+      }
+    } catch (_) {}
 
     // ==========================================================
     // 🧠 2. MASTER CALCULATION
@@ -159,6 +179,10 @@ class PosOrderService {
       'storeId': branchCode,
       'branchCode': branchCode,
       'isDeleted': false,
+      'companyLogoUrl': companyLogoUrl, // 🖼️ NEW: Saved to Database
+      'storeLogoUrl': storeLogoUrl, // 🖼️ NEW: Saved to Database
+      'companyName': fetchedCompanyName, // 🏢 ADDED: Save to DB for Invoice
+      'storeName': fetchedStoreName, // 🏢 ADDED: Save to DB for Invoice
     };
 
     batch.set(orderRef, orderData);

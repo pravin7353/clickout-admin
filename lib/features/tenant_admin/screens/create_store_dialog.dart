@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../features/onboarding/widgets/simulations_coach_overlay.dart';
+import '../../../core/widgets/debouncer.dart';
+import '../../../core/widgets/api_cache.dart';
 
 /// A single bank account entry. A store can have more than one settlement
 /// account (e.g. a supermarket commonly keeps a separate current account for
@@ -95,6 +97,8 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
 
   bool _isFetchingLocation = false;
   bool _isLocationVerified = false;
+  final _pincodeDebouncer = Debouncer(milliseconds: 400);
+  final _ifscDebouncer = Debouncer(milliseconds: 400);
 
   // ---- Banking (multi-account) ----
   final List<_BankAccount> _bankAccounts = [];
@@ -263,6 +267,23 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
 
   Future<void> _onPincodeChanged(String val) async {
     if (val.length == 6) {
+      final cacheKey = 'pincode_$val';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _cityCtrl.text = cached['city'];
+            _selectedState = _states.contains(cached['state'])
+                ? cached['state']
+                : null;
+            _isLocationVerified = true;
+            _isFetchingLocation = false;
+            _autoGenerateBranchCode();
+          });
+        }
+        return;
+      }
+
       setState(() {
         _isFetchingLocation = true;
         _isLocationVerified = false;
@@ -275,10 +296,12 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
           final data = json.decode(response.body);
           if (data[0]['Status'] == 'Success') {
             final postOffice = data[0]['PostOffice'][0];
+            final city = postOffice['District'] ?? postOffice['Block'];
+            final fetchedState = postOffice['State'];
+            ApiCache.set(cacheKey, {'city': city, 'state': fetchedState});
             if (mounted) {
               setState(() {
-                _cityCtrl.text = postOffice['District'] ?? postOffice['Block'];
-                String fetchedState = postOffice['State'];
+                _cityCtrl.text = city;
                 _selectedState = _states.contains(fetchedState)
                     ? fetchedState
                     : null;
@@ -309,6 +332,22 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
 
   Future<void> _onIfscChanged(_BankAccount acct, String val) async {
     if (val.length == 11) {
+      final cacheKey = 'ifsc_${val.toUpperCase()}';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as String;
+        if (mounted) {
+          setState(() {
+            acct.bankNameCtrl.text = cached;
+            acct.isVerified = true;
+            acct.isFetching = false;
+            if (acct.accNameCtrl.text.isEmpty) {
+              acct.accNameCtrl.text = _storeNameCtrl.text.toUpperCase();
+            }
+          });
+        }
+        return;
+      }
+
       setState(() {
         acct.isFetching = true;
         acct.isVerified = false;
@@ -319,9 +358,11 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
             .timeout(const Duration(seconds: 3));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
+          final resolved = "${data['BANK']} (${data['BRANCH']})";
+          ApiCache.set(cacheKey, resolved);
           if (mounted) {
             setState(() {
-              acct.bankNameCtrl.text = "${data['BANK']} (${data['BRANCH']})";
+              acct.bankNameCtrl.text = resolved;
               acct.isVerified = true;
               acct.isFetching = false;
               if (acct.accNameCtrl.text.isEmpty) {
@@ -468,6 +509,8 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
     for (var acct in _bankAccounts) {
       acct.dispose();
     }
+    _pincodeDebouncer.dispose();
+    _ifscDebouncer.dispose();
     super.dispose();
   }
 
@@ -622,6 +665,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
       // 🧹 CLEANUP FIX: Removed unused 'adminEmail' variable warning.
       batch.set(staffRef, {
         'docId': staffRef.id,
+        'empId': _managerEmpIdCtrl.text.trim(), // 🛠️ FIX: Added Employee ID
         'email': _managerEmailCtrl.text.trim().toLowerCase(),
         'name': _managerNameCtrl.text.trim(),
         'phone': _managerPhoneCtrl.text.trim(),
@@ -630,6 +674,7 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
         'storeId': storeRef.id,
         'branchCode': _branchCodeCtrl.text.trim().toUpperCase(),
         'isActive': true,
+        'isDeleted': false, // 🛠️ FIX: Required for Command Roster visibility
         'createdAt': FieldValue.serverTimestamp(),
       });
 
@@ -1094,7 +1139,8 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: _onPincodeChanged,
+              onChanged: (v) =>
+                  _pincodeDebouncer.run(() => _onPincodeChanged(v)),
               decoration: _inputDeco(
                 "Pincode *",
                 prefix: Icon(
@@ -1390,7 +1436,8 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                       style: TextStyle(color: c.textPrimary),
                       textCapitalization: TextCapitalization.characters,
                       maxLength: 11,
-                      onChanged: (v) => _onIfscChanged(acct, v),
+                      onChanged: (v) =>
+                          _ifscDebouncer.run(() => _onIfscChanged(acct, v)),
                       decoration: _inputDeco(
                         "IFSC Code",
                         suffix: acct.isFetching

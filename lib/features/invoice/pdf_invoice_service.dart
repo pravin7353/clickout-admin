@@ -28,6 +28,17 @@ class PdfInvoiceService {
     final ttf = await PdfGoogleFonts.robotoRegular();
     final ttfBold = await PdfGoogleFonts.robotoBold();
 
+    // 🖼️ FIX: Fetch Logo from Network before building PDF
+    pw.ImageProvider? logoImage;
+    try {
+      String? logoUrl = data['storeLogoUrl'] ?? data['companyLogoUrl'];
+      if (logoUrl != null && logoUrl.isNotEmpty) {
+        logoImage = await networkImage(logoUrl);
+      }
+    } catch (e) {
+      print("PDF Logo Fetch Error: $e");
+    }
+
     DateTime date = DateTime.now();
     if (data['timestamp'] != null) {
       if (data['timestamp'] is Timestamp) {
@@ -119,14 +130,25 @@ class PdfInvoiceService {
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text(
-                    "CLICKOUT",
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.red,
+                  // 🖼️ FIX: Logo load hua toh Logo dikhega, warna "CLICKOUT" ki jagah seedha Dukaan ka naam aayega!
+                  if (logoImage != null)
+                    pw.Image(
+                      logoImage,
+                      width: 120,
+                      height: 50,
+                      fit: pw.BoxFit.contain,
+                    )
+                  else
+                    pw.Text(
+                      data['storeName'] ??
+                          data['companyName'] ??
+                          "RETAIL INVOICE",
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.red,
+                      ),
                     ),
-                  ),
                   pw.Text(
                     "TAX INVOICE",
                     style: pw.TextStyle(

@@ -1215,7 +1215,8 @@ class TenantDashboardScreen extends ConsumerWidget {
       Tooltip(
         message: "Enter Store",
         child: IconButton(
-          icon: Icon(Icons.login, color: Colors.white, size: 20),
+          // 🛠️ FIX: Changed Colors.white to textPrimary so it adapts to Light/Dark theme automatically
+          icon: Icon(Icons.login, color: textPrimary, size: 20),
           onPressed: enterStore,
           splashRadius: 20,
         ),

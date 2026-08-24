@@ -6,6 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_loader.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/debouncer.dart';
+import '../../../core/widgets/api_cache.dart';
 
 // IMPORTANT: Adjust import paths based on your actual file structure
 import '../../auth/auth_provider.dart';
@@ -23,6 +27,8 @@ class _TenantOnboardingScreenState
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isFetching = true;
+  bool _hasError = false;
+  final _pincodeDebouncer = Debouncer(milliseconds: 400);
 
   // Controllers
   final _companyNameCtrl = TextEditingController();
@@ -117,7 +123,12 @@ class _TenantOnboardingScreenState
           }
         } catch (e) {
           debugPrint("Error fetching tenant profile: $e");
-          if (mounted) setState(() => _isFetching = false);
+          if (mounted) {
+            setState(() {
+              _isFetching = false;
+              _hasError = true;
+            });
+          }
         }
       } else {
         if (mounted) setState(() => _isFetching = false);
@@ -130,6 +141,24 @@ class _TenantOnboardingScreenState
   /// there simply was no pincode field or lookup wired up on this screen).
   Future<void> _onPincodeChanged(String val) async {
     if (val.length == 6) {
+      // Skip the network call entirely if this pincode was already looked
+      // up in this session (e.g. user typed it, backspaced, retyped it).
+      final cacheKey = 'pincode_$val';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _hoCityCtrl.text = cached['city'];
+            _selectedState = _indianStates.contains(cached['state'])
+                ? cached['state']
+                : null;
+            _isPincodeVerified = true;
+            _isFetchingPincode = false;
+          });
+        }
+        return;
+      }
+
       setState(() {
         _isFetchingPincode = true;
         _isPincodeVerified = false;
@@ -142,11 +171,12 @@ class _TenantOnboardingScreenState
           final data = json.decode(response.body);
           if (data[0]['Status'] == 'Success') {
             final postOffice = data[0]['PostOffice'][0];
+            final city = postOffice['District'] ?? postOffice['Block'];
+            final fetchedState = postOffice['State'];
+            ApiCache.set(cacheKey, {'city': city, 'state': fetchedState});
             if (mounted) {
               setState(() {
-                _hoCityCtrl.text =
-                    postOffice['District'] ?? postOffice['Block'];
-                String fetchedState = postOffice['State'];
+                _hoCityCtrl.text = city;
                 _selectedState = _indianStates.contains(fetchedState)
                     ? fetchedState
                     : null;
@@ -176,6 +206,7 @@ class _TenantOnboardingScreenState
 
   @override
   void dispose() {
+    _pincodeDebouncer.dispose();
     _companyNameCtrl.dispose();
     _hoAddressCtrl.dispose();
     _hoPincodeCtrl.dispose();
@@ -296,15 +327,63 @@ class _TenantOnboardingScreenState
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+
     if (_isFetching) {
-      return const Scaffold(
+      return Scaffold(
+        backgroundColor: c.scaffoldBg,
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF2B3674)),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Container(
+              width: 700,
+              padding: const EdgeInsets.all(30),
+              decoration: BoxDecoration(
+                color: c.cardBg,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SkeletonBox(height: 24, width: 220),
+                  const SizedBox(height: 24),
+                  SkeletonBox(height: 48),
+                  const SizedBox(height: 16),
+                  SkeletonBox(height: 48),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(child: SkeletonBox(height: 48)),
+                      const SizedBox(width: 20),
+                      Expanded(child: SkeletonBox(height: 48)),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SkeletonBox(height: 48),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
 
-    final c = context.colors;
+    if (_hasError) {
+      return Scaffold(
+        backgroundColor: c.scaffoldBg,
+        body: ErrorState(
+          message:
+              "Couldn't load your company profile. Check your connection and try again.",
+          onRetry: () {
+            setState(() {
+              _isFetching = true;
+              _hasError = false;
+            });
+            _fetchInitialData();
+          },
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: c.scaffoldBg,
       body: Center(
@@ -447,7 +526,9 @@ class _TenantOnboardingScreenState
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
                                 ],
-                                onChanged: _onPincodeChanged,
+                                onChanged: (v) => _pincodeDebouncer.run(
+                                  () => _onPincodeChanged(v),
+                                ),
                                 decoration:
                                     _premiumInputStyle(
                                       "Pincode *",

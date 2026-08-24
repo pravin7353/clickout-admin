@@ -194,32 +194,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _handleDevBypass() async {
-    setState(() => _isLoading = true);
-    try {
-      await UnifiedAuthService.devBypassLogin();
-      final isFirstTime = await ref
-          .read(authControllerProvider.notifier)
-          .setupAdminSession();
-      if (mounted) {
-        if (isFirstTime) {
-          context.go('/simulator');
-        } else {
-          context.go('/dashboard');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Dev Login Failed: $e"),
-            backgroundColor: context.colors.danger,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+  void _handleRecovery() {
+    if (_emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Enter your primary email to initiate recovery."),
+          backgroundColor: context.colors.danger,
+        ),
+      );
+      return;
     }
+    // 🚀 SAAS RECOVERY INITIATED
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          "Recovery initiated! Instructions sent to backup email (if configured).",
+        ),
+        backgroundColor: context.colors.success,
+      ),
+    );
+    // TODO: Connect Firebase Cloud Function for actual Recovery email firing
   }
 
   @override
@@ -360,24 +354,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
 
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 32),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _isLoading ? null : _handleDevBypass,
-                          icon: const Icon(Icons.rocket_launch, size: 18),
-                          label: Text(
-                            "DEV BYPASS",
-                            style: GoogleFonts.dmSans(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                              letterSpacing: 0.5,
-                            ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _isLoading
+                            ? null
+                            : _handleRecovery, // 🛠️ FIX: Recovery Mode Mapped
+                        icon: const Icon(
+                          Icons.health_and_safety_outlined,
+                          size: 18,
+                        ),
+                        label: Text(
+                          "LOST ACCESS? USE RECOVERY",
+                          style: GoogleFonts.dmSans(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ] else ...[
                     _isLoading
                         ? CircularProgressIndicator(

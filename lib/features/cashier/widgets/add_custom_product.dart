@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 
-class AddCustomProductWidget extends StatefulWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+// 🛠️ Note: Agar VS Code in imports par red line dikhaye, toh 'Quick Fix' karke apna correct path import kar lena
+import '../../../features/auth/auth_provider.dart';
+import '../../../features/tenant_admin/providers/tenant_dashboard_provider.dart';
+
+class AddCustomProductWidget extends ConsumerStatefulWidget {
   final Function(String name, double price, int qty, double gst, bool isService)
   onAdd;
 
   const AddCustomProductWidget({super.key, required this.onAdd});
 
   @override
-  State<AddCustomProductWidget> createState() => _AddCustomProductWidgetState();
+  ConsumerState<AddCustomProductWidget> createState() =>
+      _AddCustomProductWidgetState();
 }
 
-class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
+class _AddCustomProductWidgetState
+    extends ConsumerState<AddCustomProductWidget> {
   bool _isProduct = true; // Toggle state (True = Product, False = Service)
 
   final _nameCtrl = TextEditingController();
@@ -51,6 +58,19 @@ class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cardBg = context.colors.cardBg;
+
+    // 🧠 SMART GST COMPLIANCE CHECK
+    final adminData = ref.watch(adminRoleProvider).value;
+    final tenantId = adminData?['tenantId'] ?? '';
+    final tenantData = ref.watch(tenantProfileProvider(tenantId)).value;
+
+    bool hasGst = false;
+    if (tenantData != null && tenantData['licenses'] != null) {
+      final licenses = tenantData['licenses'] as List<dynamic>;
+      hasGst = licenses.any(
+        (l) => l['type'] == 'GSTIN' && l['number'].toString().isNotEmpty,
+      );
+    }
 
     return Dialog(
       backgroundColor: cardBg,
@@ -113,6 +133,55 @@ class _AddCustomProductWidgetState extends State<AddCustomProductWidget> {
                 ],
               ),
             ),
+
+            // 🚀 SMART GST INTIMATION BANNER (Ye sirf tab dikhega jab GSTIN nahi hoga)
+            if (!hasGst)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.amber,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            "GST Compliance Alert",
+                            style: TextStyle(
+                              color: Colors.amber,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            "GSTIN not found in store profile. Bills will generate with 0% tax for legal compliance.",
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
             Row(
               children: [

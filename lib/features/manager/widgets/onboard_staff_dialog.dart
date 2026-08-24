@@ -25,6 +25,7 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
   final _emailCtrl = TextEditingController();
 
   bool _isLoading = false;
+  Future<QuerySnapshot>? _storesFuture; // 🛠️ FIX: Cache for stores
 
   // 🎨 STRICT DARK THEME CONSTANTS
   Color get bgDark => context.colors.scaffoldBg;
@@ -104,7 +105,10 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
         color: textSecondary,
         fontSize: 13,
       ), // 🚀 Removed const
-      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5), fontSize: 13),
+      hintStyle: TextStyle(
+        color: textSecondary.withValues(alpha: 0.5),
+        fontSize: 13,
+      ),
       filled: true,
       fillColor: inputBg,
       prefixIcon: prefixIcon != null
@@ -135,6 +139,14 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     final adminData = ref.watch(adminRoleProvider).value;
+
+    // 🛠️ FIX: Initialize Future once to prevent dropdown flickering on setState
+    _storesFuture ??= FirebaseFirestore.instance
+        .collection('stores')
+        .where('tenantId', isEqualTo: adminData?['tenantId'])
+        .where('isDeleted', isEqualTo: false)
+        .limit(200)
+        .get();
     final String autoFetchedBranch =
         adminData?['branchCode']?.toString().toUpperCase() ?? 'HQ';
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
@@ -210,17 +222,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 🚀 DYNAMIC BRANCH SELECTION OR STATIC WALL
-                      StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('stores')
-                            .where(
-                              'tenantId',
-                              isEqualTo: adminData?['tenantId'],
-                            )
-                            .where('isDeleted', isEqualTo: false)
-                            // 🚀 COST FIX: safety cap on branch dropdown.
-                            .limit(200)
-                            .snapshots(),
+                      FutureBuilder<QuerySnapshot>(
+                        future: _storesFuture, // 🛠️ FIX: Used cached future
                         builder: (context, snapshot) {
                           // 🛡️ Agar Manager hai, toh purana non-editable Wall chip dikhao
                           if (!isTenantAdmin) {
@@ -349,7 +352,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 20),
                             child: DropdownButtonFormField<String>(
-                              initialValue: _selectedBranch,
+                              // 🛠️ FIX: Removed ValueKey to fix the locking bug!
+                              value: _selectedBranch,
                               dropdownColor: cardDark,
                               icon: const Icon(
                                 Icons.keyboard_arrow_down,
@@ -371,7 +375,8 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
 
                       // 🚀 STATIC DROPDOWN (Replaced Org Engine)
                       DropdownButtonFormField<String>(
-                        initialValue: _selectedRole,
+                        // 🛠️ FIX: Removed ValueKey to fix the locking bug!
+                        value: _selectedRole,
                         dropdownColor: cardDark,
                         icon: const Icon(
                           Icons.keyboard_arrow_down,

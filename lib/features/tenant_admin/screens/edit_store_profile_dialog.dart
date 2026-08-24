@@ -5,6 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_loader.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/debouncer.dart';
+import '../../../core/widgets/api_cache.dart';
 
 class _BankAccount {
   String label;
@@ -52,9 +56,12 @@ class EditStoreProfileDialog extends StatefulWidget {
 class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   bool _isLoading = false;
   bool _isFetching = true;
+  bool _hasError = false;
   final _formKey = GlobalKey<FormState>();
   final ScrollController _scrollController = ScrollController();
   String? _targetDocId;
+  final _pincodeDebouncer = Debouncer(milliseconds: 400);
+  final _ifscDebouncer = Debouncer(milliseconds: 400);
 
   Color get bgDark => context.colors.scaffoldBg;
   Color get cardDark => context.colors.cardBg;
@@ -287,6 +294,7 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       }
     } catch (e) {
       debugPrint("Fetch Error: $e");
+      if (mounted) _hasError = true;
     } finally {
       if (mounted) setState(() => _isFetching = false);
     }
@@ -313,6 +321,8 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
       acct.dispose();
     }
     _scrollController.dispose();
+    _pincodeDebouncer.dispose();
+    _ifscDebouncer.dispose();
     super.dispose();
   }
 
@@ -348,6 +358,22 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
 
   Future<void> _onPincodeChanged(String val) async {
     if (val.length == 6) {
+      final cacheKey = 'pincode_$val';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _cityCtrl.text = cached['city'];
+            _selectedState = _states.contains(cached['state'])
+                ? cached['state']
+                : null;
+            _isLocationVerified = true;
+            _isFetchingLocation = false;
+          });
+        }
+        return;
+      }
+
       setState(() {
         _isFetchingLocation = true;
         _isLocationVerified = false;
@@ -360,10 +386,12 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
           final data = json.decode(response.body);
           if (data[0]['Status'] == 'Success') {
             final postOffice = data[0]['PostOffice'][0];
+            final city = postOffice['District'] ?? postOffice['Block'];
+            final fetchedState = postOffice['State'];
+            ApiCache.set(cacheKey, {'city': city, 'state': fetchedState});
             if (mounted)
               setState(() {
-                _cityCtrl.text = postOffice['District'] ?? postOffice['Block'];
-                String fetchedState = postOffice['State'];
+                _cityCtrl.text = city;
                 _selectedState = _states.contains(fetchedState)
                     ? fetchedState
                     : null;
@@ -392,6 +420,21 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
 
   Future<void> _onIfscChanged(_BankAccount acct, String val) async {
     if (val.length == 11) {
+      final cacheKey = 'ifsc_${val.toUpperCase()}';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as String;
+        if (mounted) {
+          setState(() {
+            acct.bankNameCtrl.text = cached;
+            acct.isVerified = true;
+            acct.isFetching = false;
+            if (acct.accNameCtrl.text.isEmpty)
+              acct.accNameCtrl.text = _storeNameCtrl.text.toUpperCase();
+          });
+        }
+        return;
+      }
+
       setState(() {
         acct.isFetching = true;
         acct.isVerified = false;
@@ -402,9 +445,11 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
             .timeout(const Duration(seconds: 3));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
+          final resolved = "${data['BANK']} (${data['BRANCH']})";
+          ApiCache.set(cacheKey, resolved);
           if (mounted)
             setState(() {
-              acct.bankNameCtrl.text = "${data['BANK']} (${data['BRANCH']})";
+              acct.bankNameCtrl.text = resolved;
               acct.isVerified = true;
               acct.isFetching = false;
               if (acct.accNameCtrl.text.isEmpty)
@@ -617,7 +662,41 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: _isFetching
-            ? Center(child: CircularProgressIndicator(color: accentBlue))
+            ? Padding(
+                padding: const EdgeInsets.all(30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SkeletonBox(height: 24, width: 220),
+                    const SizedBox(height: 24),
+                    SkeletonBox(height: 48),
+                    const SizedBox(height: 16),
+                    SkeletonBox(height: 48),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(child: SkeletonBox(height: 48)),
+                        const SizedBox(width: 20),
+                        Expanded(child: SkeletonBox(height: 48)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SkeletonBox(height: 48),
+                  ],
+                ),
+              )
+            : _hasError
+            ? ErrorState(
+                message:
+                    "Couldn't load store details. Check your connection and try again.",
+                onRetry: () {
+                  setState(() {
+                    _isFetching = true;
+                    _hasError = false;
+                  });
+                  _fetchStoreData();
+                },
+              )
             : Column(
                 children: [
                   Container(
@@ -789,7 +868,9 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                       inputFormatters: [
                                         FilteringTextInputFormatter.digitsOnly,
                                       ],
-                                      onChanged: _onPincodeChanged,
+                                      onChanged: (v) => _pincodeDebouncer.run(
+                                        () => _onPincodeChanged(v),
+                                      ),
                                       decoration: _inputDeco(
                                         "Pincode *",
                                         suffix: _isFetchingLocation
@@ -857,7 +938,9 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                           FilteringTextInputFormatter
                                               .digitsOnly,
                                         ],
-                                        onChanged: _onPincodeChanged,
+                                        onChanged: (v) => _pincodeDebouncer.run(
+                                          () => _onPincodeChanged(v),
+                                        ),
                                         decoration: _inputDeco(
                                           "Pincode *",
                                           suffix: _isFetchingLocation
@@ -1226,7 +1309,9 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                       maxLength: 11,
                                       onChanged: _isManagerView
                                           ? null
-                                          : (v) => _onIfscChanged(acct, v),
+                                          : (v) => _ifscDebouncer.run(
+                                              () => _onIfscChanged(acct, v),
+                                            ),
                                       decoration: _inputDeco(
                                         "IFSC Code *",
                                         isReadOnly: _isManagerView,

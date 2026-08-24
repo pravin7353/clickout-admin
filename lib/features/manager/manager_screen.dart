@@ -95,6 +95,14 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
 
     bool isLoading = false;
 
+    // 🛠️ FIX: Future cache kiya taaki setState par dropdown close na ho
+    final Future<QuerySnapshot> storesFuture = FirebaseFirestore.instance
+        .collection('stores')
+        .where('tenantId', isEqualTo: staffData['tenantId'])
+        .where('isDeleted', isEqualTo: false)
+        .limit(200)
+        .get();
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -198,12 +206,12 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
 
                             // 🚀 STATIC ROLES LIST
                             DropdownButtonFormField<String>(
-                              initialValue:
+                              // 🛠️ FIX: Removed ValueKey to stop dropdown from locking up!
+                              value:
                                   [
                                     'MANAGER',
                                     'CASHIER',
                                     'GUARD',
-                                    'ALL',
                                   ].contains(selectedRole.toUpperCase())
                                   ? selectedRole.toUpperCase()
                                   : 'CASHIER',
@@ -225,8 +233,10 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                         role,
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color:
-                                              theme.textTheme.bodyLarge?.color,
+                                          color: isDark
+                                              ? Colors.white
+                                              : Colors
+                                                    .black, // 🛠️ FIX: Enforced correct text color
                                         ),
                                       ),
                                     ),
@@ -287,18 +297,10 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                               ),
                             const SizedBox(height: 20),
 
-                            // 🚀 DYNAMIC BRANCH SELECTION (StreamBuilder)
-                            StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('stores')
-                                  .where(
-                                    'tenantId',
-                                    isEqualTo: staffData['tenantId'],
-                                  )
-                                  .where('isDeleted', isEqualTo: false)
-                                  // 🚀 COST FIX: safety cap on branch dropdown.
-                                  .limit(200)
-                                  .snapshots(),
+                            // 🚀 DYNAMIC BRANCH SELECTION (FutureBuilder Fixed)
+                            FutureBuilder<QuerySnapshot>(
+                              future:
+                                  storesFuture, // 🛠️ FIX: Uses cached future to stop dropdown closing
                               builder: (context, snapshot) {
                                 if (!snapshot.hasData) {
                                   return const Center(
@@ -311,9 +313,10 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                     value: "ALL",
                                     child: Text(
                                       "ALL BRANCHES (HQ)",
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.w900,
-                                        color: theme.primaryColor,
+                                        color: Colors
+                                            .green, // 🛠️ FIX: Fixed black color issue in Dark Theme
                                       ),
                                     ),
                                   ),
@@ -332,10 +335,10 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                         child: Text(
                                           "$bCode - $sName",
                                           style: TextStyle(
-                                            color: theme
-                                                .textTheme
-                                                .bodyLarge
-                                                ?.color,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors
+                                                      .black, // 🛠️ FIX: Font color for branches
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -388,10 +391,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                         Text(
                                           "Branch: $currentEditorBranch (Locked)",
                                           style: TextStyle(
-                                            color: theme
-                                                .textTheme
-                                                .bodyLarge
-                                                ?.color,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -401,7 +403,8 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                 }
 
                                 return DropdownButtonFormField<String>(
-                                  initialValue: selectedBranch.isEmpty
+                                  // 🛠️ FIX: Removed ValueKey. Dropdown lock issue resolved!
+                                  value: selectedBranch.isEmpty
                                       ? "ALL"
                                       : selectedBranch,
                                   dropdownColor: theme.cardColor,
@@ -791,7 +794,17 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                   ),
                   dropdownColor: theme.cardColor,
                   items: ['ALL', 'CASHIER', 'GUARD', 'MANAGER']
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(
+                            e,
+                            style: TextStyle(
+                              color: isDark ? Colors.white : Colors.black,
+                            ),
+                          ),
+                        ),
+                      ) // 🛠️ FIX: Font color for filter dropdown
                       .toList(),
                   onChanged: (val) => managerNotifier.updateFilter(role: val),
                 ),
@@ -953,12 +966,28 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                                   ),
                                                 DataCell(
                                                   Text(
-                                                    data['empId'] ?? 'N/A',
+                                                    (data['empId'] == null ||
+                                                            data['empId'] ==
+                                                                'N/A' ||
+                                                            data['empId'] == '')
+                                                        ? (data['role'] ==
+                                                                  'TENANT_ADMIN'
+                                                              ? '★ OWNER'
+                                                              : 'SYSTEM')
+                                                        : data['empId'],
                                                     style: TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
                                                       fontFamily: 'monospace',
-                                                      color: textP,
+                                                      color:
+                                                          (data['empId'] ==
+                                                                  null ||
+                                                              data['empId'] ==
+                                                                  'N/A' ||
+                                                              data['empId'] ==
+                                                                  '')
+                                                          ? Colors.amber
+                                                          : textP,
                                                     ),
                                                   ),
                                                 ),
@@ -980,12 +1009,58 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                                   ),
                                                 ),
                                                 DataCell(
-                                                  Text(
-                                                    data['branchCode'] ?? 'N/A',
-                                                    style: const TextStyle(
-                                                      color: Colors.grey,
-                                                      fontWeight:
-                                                          FontWeight.w500,
+                                                  Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 8,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          (data['branchCode'] ==
+                                                                  null ||
+                                                              data['branchCode'] ==
+                                                                  'N/A' ||
+                                                              data['branchCode'] ==
+                                                                  'ALL' ||
+                                                              data['branchCode'] ==
+                                                                  '')
+                                                          ? Colors.purple
+                                                                .withValues(
+                                                                  alpha: 0.1,
+                                                                )
+                                                          : Colors.transparent,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      (data['branchCode'] ==
+                                                                  null ||
+                                                              data['branchCode'] ==
+                                                                  'N/A' ||
+                                                              data['branchCode'] ==
+                                                                  'ALL' ||
+                                                              data['branchCode'] ==
+                                                                  '')
+                                                          ? 'GLOBAL HQ'
+                                                          : data['branchCode'],
+                                                      style: TextStyle(
+                                                        color:
+                                                            (data['branchCode'] ==
+                                                                    null ||
+                                                                data['branchCode'] ==
+                                                                    'N/A' ||
+                                                                data['branchCode'] ==
+                                                                    'ALL' ||
+                                                                data['branchCode'] ==
+                                                                    '')
+                                                            ? Colors.purple
+                                                            : Colors.grey,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),

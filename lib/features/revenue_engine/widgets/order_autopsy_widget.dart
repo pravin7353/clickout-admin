@@ -112,13 +112,33 @@ class OrderAutopsyDrawer extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "Order Autopsy 🔬",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: context.colors.textPrimary,
-                ),
+              Row(
+                children: [
+                  // 🖼️ FIX: Store/Company logo shown next to Autopsy Title
+                  if (order['storeLogoUrl'] != null ||
+                      order['companyLogoUrl'] != null) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        order['storeLogoUrl'] ?? order['companyLogoUrl'],
+                        height: 40,
+                        width: 40,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) =>
+                            const Icon(Icons.receipt_long),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
+                  Text(
+                    "Order Autopsy 🔬",
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: context.colors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
               IconButton(
                 icon: const Icon(Icons.close),

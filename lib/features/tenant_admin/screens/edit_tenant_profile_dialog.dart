@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_loader.dart';
+import '../../../core/widgets/error_state.dart';
+import '../../../core/widgets/debouncer.dart';
+import '../../../core/widgets/api_cache.dart';
 
 class EditTenantProfileDialog extends StatefulWidget {
   final String tenantId;
@@ -17,7 +21,10 @@ class EditTenantProfileDialog extends StatefulWidget {
 class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _hasError = false;
   final _formKey = GlobalKey<FormState>();
+  final _pincodeDebouncer = Debouncer(milliseconds: 400);
+  final _ifscDebouncer = Debouncer(milliseconds: 400);
 
   // --- CORE CONTROLLERS ---
   final _brandCtrl = TextEditingController();
@@ -155,6 +162,8 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
     _bankNameCtrl.dispose();
     _industrySearchCtrl.dispose();
     _accNoFocus.dispose();
+    _pincodeDebouncer.dispose();
+    _ifscDebouncer.dispose();
     super.dispose();
   }
 
@@ -173,6 +182,22 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
   // ⚡ REAL-TIME PINCODE API WITH GRACEFUL DEGRADATION
   Future<void> _onPincodeChanged(String val) async {
     if (val.length == 6) {
+      final cacheKey = 'pincode_$val';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as Map<String, dynamic>;
+        if (mounted) {
+          setState(() {
+            _cityCtrl.text = cached['city'];
+            _selectedState = _states.contains(cached['state'])
+                ? cached['state']
+                : null;
+            _isLocationVerified = true;
+            _isFetchingLocation = false;
+          });
+        }
+        return;
+      }
+
       setState(() {
         _isFetchingLocation = true;
         _isLocationVerified = false;
@@ -187,10 +212,12 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
           final data = json.decode(response.body);
           if (data[0]['Status'] == 'Success') {
             final postOffice = data[0]['PostOffice'][0];
+            final city = postOffice['District'] ?? postOffice['Block'];
+            final fetchedState = postOffice['State'];
+            ApiCache.set(cacheKey, {'city': city, 'state': fetchedState});
             if (mounted) {
               setState(() {
-                _cityCtrl.text = postOffice['District'] ?? postOffice['Block'];
-                String fetchedState = postOffice['State'];
+                _cityCtrl.text = city;
                 _selectedState = _states.contains(fetchedState)
                     ? fetchedState
                     : null;
@@ -225,6 +252,21 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
   // 📡 REAL-TIME IFSC API WITH GRACEFUL DEGRADATION
   Future<void> _onIfscChanged(String val) async {
     if (val.length == 11) {
+      final cacheKey = 'ifsc_${val.toUpperCase()}';
+      if (ApiCache.has(cacheKey)) {
+        final cached = ApiCache.get(cacheKey) as String;
+        if (mounted) {
+          setState(() {
+            _bankNameCtrl.text = cached;
+            _isBankVerified = true;
+            _isFetchingBank = false;
+            if (_accNameCtrl.text.isEmpty)
+              _accNameCtrl.text = _brandCtrl.text.toUpperCase();
+          });
+        }
+        return;
+      }
+
       setState(() {
         _isFetchingBank = true;
         _isBankVerified = false;
@@ -237,9 +279,11 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
 
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
+          final resolved = "${data['BANK']} (${data['BRANCH']})";
+          ApiCache.set(cacheKey, resolved);
           if (mounted) {
             setState(() {
-              _bankNameCtrl.text = "${data['BANK']} (${data['BRANCH']})";
+              _bankNameCtrl.text = resolved;
               _isBankVerified = true;
               _isFetchingBank = false;
               if (_accNameCtrl.text.isEmpty)
@@ -416,6 +460,9 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
         if (_ifscCtrl.text.length == 11 && _bankNameCtrl.text.isNotEmpty)
           _isBankVerified = true;
       }
+    } catch (e) {
+      debugPrint("Fetch Error: $e");
+      if (mounted) _hasError = true;
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -550,8 +597,44 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
+      return Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SkeletonBox(height: 24, width: 220),
+            const SizedBox(height: 24),
+            SkeletonBox(height: 48),
+            const SizedBox(height: 16),
+            SkeletonBox(height: 48),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(child: SkeletonBox(height: 48)),
+                const SizedBox(width: 20),
+                Expanded(child: SkeletonBox(height: 48)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SkeletonBox(height: 48),
+          ],
+        ),
+      );
+    }
+
+    if (_hasError) {
       return Center(
-        child: CircularProgressIndicator(color: context.colors.success),
+        child: ErrorState(
+          message:
+              "Couldn't load tenant details. Check your connection and try again.",
+          onRetry: () {
+            setState(() {
+              _isLoading = true;
+              _hasError = false;
+            });
+            _loadData();
+          },
+        ),
       );
     }
 
@@ -916,7 +999,9 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                               style: TextStyle(color: textCol),
                               keyboardType: TextInputType.number,
                               maxLength: 6,
-                              onChanged: _onPincodeChanged,
+                              onChanged: (v) => _pincodeDebouncer.run(
+                                () => _onPincodeChanged(v),
+                              ),
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
@@ -1155,7 +1240,8 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                               style: TextStyle(color: textCol),
                               textCapitalization: TextCapitalization.characters,
                               maxLength: 11,
-                              onChanged: _onIfscChanged,
+                              onChanged: (v) =>
+                                  _ifscDebouncer.run(() => _onIfscChanged(v)),
                               decoration: _deco(
                                 context,
                                 "IFSC Code *",

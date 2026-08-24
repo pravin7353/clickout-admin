@@ -162,9 +162,13 @@ class PosCartNotifier extends Notifier<PosCartState> {
     }
 
     double price = double.tryParse(pData['price']?.toString() ?? '0') ?? 0.0;
+    // 🛠️ FIX: 'gst' aur 'gstRate' dono check karega taaki 5% GST properly bill me calculate ho.
     double gst =
         double.tryParse(
-          pData['gstRate']?.toString().replaceAll(RegExp(r'[^0-9.]'), '') ??
+          (pData['gst'] ?? pData['gstRate'])?.toString().replaceAll(
+                RegExp(r'[^0-9.]'),
+                '',
+              ) ??
               '0',
         ) ??
         0.0;

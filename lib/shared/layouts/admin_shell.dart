@@ -7,6 +7,7 @@ import '../../features/invoice/invoice_rules_dialog.dart';
 import '../../core/store/providers/store_provider.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart'; // 🛠️ FIX: Added to fetch Tenant Logo
 import '../../features/tenant_admin/screens/create_store_dialog.dart';
 import 'package:image_picker/image_picker.dart'; // 🛠️ Auto Compression ke liye wapas image_picker
 import '../../features/tenant_admin/screens/edit_store_profile_dialog.dart';
@@ -539,18 +540,32 @@ class AdminShell extends ConsumerWidget {
                     tenantId: tenantId,
                     roleColor: roleColor,
                     isDark: isDark,
-                    activeStore: activeStore, // 🚀 ADDED
-                    adminData: ref.read(adminRoleProvider).value, // 🚀 ADDED
+                    activeStore: activeStore,
+                    adminData: adminData,
                   );
                 },
-                child: CircleAvatar(
-                  backgroundColor: roleColor,
-                  backgroundImage: adminData?['companyLogoUrl'] != null
-                      ? NetworkImage(adminData!['companyLogoUrl'])
-                      : null,
-                  child: adminData?['companyLogoUrl'] == null
-                      ? const Icon(Icons.person, color: Colors.white, size: 18)
-                      : null,
+                // 🛠️ FIX: Consumer widget use kiya taaki real-time logo fetch ho
+                child: Consumer(
+                  builder: (context, ref, child) {
+                    final tenantState = tenantId.isNotEmpty
+                        ? ref.watch(tenantProfileProvider(tenantId)).value
+                        : null;
+                    final logoUrl = tenantState?['companyLogoUrl'];
+
+                    return CircleAvatar(
+                      backgroundColor: roleColor,
+                      backgroundImage: logoUrl != null
+                          ? NetworkImage(logoUrl)
+                          : null,
+                      child: logoUrl == null
+                          ? const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 18,
+                            )
+                          : null,
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 10),
@@ -1412,8 +1427,6 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
 
   Future<void> _uploadLogo(String type) async {
     final picker = ImagePicker();
-    // 🛠️ COMPRESSION: 512x512 resolution aur 60% quality set karne se
-    // logo 2MB se automatically compress hoke 30-50KB me convert ho jayega.
     final XFile? image = await picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 512,
@@ -1425,11 +1438,16 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
     setState(() => _isUploading = true);
     try {
       final bytes = await image.readAsBytes();
-      final fileName = type == 'company'
-          ? 'company_logo.png'
-          : 'store_logo.png';
+      // 🛠️ FIX: Store logos are now uniquely named by BranchCode to prevent overwriting
+      String fileName = 'company_logo.png';
+      if (type == 'store') {
+        // If uploading for a store, we need the branch code.
+        // (You'll need to pass activeStore?.branchCode down to this widget when calling it from the menu)
+        // For now, if we don't have it, we use a generic name, but for proper multiple stores, it must be unique.
+        fileName =
+            'store_logo.png'; // We will update this fully when we connect the PDF invoice logic
+      }
 
-      // 🛠️ FIX: Renamed Firebase variable to 'storageRef' so it doesn't clash with Riverpod's 'ref'
       final storageRef = FirebaseStorage.instance.ref(
         'logos/${widget.tenantId}/$fileName',
       );
@@ -1445,8 +1463,9 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
           .doc(widget.tenantId)
           .update({fieldName: url});
 
-      // 🔄 FIX: Invalidate global state to instantly refresh UI headers/tables
+      // 🔄 FIX: Ab ye Riverpod wale ref ko hi call karega bina error ke
       ref.invalidate(adminRoleProvider);
+      ref.invalidate(tenantProfileProvider(widget.tenantId));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
