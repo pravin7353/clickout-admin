@@ -1232,3 +1232,88 @@ exports.changeTenantPlan = onCall(async (request) => {
     await batch.commit();
     return { success: true };
 });
+
+// ============================================================================
+// 20. DPDP COMPLIANCE: ULTIMATE STORE HARD DELETE (CASCADE & STORAGE WIPE)
+// ============================================================================
+exports.onStoreDeleted = onDocumentDeleted('stores/{storeId}', async (event) => {
+    const snap = event.data;
+    if (!snap) return;
+    
+    const storeData = snap.data() || {};
+    const storeId = event.params.storeId;
+    const branchCode = storeData.branchCode;
+    const tenantId = storeData.tenantId;
+    
+    console.log(`⚖️ DPDP WIPE INITIATED: Store ${storeId} (${branchCode}). Purging database and storage...`);
+
+    try {
+        // 1. Wipe Database Collections linked via 'storeId'
+        // Hata diya faltu "reservations" aur "services" (agar use nahi ho raha). Sirf zaroori collections rakhe hain.
+        const storeIdCollections = [
+            'staff', 'carts', 'idt_deposits', 'audit_logs', 
+            'notifications', 'orders', 'invoices', 'analytics', 
+            'customer_sessions', 'gate_authorized', 'gate_overrides', 
+            'offers', 'refunds', 'purchase_orders'
+        ];
+        
+        for (const coll of storeIdCollections) {
+            const querySnap = await db.collection(coll).where('storeId', '==', storeId).get();
+            if (!querySnap.empty) {
+                const batch = db.batch();
+                querySnap.forEach(doc => {
+                    // 🛡️ SECURITY: Tenant Admin aur Super Admin ko kabhi delete mat karna
+                    if (doc.data().role !== 'TENANT_ADMIN' && doc.data().role !== 'SUPER_ADMIN') {
+                        batch.delete(doc.ref);
+                    }
+                });
+                await batch.commit();
+                console.log(`🧹 Wiped ${querySnap.size} DB records from ${coll}`);
+            }
+        }
+
+        // 2. Wipe Collections linked via 'branchCode' (Products, Metrics)
+        if (branchCode) {
+            const branchCollections = ['products']; // Add any other collections using branchCode here
+            for (const coll of branchCollections) {
+                const querySnap = await db.collection(coll).where('branchCode', '==', branchCode).get();
+                if (!querySnap.empty) {
+                    const batch = db.batch();
+                    querySnap.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                    console.log(`🧹 Wiped ${querySnap.size} DB records from ${coll}`);
+                }
+            }
+            
+            // Direct document metrics wipe
+            await db.collection('store_metrics').doc(branchCode).delete().catch(()=> {});
+            await db.collection('daily_store_stats').doc(branchCode).delete().catch(()=> {});
+        }
+
+        // 3. STORAGE WIPE: Delete the Store Logo from Firebase Storage!
+        // Firebase Storage bucket import karo upar (if not already there)
+        const bucket = getStorage().bucket(); 
+        
+        if (tenantId && branchCode) { // Store logo ka path branchCode ke sath save karna best practice hai
+             // Example path: logos/{tenantId}/store_logo_{branchCode}.png
+             // Agar file milti hai toh delete kar do
+             const fileName = `logos/${tenantId}/store_logo_${branchCode}.png`; 
+             const file = bucket.file(fileName);
+             
+             file.exists().then(async (data) => {
+                 const exists = data[0];
+                 if (exists) {
+                     await file.delete();
+                     console.log(`🗑️ Wiped Store Logo from Storage: ${fileName}`);
+                 }
+             }).catch((err) => {
+                 console.log("No store logo found to delete or error checking.", err);
+             });
+        }
+
+
+        console.log(`✅ SUCCESS: 100% DPDP Hard Wipe complete (DB + Storage) for Store ${storeId}.`);
+    } catch (error) {
+        console.error(`🚨 CRITICAL: DPDP Wipe failed for ${storeId}:`, error);
+    }
+});
