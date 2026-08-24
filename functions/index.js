@@ -280,6 +280,37 @@ exports.processNewOrder = onDocumentCreated(
                 status: "PENDING_INVESTIGATION"
             });
             console.log(`🚨 ALERT: Fraud log created for Order: ${orderId}`);
+
+            // 🚀 SAAS ALERT ROUTING: Primary + Backup contact par simultaneous Email
+            if (orderData.tenantId) {
+                try {
+                    const tenantSnap = await db.collection("tenants").doc(orderData.tenantId).get();
+                    if (tenantSnap.exists) {
+                        const contact = tenantSnap.data().contact || {};
+                        const primaryEmail = contact.email;
+                        const backupEmail = contact.recoveryEmail;
+
+                        const emailRecipients = [];
+                        if (primaryEmail) emailRecipients.push(primaryEmail);
+                        if (backupEmail && backupEmail.trim() !== '') emailRecipients.push(backupEmail);
+
+                        if (emailRecipients.length > 0) {
+                            await db.collection("mail").add({
+                                to: emailRecipients,
+                                message: {
+                                    subject: `CRITICAL FRAUD ALERT - Order ${orderId}`,
+                                    html: `<p>High risk activity detected (Risk Score: ${riskScore}).</p>
+                                           <p>Store ID: ${orderData.storeId}</p>
+                                           <p>Please check the ClickOut Command Center Risk Engine immediately.</p>`
+                                }
+                            });
+                            console.log(`✉️ Alert routed to ${emailRecipients.length} addresses including backups.`);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`🚨 Alert Routing failed for Tenant ${orderData.tenantId}:`, err);
+                }
+            }
         }
     }
 );
