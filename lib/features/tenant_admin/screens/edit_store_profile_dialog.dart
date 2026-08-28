@@ -575,28 +575,53 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
     Widget? suffix,
     bool isReadOnly = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon: prefix,
       suffixIcon: suffix,
-      labelStyle: TextStyle(color: textSecondary, fontSize: 13),
-      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
+      labelStyle: TextStyle(
+        color: isDark ? Colors.white70 : Colors.black87,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      hintStyle: TextStyle(
+        color: isDark ? Colors.white24 : Colors.black26,
+        fontSize: 13,
+      ),
       filled: true,
-      fillColor: isReadOnly ? inputBg.withValues(alpha: 0.55) : inputBg,
+      fillColor: isReadOnly
+          ? (isDark ? Colors.white10 : Colors.grey.shade100)
+          : (isDark
+                ? cardDark
+                : Colors
+                      .white), // 🚀 FIX: Solid white in light theme to prevent transparency
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: accentBlue, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
       ),
-      errorStyle: const TextStyle(color: Colors.redAccent),
     );
   }
 
@@ -646,20 +671,32 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
   Widget build(BuildContext context) {
     final isMobile = MediaQuery.of(context).size.width < 768;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      backgroundColor: bgDark,
-      surfaceTintColor: Colors.transparent,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentBlue.withValues(alpha: 0.2)),
-      ),
       child: Container(
         width: isMobile ? double.infinity : 850,
         height: MediaQuery.of(context).size.height * 0.9,
         decoration: BoxDecoration(
-          color: cardDark,
-          borderRadius: BorderRadius.circular(16),
+          color: bgDark,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? accentBlue.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.1),
+              blurRadius: 40,
+              spreadRadius: -10,
+            ),
+          ],
         ),
         child: _isFetching
             ? Padding(
@@ -702,9 +739,13 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
+                      color: cardDark,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(24),
+                      ),
                       border: Border(
                         bottom: BorderSide(
-                          color: accentBlue.withValues(alpha: 0.15),
+                          color: isDark ? Colors.white12 : Colors.grey.shade200,
                         ),
                       ),
                     ),
@@ -905,7 +946,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                     DropdownButtonFormField<String>(
                                       isExpanded: true,
                                       value: _selectedState,
-                                      dropdownColor: inputBg,
+                                      dropdownColor: isDark
+                                          ? cardDark
+                                          : Colors
+                                                .white, // 🚀 FIX: Solid background
                                       style: TextStyle(color: textPrimary),
                                       decoration: _inputDeco("State *"),
                                       items: _states
@@ -980,7 +1024,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                       child: DropdownButtonFormField<String>(
                                         isExpanded: true,
                                         value: _selectedState,
-                                        dropdownColor: inputBg,
+                                        dropdownColor: isDark
+                                            ? cardDark
+                                            : Colors
+                                                  .white, // 🚀 FIX: Solid background
                                         style: TextStyle(color: textPrimary),
                                         decoration: _inputDeco("State *"),
                                         items: _states
@@ -1129,7 +1176,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                   value: _licenseTypes.contains(lic['type'])
                                       ? lic['type']
                                       : 'Other',
-                                  dropdownColor: inputBg,
+                                  dropdownColor: isDark
+                                      ? cardDark
+                                      : Colors
+                                            .white, // 🚀 FIX: Solid background
                                   style: TextStyle(color: textPrimary),
                                   decoration: _inputDeco("Compliance Type"),
                                   items: _licenseTypes
@@ -1244,7 +1294,10 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                                               _bankLabels.contains(acct.label)
                                               ? acct.label
                                               : 'Other',
-                                          dropdownColor: inputBg,
+                                          dropdownColor: isDark
+                                              ? cardDark
+                                              : Colors
+                                                    .white, // 🚀 FIX: Solid background
                                           style: TextStyle(color: textPrimary),
                                           decoration: _inputDeco(
                                             "Account Purpose",
@@ -1415,13 +1468,12 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 30,
-                      vertical: 20,
+                      vertical: 24,
                     ),
                     decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: accentBlue.withValues(alpha: 0.15),
-                        ),
+                      color: cardDark,
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(24),
                       ),
                     ),
                     child: Wrap(
@@ -1445,13 +1497,15 @@ class _EditStoreProfileDialogState extends State<EditStoreProfileDialog> {
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: accentBlue,
-                            foregroundColor: Colors.white,
+                            foregroundColor:
+                                Colors.black, // 🛠️ Premium dark text
+                            elevation: 0,
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 30,
+                              horizontal: 32,
                               vertical: 16,
                             ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           onPressed: _isLoading ? null : _submit,

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION
-import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
-import '../../../core/theme/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:clickout_admin/features/auth/auth_provider.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
 
 class AddDistributorDialog extends ConsumerStatefulWidget {
   const AddDistributorDialog({super.key});
@@ -13,7 +13,6 @@ class AddDistributorDialog extends ConsumerStatefulWidget {
 }
 
 class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
-  // 🚀 FIX: Aapke Missing Controllers wapas aa gaye!
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
 
@@ -22,14 +21,6 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _categoryCtrl = TextEditingController();
-
-  // 🎨 STRICT DARK THEME CONSTANTS
-  Color get bgDark => context.colors.scaffoldBg;
-  Color get cardDark => context.colors.cardBg;
-  static const Color accentGreen = Color(0xFF00C853);
-  Color get textPrimary => context.colors.textPrimary;
-  Color get textSecondary => context.colors.textSecondary;
-  Color get inputBg => context.colors.scaffoldBg;
 
   @override
   void dispose() {
@@ -46,14 +37,12 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
     setState(() => _isLoading = true);
 
     try {
-      // 🚀 SAAS INJECTION: Fetch Tenant Identity safely
       final adminData = ref.read(adminRoleProvider).value;
       final tenantId = adminData?['tenantId'];
       final adminEmail = adminData?['email'] ?? 'Unknown Admin';
 
-      if (tenantId == null) {
+      if (tenantId == null)
         throw "Tenant Identity Missing! Cannot save distributor.";
-      }
 
       final supplierData = {
         'supplierID': _idCtrl.text.trim().isEmpty
@@ -63,12 +52,11 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
         'email': _emailCtrl.text.trim(),
         'phone': _phoneCtrl.text.trim(),
         'categories': _categoryCtrl.text.trim(),
-        'tenantId': tenantId, // 🚀 FIX: SaaS Isolation Locked!
-        'addedBy': adminEmail, // 🚀 FIX: Audit Trail Locked!
+        'tenantId': tenantId,
+        'addedBy': adminEmail,
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to Firestore (Auto-ID generate hoga)
       await FirebaseFirestore.instance
           .collection('suppliers')
           .add(supplierData);
@@ -77,9 +65,9 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
         setState(() => _isLoading = false);
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("✅ New Distributor Added Successfully!"),
-            backgroundColor: accentGreen,
+          SnackBar(
+            content: const Text("✅ New Distributor Added Successfully!"),
+            backgroundColor: context.colors.success,
           ),
         );
       }
@@ -89,7 +77,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Failed to save distributor: $e"),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: context.colors.danger,
           ),
         );
       }
@@ -98,19 +86,33 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
-      ),
-      backgroundColor: bgDark,
-      elevation: 24,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(20),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 700),
         child: Container(
           decoration: BoxDecoration(
-            color: bgDark,
-            borderRadius: BorderRadius.circular(16),
+            color: c.scaffoldBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade200,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? const Color(0xFFFF6D00).withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.1),
+                blurRadius: 40,
+                spreadRadius: -10,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -122,12 +124,14 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: c.cardBg,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
+                    top: Radius.circular(24),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white12 : Colors.grey.shade200,
+                    ),
                   ),
                 ),
                 child: Row(
@@ -135,12 +139,12 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentGreen.withValues(alpha: 0.1),
+                        color: const Color(0xFFFF6D00).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
                         Icons.domain_add,
-                        color: accentGreen,
+                        color: Color(0xFFFF6D00),
                         size: 26,
                       ),
                     ),
@@ -150,10 +154,9 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            // 🚀 Removed const
                             "Add New Distributor",
                             style: TextStyle(
-                              color: textPrimary,
+                              color: c.textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.5,
@@ -163,7 +166,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                           Text(
                             "Register a new supplier for automated POs and tracking.",
                             style: TextStyle(
-                              color: textSecondary, // 🚀 Requires dynamic color
+                              color: c.textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -172,10 +175,7 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(
-                        Icons.close,
-                        color: textSecondary,
-                      ), // 🚀 Removed const
+                      icon: Icon(Icons.close, color: c.textSecondary),
                       onPressed: () => Navigator.pop(context),
                       splashRadius: 24,
                     ),
@@ -186,13 +186,14 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
               // ⬜ FORM BODY SECTION
               Flexible(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(30),
+                  padding: const EdgeInsets.all(32),
+                  physics: const BouncingScrollPhysics(),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionTitle("COMPANY IDENTITY"),
+                        _buildSectionTitle("COMPANY IDENTITY", c),
                         Wrap(
                           spacing: 20,
                           runSpacing: 20,
@@ -203,6 +204,8 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                               icon: Icons.business,
                               hintText: "E.g., Amul Distributor Mumbai",
                               width: 350,
+                              c: c,
+                              isDark: isDark,
                               validator: (v) =>
                                   v!.isEmpty ? 'Name is required' : null,
                             ),
@@ -212,12 +215,14 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                               icon: Icons.badge,
                               hintText: "E.g., SUP001",
                               width: 200,
+                              c: c,
+                              isDark: isDark,
                             ),
                           ],
                         ),
-                        _buildDivider(),
+                        _buildDivider(c),
 
-                        _buildSectionTitle("CONTACT & COMMUNICATION"),
+                        _buildSectionTitle("CONTACT & COMMUNICATION", c),
                         Wrap(
                           spacing: 20,
                           runSpacing: 20,
@@ -229,6 +234,8 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                               hintText: "orders@supplier.com",
                               width: 280,
                               keyboardType: TextInputType.emailAddress,
+                              c: c,
+                              isDark: isDark,
                               validator: (v) => v!.isEmpty || !v.contains('@')
                                   ? 'Valid email required for POs'
                                   : null,
@@ -240,21 +247,25 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                               hintText: "+91 9876543210",
                               width: 280,
                               keyboardType: TextInputType.phone,
+                              c: c,
+                              isDark: isDark,
                               validator: (v) => v!.isEmpty
                                   ? 'Phone number is required'
                                   : null,
                             ),
                           ],
                         ),
-                        _buildDivider(),
+                        _buildDivider(c),
 
-                        _buildSectionTitle("SUPPLY CATEGORIES"),
+                        _buildSectionTitle("SUPPLY CATEGORIES", c),
                         _buildTextField(
                           label: "Categories Handled",
                           controller: _categoryCtrl,
                           icon: Icons.category_outlined,
                           hintText: "E.g., Dairy, Bakery, FMCG",
                           width: double.infinity,
+                          c: c,
+                          isDark: isDark,
                         ),
                       ],
                     ),
@@ -266,15 +277,12 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 20,
+                  vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: c.cardBg,
                   borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(16),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: Radius.circular(24),
                   ),
                 ),
                 child: Row(
@@ -285,10 +293,9 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                           ? null
                           : () => Navigator.pop(context),
                       child: Text(
-                        // 🚀 Removed const
                         "Cancel",
                         style: TextStyle(
-                          color: textSecondary, // 🚀 Uses dynamic color
+                          color: c.textSecondary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -298,23 +305,23 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
                     ElevatedButton.icon(
                       onPressed: _isLoading ? null : _saveDistributor,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: accentGreen,
-                        foregroundColor: bgDark,
+                        backgroundColor: const Color(0xFFFF6D00),
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 18,
+                          horizontal: 32,
+                          vertical: 16,
                         ),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       icon: _isLoading
-                          ? SizedBox(
-                              // 🚀 Removed const
+                          ? const SizedBox(
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                color: bgDark, // 🚀 Uses dynamic color
+                                color: Colors.white,
                                 strokeWidth: 2,
                               ),
                             )
@@ -337,29 +344,28 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, dynamic c) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         title,
         style: TextStyle(
-          // 🚀 Removed const
           fontSize: 11,
           fontWeight: FontWeight.w900,
-          color: textSecondary, // 🚀 Uses dynamic color
+          color: c.textSecondary,
           letterSpacing: 1.5,
         ),
       ),
     );
   }
 
-  Widget _buildDivider() {
+  Widget _buildDivider(dynamic c) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Divider(
         height: 1,
         thickness: 1,
-        color: textSecondary.withValues(alpha: 0.1), // 🚀 Dynamic color
+        color: c.textSecondary.withValues(alpha: 0.1),
       ),
     );
   }
@@ -369,6 +375,8 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
     required TextEditingController controller,
     required IconData icon,
     required double width,
+    required dynamic c,
+    required bool isDark,
     String? hintText,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
@@ -381,44 +389,45 @@ class _AddDistributorDialogState extends ConsumerState<AddDistributorDialog> {
           Text(
             label,
             style: TextStyle(
-              // 🚀 Removed const
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: textPrimary, // 🚀 Dynamic color
+              color: c.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           TextFormField(
             controller: controller,
             keyboardType: keyboardType,
-            style: TextStyle(
-              // 🚀 Removed const
-              fontWeight: FontWeight.w600,
-              color: textPrimary, // 🚀 Dynamic color
-            ),
+            style: TextStyle(fontWeight: FontWeight.w600, color: c.textPrimary),
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(
-                color: textSecondary.withValues(alpha: 0.5),
+                color: c.textSecondary.withValues(alpha: 0.5),
                 fontWeight: FontWeight.normal,
               ),
-              prefixIcon: Icon(icon, color: textSecondary, size: 20),
+              prefixIcon: Icon(icon, color: c.textSecondary, size: 20),
               filled: true,
-              fillColor: inputBg,
+              fillColor: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade100,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 16,
               ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
               focusedBorder: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8)),
-                borderSide: BorderSide(color: accentGreen, width: 2),
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+                borderSide: BorderSide(color: Color(0xFFFF6D00), width: 1.5),
               ),
               errorBorder: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(8)),
+                borderRadius: BorderRadius.all(Radius.circular(12)),
                 borderSide: BorderSide(color: Colors.redAccent),
               ),
             ),

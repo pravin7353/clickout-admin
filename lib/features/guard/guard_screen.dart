@@ -9,6 +9,8 @@ import 'services/guard_service.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../coach/widgets/info_button.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import 'package:clickout_admin/core/widgets/skeleton_loader.dart'; // 🚀 Added
+import 'package:clickout_admin/core/widgets/error_state.dart'; // 🚀 Added
 
 class GuardScreen extends ConsumerWidget {
   const GuardScreen({super.key});
@@ -179,6 +181,8 @@ class GuardScreen extends ConsumerWidget {
       barrierLabel: "GatePass",
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
+        final c = context.colors; // 🚀 FIX: DYNAMIC THEME COLORS FETCHED
+
         return Align(
           alignment: Alignment.centerRight,
           child: Material(
@@ -192,7 +196,7 @@ class GuardScreen extends ConsumerWidget {
                   ? 450
                   : MediaQuery.of(context).size.width,
               height: double.infinity,
-              color: context.colors.scaffoldBg, // ⬛ PREMIUM DARK
+              color: c.scaffoldBg, // ⬛ PREMIUM DARK / LIGHT SAFE
               padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top + 24,
                 left: 24,
@@ -205,20 +209,20 @@ class GuardScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Row(
+                      Row(
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.receipt_long,
                             color: Colors.blueAccent,
                             size: 28,
                           ),
-                          SizedBox(width: 10),
+                          const SizedBox(width: 10),
                           Text(
                             "Digital Gate Pass",
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: c.textPrimary, // 🚀 FIX
                             ),
                           ),
                         ],
@@ -229,23 +233,23 @@ class GuardScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const Divider(height: 15, color: Colors.white10),
+                  Divider(height: 15, color: c.border), // 🚀 FIX
 
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: context.colors.cardBg,
+                      color: c.cardBg,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: context.colors.border),
+                      border: Border.all(color: c.border),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           "ORDER ID: ${orderId.toUpperCase()}",
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: c.textPrimary, // 🚀 FIX
                             fontWeight: FontWeight.w900,
                             fontFamily: 'monospace',
                             fontSize: 16,
@@ -255,7 +259,7 @@ class GuardScreen extends ConsumerWidget {
                         Text(
                           DateFormat('dd MMM yyyy, hh:mm a').format(date),
                           style: TextStyle(
-                            color: Colors.grey.shade400,
+                            color: c.textSecondary, // 🚀 FIX
                             fontSize: 12,
                           ),
                         ),
@@ -279,9 +283,9 @@ class GuardScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: context.colors.cardBg,
+                        color: c.cardBg,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: context.colors.border),
+                        border: Border.all(color: c.border),
                       ),
                       child: itemsList.isEmpty
                           ? const Center(
@@ -293,8 +297,9 @@ class GuardScreen extends ConsumerWidget {
                           : ListView.separated(
                               physics: const BouncingScrollPhysics(),
                               itemCount: itemsList.length,
-                              separatorBuilder: (context, index) =>
-                                  const Divider(color: Colors.white10),
+                              separatorBuilder: (context, index) => Divider(
+                                color: c.border.withValues(alpha: 0.5),
+                              ), // 🚀 FIX
                               itemBuilder: (context, index) {
                                 final item =
                                     itemsList[index] as Map<String, dynamic>;
@@ -356,17 +361,18 @@ class GuardScreen extends ConsumerWidget {
                                           children: [
                                             Text(
                                               itemName,
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontWeight: FontWeight.w700,
                                                 fontSize: 14,
-                                                color: Colors.white,
+                                                color: c.textPrimary, // 🚀 FIX
                                               ),
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               "@ ₹${price.toStringAsFixed(2)} / unit",
                                               style: TextStyle(
-                                                color: Colors.grey.shade500,
+                                                color:
+                                                    c.textSecondary, // 🚀 FIX
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -376,10 +382,10 @@ class GuardScreen extends ConsumerWidget {
                                       ),
                                       Text(
                                         "₹${itemTotal.toStringAsFixed(2)}",
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w900,
                                           fontSize: 14,
-                                          color: Colors.white,
+                                          color: c.textPrimary, // 🚀 FIX
                                         ),
                                       ),
                                     ],
@@ -586,14 +592,26 @@ class GuardScreen extends ConsumerWidget {
               const SizedBox(height: 12),
 
               pendingState.when(
-                loading: () => const SizedBox(
-                  height: 100,
-                  child: Center(
-                    child: CircularProgressIndicator(color: Colors.blueAccent),
+                loading: () => SizedBox(
+                  height: 140,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 3,
+                    itemBuilder: (context, index) => Container(
+                      margin: const EdgeInsets.only(right: 16),
+                      child: const SkeletonBox(
+                        width: 260,
+                        height: 140,
+                        borderRadius: BorderRadius.all(Radius.circular(16)),
+                      ), // 🚀 MATCHES RADAR CARD SIZE
+                    ),
                   ),
                 ),
-                error: (err, stack) => _buildErrorCard(
-                  "Radar offline: Firebase Index required! Check console.",
+                error: (err, stack) => ErrorState(
+                  message:
+                      "Radar offline. Please check your connection or database indexes.",
+                  onRetry: () => ref.invalidate(pendingExitsProvider),
                 ),
                 data: (pendingDocs) {
                   if (pendingDocs.isEmpty) {
@@ -770,16 +788,22 @@ class GuardScreen extends ConsumerWidget {
                     const SizedBox(height: 16),
 
                     historyState.when(
-                      loading: () => const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(40),
-                          child: CircularProgressIndicator(
-                            color: Colors.blueAccent,
-                          ),
+                      loading: () => ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: 5,
+                        itemBuilder: (_, __) => const Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: SkeletonBox(
+                            height: 50,
+                            borderRadius: BorderRadius.all(Radius.circular(8)),
+                          ), // 🚀 MATCHES TABLE ROW
                         ),
                       ),
-                      error: (err, stack) => _buildErrorCard(
-                        "Table offline: Firebase Index required! Check console.",
+                      error: (err, stack) => ErrorState(
+                        message:
+                            "Table offline. Please check your connection or database indexes.",
+                        onRetry: () => ref.invalidate(gateHistoryProvider),
                       ),
                       data: (historyDocs) {
                         if (historyDocs.isEmpty) {

@@ -3,21 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
-import '../../../core/theme/app_theme.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
 
 class BlockedInventoryScreen extends ConsumerWidget {
   const BlockedInventoryScreen({super.key});
 
-  // 🎨 STRICT DARK THEME CONSTANTS
-  static const Color accentGreen = Color(0xFF00C853);
-  static const Color accentRed = Color(0xFFFE8181);
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final bgDark = context.colors.scaffoldBg;
-    final cardDark = context.colors.cardBg;
-    final textPrimary = context.colors.textPrimary;
-    final textSecondary = context.colors.textSecondary;
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final adminData = ref.watch(adminRoleProvider).value;
     final tenantId = adminData?['tenantId'];
@@ -25,12 +19,12 @@ class BlockedInventoryScreen extends ConsumerWidget {
 
     if (role == 'MANAGER') {
       return Scaffold(
-        backgroundColor: bgDark,
+        backgroundColor: c.scaffoldBg,
         body: Center(
           child: Text(
             "Access Denied. HQ Report Only.",
             style: TextStyle(
-              color: accentRed,
+              color: c.danger,
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -40,7 +34,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
     }
 
     return Scaffold(
-      backgroundColor: bgDark,
+      backgroundColor: c.scaffoldBg,
       body: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(
@@ -51,7 +45,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w900,
-                color: textPrimary,
+                color: c.textPrimary,
                 letterSpacing: -0.5,
               ),
             ),
@@ -59,7 +53,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
             Text(
               "Cross-Branch Expiry and Damage Tracking.",
               style: TextStyle(
-                color: textSecondary,
+                color: c.textSecondary,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
               ),
@@ -70,9 +64,20 @@ class BlockedInventoryScreen extends ConsumerWidget {
               child: Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: cardDark,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: textSecondary.withValues(alpha: 0.1)),
+                  color: c.cardBg,
+                  borderRadius: BorderRadius.circular(24), // 🚀 Premium 24px
+                  border: Border.all(
+                    color: c.textSecondary.withValues(alpha: 0.1),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark
+                          ? c.danger.withValues(alpha: 0.05)
+                          : Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 20,
+                      spreadRadius: -5,
+                    ),
+                  ],
                 ),
                 child: StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -80,23 +85,20 @@ class BlockedInventoryScreen extends ConsumerWidget {
                       .where('tenantId', isEqualTo: tenantId)
                       .where('reason', isEqualTo: 'EXPIRED_BATCH_BLOCKED')
                       .orderBy('createdAt', descending: true)
-                      // 🚀 COST FIX: Ledger history time ke saath badhta rehta
-                      // hai; bina limit ke ye har baar poori history stream
-                      // karta. Recent 100 records dikhana kaafi hai.
                       .limit(100)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: accentRed),
+                      return Center(
+                        child: CircularProgressIndicator(color: c.danger),
                       );
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Text(
                           "No shrinkage reported. Good job!",
                           style: TextStyle(
-                            color: accentGreen,
+                            color: c.success,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -114,20 +116,23 @@ class BlockedInventoryScreen extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: accentRed.withValues(alpha: 0.1),
+                            color: c.danger.withValues(alpha: 0.1),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
                             border: Border(
                               bottom: BorderSide(
-                                color: accentRed.withValues(alpha: 0.3),
+                                color: c.danger.withValues(alpha: 0.3),
                               ),
                             ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text(
+                              Text(
                                 "TOTAL UNITS LOST (ALL STORES)",
                                 style: TextStyle(
-                                  color: accentRed,
+                                  color: c.danger,
                                   fontWeight: FontWeight.bold,
                                   fontSize: 12,
                                   letterSpacing: 1.5,
@@ -135,8 +140,8 @@ class BlockedInventoryScreen extends ConsumerWidget {
                               ),
                               Text(
                                 "$totalLoss Units",
-                                style: const TextStyle(
-                                  color: accentRed,
+                                style: TextStyle(
+                                  color: c.danger,
                                   fontWeight: FontWeight.w900,
                                   fontSize: 20,
                                 ),
@@ -152,11 +157,11 @@ class BlockedInventoryScreen extends ConsumerWidget {
                               physics: const BouncingScrollPhysics(),
                               child: DataTable(
                                 headingRowColor: WidgetStateProperty.all(
-                                  context.colors.cardBg,
+                                  c.cardBg,
                                 ),
                                 headingTextStyle: TextStyle(
                                   fontWeight: FontWeight.w800,
-                                  color: textPrimary,
+                                  color: c.textPrimary,
                                   fontSize: 12,
                                   letterSpacing: 1.0,
                                 ),
@@ -184,7 +189,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                         Text(
                                           date,
                                           style: TextStyle(
-                                            color: textSecondary,
+                                            color: c.textSecondary,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
@@ -194,7 +199,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                           data['productId'] ?? 'N/A',
                                           style: TextStyle(
                                             fontFamily: 'monospace',
-                                            color: accentGreen,
+                                            color: c.success,
                                           ),
                                         ),
                                       ),
@@ -202,7 +207,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                         Text(
                                           data['productName'] ?? 'N/A',
                                           style: TextStyle(
-                                            color: textPrimary,
+                                            color: c.textPrimary,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
@@ -210,8 +215,8 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                       DataCell(
                                         Text(
                                           "- ${data['quantityRemoved'] ?? 0}",
-                                          style: const TextStyle(
-                                            color: accentRed,
+                                          style: TextStyle(
+                                            color: c.danger,
                                             fontWeight: FontWeight.w900,
                                           ),
                                         ),
@@ -220,7 +225,7 @@ class BlockedInventoryScreen extends ConsumerWidget {
                                         Text(
                                           data['blockedBy'] ?? 'Unknown',
                                           style: TextStyle(
-                                            color: textSecondary,
+                                            color: c.textSecondary,
                                           ),
                                         ),
                                       ),

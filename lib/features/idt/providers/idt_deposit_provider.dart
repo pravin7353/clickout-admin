@@ -33,11 +33,14 @@ class IdtDepositNotifier extends ChangeNotifier {
     if (!_isDisposed) notifyListeners();
   }
 
-  Future<void> fetchInitial() async {
+  // 🚀 FIX: Added 'silent' flag to prevent UI from unmounting during background refreshes
+  Future<void> fetchInitial({bool silent = false}) async {
     if (_isDisposed) return;
-    isLoading = true;
-    errorMsg = '';
-    _safeNotify();
+    if (!silent) {
+      isLoading = true;
+      errorMsg = '';
+      _safeNotify();
+    }
 
     try {
       Query q = _db
@@ -54,22 +57,30 @@ class IdtDepositNotifier extends ChangeNotifier {
         q = q.where('branchCode', isEqualTo: branchCode);
 
       final snap = await q.get();
-      records.clear();
       if (snap.docs.isNotEmpty) {
         _lastDoc = snap.docs.last;
         hasMore = snap.docs.length == 20;
-        for (var doc in snap.docs) {
+        // 🚀 FIX: Assign a brand-new List instead of mutating the old one
+        // in place (clear() + add()). The screen's didUpdateWidget does a
+        // reference check (`widget.records != oldWidget.records`) to decide
+        // when to refresh its local cache — mutating in place kept the same
+        // reference forever, so processed items never disappeared from the
+        // IDT Deposits table.
+        records = snap.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           data['docId'] = doc.id;
-          records.add(data);
-        }
+          return data;
+        }).toList();
       } else {
+        records = [];
         hasMore = false;
       }
     } catch (e) {
-      errorMsg = "Error: $e";
+      if (!silent) errorMsg = "Error: $e";
     }
-    isLoading = false;
+    if (!silent) {
+      isLoading = false;
+    }
     _safeNotify();
   }
 
@@ -97,11 +108,13 @@ class IdtDepositNotifier extends ChangeNotifier {
       if (snap.docs.isNotEmpty) {
         _lastDoc = snap.docs.last;
         hasMore = snap.docs.length == 20;
-        for (var doc in snap.docs) {
+        final newItems = snap.docs.map((doc) {
           final data = doc.data() as Map<String, dynamic>;
           data['docId'] = doc.id;
-          records.add(data);
-        }
+          return data;
+        }).toList();
+        // 🚀 FIX: same reason as fetchInitial — new list reference needed.
+        records = [...records, ...newItems];
       } else {
         hasMore = false;
       }
@@ -188,26 +201,43 @@ class IdtDepositNotifier extends ChangeNotifier {
         }
       }
 
-      // 2. Process DB Items
+      // 2. Process DB Items safely without losing unselected items
       for (var docId in groupedDb.keys) {
-        final updatedItems = groupedDb[docId]!;
+        final processedItems = groupedDb[docId]!;
         final record = records.firstWhere((r) => r['docId'] == docId);
         final docTenantId = record['tenantId'];
         final docBranchCode = record['branchCode'];
+        List<dynamic> existingItems = List.from(record['items']);
 
-        for (var item in updatedItems) {
-          await _updateOrSetProduct(
-            batch,
-            docTenantId,
-            docBranchCode,
-            item,
-          ); // 🚀 AWAIT ADDED
+        for (var item in processedItems) {
+          await _updateOrSetProduct(batch, docTenantId, docBranchCode, item);
+          // Remove only processed items from original array
+          existingItems.removeWhere((ex) => ex['barcode'] == item['barcode']);
         }
-        batch.update(_db.collection('idt_deposits').doc(docId), {
-          'status': 'PROCESSED',
-          'items': updatedItems,
-          'processedAt': FieldValue.serverTimestamp(),
-        });
+
+        if (existingItems.isEmpty) {
+          // If all items processed, just update the main doc
+          batch.update(_db.collection('idt_deposits').doc(docId), {
+            'status': 'PROCESSED',
+            'processedAt': FieldValue.serverTimestamp(),
+          });
+        } else {
+          // 🚀 CRITICAL FIX: Keep unprocessed items in original doc
+          batch.update(_db.collection('idt_deposits').doc(docId), {
+            'items': existingItems,
+          });
+          // Move processed items to a new history doc
+          final newDocRef = _db.collection('idt_deposits').doc();
+          batch.set(newDocRef, {
+            'tenantId': docTenantId,
+            'branchCode': docBranchCode,
+            'status': 'PROCESSED',
+            'source': record['source'] ?? 'PARTIAL_PROCESS',
+            'items': processedItems,
+            'timestamp': record['timestamp'],
+            'processedAt': FieldValue.serverTimestamp(),
+          });
+        }
       }
 
       // 3. Process Local Scanned Items (Directly go live)
@@ -239,7 +269,9 @@ class IdtDepositNotifier extends ChangeNotifier {
       }
 
       await batch.commit();
-      await fetchInitial();
+      await fetchInitial(
+        silent: true,
+      ); // 🚀 CRITICAL FIX: Silent refresh blocks the UI unmount bug!
     } catch (e) {
       throw Exception("Failed to Go Live: $e");
     }
@@ -252,11 +284,17 @@ class IdtDepositNotifier extends ChangeNotifier {
     String? bCode,
     Map<String, dynamic> item,
   ) async {
-    final barcode = item['barcode'];
+    // 🛠️ BUG FIX: Ensure Document ID exactly matches the existing schema to prevent duplicates
+    final barcode = item['barcode']?.toString().trim() ?? '';
+    final safeBCode = (bCode == null || bCode.trim().isEmpty)
+        ? 'HQ'
+        : bCode.trim();
+    final safeTId = tId?.trim() ?? 'UNKNOWN';
     final int qty = int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
+
     final productRef = _db
         .collection('products')
-        .doc('${tId}_${bCode}_$barcode');
+        .doc('${safeTId}_${safeBCode}_$barcode');
 
     // 🚀 NAYA FIX: Pehle check karenge ki product purana hai ya naya
     final docSnap = await productRef.get();
@@ -275,8 +313,10 @@ class IdtDepositNotifier extends ChangeNotifier {
         'addedBy': 'IDT Terminal',
         'addedByEmail': 'idt@clickout.com',
         'barcode': barcode,
-        'branchCode': bCode,
-        'tenantId': tId,
+        'branchCode':
+            safeBCode, // 🚀 FIX: Force safe Branch Code to prevent null mappings
+        'tenantId':
+            safeTId, // 🚀 FIX: Force safe Tenant ID to prevent null mappings
         'createdAt':
             FieldValue.serverTimestamp(), // 🚀 CRITICAL FIX: Iske bina list me show nahi hota tha!
         'updatedAt': FieldValue.serverTimestamp(),

@@ -1,15 +1,20 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/theme/app_theme.dart'; // 🚀 YE IMPORT MISSING THA
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+
+import '../../core/theme/app_theme.dart';
 import '../../features/auth/auth_provider.dart';
 import '../../features/invoice/invoice_rules_dialog.dart';
 import '../../core/store/providers/store_provider.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart'; // 🛠️ FIX: Added to fetch Tenant Logo
+import '../../features/manager/widgets/store_entry_qr_card.dart';
+import '../../features/tenant_admin/providers/tenant_dashboard_provider.dart';
 import '../../features/tenant_admin/screens/create_store_dialog.dart';
-import 'package:image_picker/image_picker.dart'; // 🛠️ Auto Compression ke liye wapas image_picker
 import '../../features/tenant_admin/screens/edit_store_profile_dialog.dart';
 import '../../features/tenant_admin/screens/edit_tenant_profile_dialog.dart';
 import '../../core/providers/theme_provider.dart';
@@ -21,19 +26,13 @@ import '../../core/subscription/widgets/upgrade_popup.dart';
 const double mobileBreakpoint = 768;
 const double tabletBreakpoint = 1024;
 
-// --- EXACT THEME SPEC ENFORCEMENT ---
-// (We now use Theme.of(context) dynamically, but keeping this for fallback/reference)
-const Color bgDarkTheme = Color(0xFF080B08);
-const Color cardDarkTheme = Color(0xFF111811);
 const Color accentGreenTheme = Color(0xFF00C853);
-
-// --- SECTION COLORS ---
-const globalCommandColor = Color(0xFF7F77DD);
-const tenantHqColor = accentGreenTheme;
-const operationsColor = Color(0xFF378ADD);
-const staffAuditColor = Color(0xFFEF9F27);
-const financeRiskColor = Color(0xFFE24B4A);
-const settingsColor = Color(0xFF7F8C9A);
+const Color globalCommandColor = Color(0xFF7F77DD);
+const Color tenantHqColor = accentGreenTheme;
+const Color operationsColor = Color(0xFF378ADD);
+const Color staffAuditColor = Color(0xFFEF9F27);
+const Color financeRiskColor = Color(0xFFE24B4A);
+const Color settingsColor = Color(0xFF7F8C9A);
 
 class AdminShell extends ConsumerWidget {
   final Widget child;
@@ -51,9 +50,8 @@ class AdminShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final adminData = ref.watch(adminRoleProvider).value;
-    final activeStore = ref.watch(activeStoreProvider); // 🚀 Watch Store State
+    final activeStore = ref.watch(activeStoreProvider);
 
-    // 🚀 SMART CLEAR: Jaise hi user wapas HQ (Tenant Dashboard) par aaye, Store lock hata do!
     if (currentPath == '/' && activeStore != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         ref.read(activeStoreProvider.notifier).clearStore();
@@ -69,7 +67,6 @@ class AdminShell extends ConsumerWidget {
     final isManager = rawRole == 'MANAGER';
     final roleColor = _getRoleColor(rawRole);
 
-    // 🎨 STRICT THEME ENFORCEMENT (Using context.colors extension)
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgMain = context.colors.scaffoldBg;
     final bgSidebar = context.colors.cardBg;
@@ -89,7 +86,7 @@ class AdminShell extends ConsumerWidget {
               : null,
           drawer: isMobile
               ? Drawer(
-                  backgroundColor: bgSidebar, // 💎 Clean minimal background
+                  backgroundColor: bgSidebar,
                   child: _buildSidebarContent(
                     true,
                     context,
@@ -114,8 +111,7 @@ class AdminShell extends ConsumerWidget {
                   duration: const Duration(milliseconds: 300),
                   width: isDesktop ? 260 : 80,
                   decoration: BoxDecoration(
-                    color:
-                        bgSidebar, // 💎 Removed Emerald, using semantic cardBg
+                    color: bgSidebar,
                     border: Border(
                       right: BorderSide(color: context.colors.border),
                     ),
@@ -132,8 +128,8 @@ class AdminShell extends ConsumerWidget {
                     isManager,
                     ref,
                     bgSidebar,
-                    textPrimary, // 💎 Adapts to light/dark
-                    textSecondary, // 💎 Adapts to light/dark
+                    textPrimary,
+                    textSecondary,
                   ),
                 ),
               Expanded(
@@ -159,11 +155,9 @@ class AdminShell extends ConsumerWidget {
                                 textSecondary,
                                 isDark,
                                 activeStore,
-                                adminData, // 🛠️ FIX: Passed adminData here
+                                adminData,
                               ),
-
                             _buildCriticalAlertsStrip(),
-
                             Expanded(
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
@@ -178,7 +172,6 @@ class AdminShell extends ConsumerWidget {
                             ),
                           ],
                         ),
-                        // 🔒 SUBSCRIPTION EXPIRED OVERLAY
                         if (isExpired)
                           Positioned.fill(
                             child: Stack(
@@ -186,7 +179,6 @@ class AdminShell extends ConsumerWidget {
                                 Container(
                                   color: Colors.black.withValues(alpha: 0.75),
                                 ),
-                                // Lock card
                                 Center(
                                   child: Container(
                                     margin: const EdgeInsets.symmetric(
@@ -411,12 +403,6 @@ class AdminShell extends ConsumerWidget {
         ),
       ),
       iconTheme: IconThemeData(color: textPrimary),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.power_settings_new, color: Colors.redAccent),
-          onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-        ),
-      ],
     );
   }
 
@@ -434,7 +420,7 @@ class AdminShell extends ConsumerWidget {
     Color textSecondary,
     bool isDark,
     ActiveStoreState? activeStore,
-    Map<String, dynamic>? adminData, // 🛠️ FIX: Added adminData parameter
+    Map<String, dynamic>? adminData,
   ) {
     return Container(
       height: 70,
@@ -458,7 +444,6 @@ class AdminShell extends ConsumerWidget {
                   color: textPrimary,
                 ),
               ),
-              // 🚀 THE BADGE: Jab bhi user kisi store ke andar hoga, ye chamkega!
               if (activeStore != null) ...[
                 const SizedBox(width: 20),
                 Container(
@@ -515,21 +500,13 @@ class AdminShell extends ConsumerWidget {
                     isDark ? Icons.wb_sunny_outlined : Icons.dark_mode_outlined,
                     color: Theme.of(context).colorScheme.primary,
                   ),
-                  onPressed: () {
-                    ref.read(themeProvider.notifier).toggleTheme();
-                  },
+                  onPressed: () =>
+                      ref.read(themeProvider.notifier).toggleTheme(),
                 ),
               ),
               const SizedBox(width: 5),
               const TrialCountdownBadge(),
-              const SizedBox(width: 10),
-              IconButton(
-                icon: const Icon(Icons.logout, color: Colors.redAccent),
-                onPressed: () =>
-                    ref.read(authControllerProvider.notifier).logout(),
-              ),
-              const SizedBox(width: 10),
-              // 🚀 PREMIUM GLASSMORPHIC PROFILE OVERLAY
+              const SizedBox(width: 15),
               GestureDetector(
                 onTap: () {
                   _showGlassProfileMenu(
@@ -542,15 +519,19 @@ class AdminShell extends ConsumerWidget {
                     isDark: isDark,
                     activeStore: activeStore,
                     adminData: adminData,
+                    ref: ref,
                   );
                 },
-                // 🛠️ FIX: Consumer widget use kiya taaki real-time logo fetch ho
                 child: Consumer(
                   builder: (context, ref, child) {
                     final tenantState = tenantId.isNotEmpty
                         ? ref.watch(tenantProfileProvider(tenantId)).value
                         : null;
-                    final logoUrl = tenantState?['companyLogoUrl'];
+                    final logoUrl =
+                        (activeStore != null &&
+                            tenantState?['storeLogoUrl'] != null)
+                        ? tenantState!['storeLogoUrl']
+                        : tenantState?['companyLogoUrl'];
 
                     return CircleAvatar(
                       backgroundColor: roleColor,
@@ -725,13 +706,9 @@ class AdminShell extends ConsumerWidget {
     final dividerColor = Theme.of(context).brightness == Brightness.dark
         ? Colors.white10
         : Colors.grey.shade200;
-
-    // 🚀 UPDATED MAGIC TRICK: Tenant Admin in store context OR Manager sees menus
     final activeStore = ref.watch(activeStoreProvider);
     final bool showStoreMenus =
         isManager || (isTenantAdmin && activeStore != null);
-
-    // 🔒 Subscription lock (SUPER_ADMIN ko kabhi lock nahi hoga)
     final bool isProLocked =
         !isSuperAdmin && !ref.watch(isRouteAllowedProvider('/manager'));
     final bool isGrowthLocked =
@@ -771,9 +748,6 @@ class AdminShell extends ConsumerWidget {
           child: ListView(
             padding: EdgeInsets.zero,
             children: [
-              // ==========================================
-              // 🌍 1. GLOBAL COMMAND (Super Admin Only)
-              // ==========================================
               if (isSuperAdmin) ...[
                 if (isExpanded)
                   _buildSectionHeader("GLOBAL COMMAND", globalCommandColor),
@@ -793,7 +767,6 @@ class AdminShell extends ConsumerWidget {
                   '/register-client',
                   globalCommandColor,
                 ),
-                // 🚀 SUPER ADMIN EXCLUSIVE: Campaign Manager
                 _buildNavItem(
                   context,
                   Icons.campaign_rounded,
@@ -808,9 +781,6 @@ class AdminShell extends ConsumerWidget {
                 ),
               ],
 
-              // ==========================================
-              // 🏢 2. TENANT HQ
-              // ==========================================
               Builder(
                 builder: (context) {
                   final bool isInsideTenant = currentPath.startsWith(
@@ -845,16 +815,6 @@ class AdminShell extends ConsumerWidget {
                           '/usage',
                           tenantHqColor,
                         ),
-
-                        // 🚀 TEMPORARILY DISABLED: Org Structure hidden for now.
-                        /*_buildNavItem(
-                          context,
-                          Icons.account_tree,
-                          "Org Structure",
-                          isExpanded,
-                          '/org-structure',
-                          tenantHqColor,
-                        ),*/
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Divider(color: dividerColor, height: 1),
@@ -866,11 +826,7 @@ class AdminShell extends ConsumerWidget {
                 },
               ),
 
-              // 🚀 MAGIC WRAPPER: Ye condition check karegi tabhi menus dikhenge
               if (showStoreMenus) ...[
-                // ==========================================
-                // 🏪 3. OPERATIONS
-                // ==========================================
                 if (isExpanded)
                   _buildSectionHeader(
                     "OPERATIONS",
@@ -905,17 +861,15 @@ class AdminShell extends ConsumerWidget {
                   operationsColor,
                   isReadOnly: isSuperAdmin,
                 ),
-                // ✂️ NAYA: SERVICE CONTROL MENU
                 _buildNavItem(
                   context,
-                  Icons.design_services, // Scissor / Service wala icon
+                  Icons.design_services,
                   "Service Control",
                   isExpanded,
                   '/service-control',
                   operationsColor,
                   isReadOnly: isSuperAdmin,
                 ),
-                // 📦 NAYA: IDT DEPOSITS MENU
                 _buildNavItem(
                   context,
                   Icons.move_to_inbox,
@@ -925,7 +879,6 @@ class AdminShell extends ConsumerWidget {
                   operationsColor,
                   isReadOnly: isSuperAdmin,
                 ),
-                // 🛒 NAYA: ASSISTED CHECKOUT (POS)
                 _buildNavItem(
                   context,
                   Icons.point_of_sale_rounded,
@@ -956,9 +909,6 @@ class AdminShell extends ConsumerWidget {
                   isSubscriptionLocked: isProLocked,
                 ),
 
-                // ==========================================
-                // 👮 4. STAFF & AUDIT
-                // ==========================================
                 if (isExpanded)
                   _buildSectionHeader(
                     "STAFF & AUDIT",
@@ -985,15 +935,11 @@ class AdminShell extends ConsumerWidget {
                   isReadOnly: isSuperAdmin,
                   isSubscriptionLocked: isGrowthLocked,
                 ),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Divider(color: dividerColor, height: 1),
                 ),
 
-                // ==========================================
-                // 🚨 5. FINANCE & RISK
-                // ==========================================
                 if (isExpanded)
                   _buildSectionHeader(
                     "FINANCE & RISK",
@@ -1040,15 +986,11 @@ class AdminShell extends ConsumerWidget {
                   isReadOnly: isSuperAdmin,
                   isSubscriptionLocked: isProLocked,
                 ),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Divider(color: dividerColor, height: 1),
                 ),
 
-                // ==========================================
-                // 🔌 6. SETTINGS
-                // ==========================================
                 if (isExpanded)
                   _buildSectionHeader(
                     "SETTINGS",
@@ -1065,7 +1007,7 @@ class AdminShell extends ConsumerWidget {
                   isReadOnly: isSuperAdmin,
                 ),
                 const SizedBox(height: 20),
-              ], // 🚀 WRAPPER CLOSED HERE
+              ],
             ],
           ),
         ),
@@ -1085,14 +1027,11 @@ class AdminShell extends ConsumerWidget {
     VoidCallback? onCustomTap,
   }) {
     bool isActive = false;
-
     if (route == '/') {
       isActive = currentPath == '/';
     } else {
       isActive = currentPath.startsWith(route);
     }
-
-    // 💎 Dynamic text colors matching the clean theme
     final inactiveColor = context.colors.textSecondary;
 
     return Material(
@@ -1106,11 +1045,7 @@ class AdminShell extends ConsumerWidget {
             horizontal: isExpanded ? 12 : 0,
           ),
           decoration: BoxDecoration(
-            color: isActive
-                ? context
-                      .colors
-                      .cardBg // Subtle active background
-                : Colors.transparent,
+            color: isActive ? context.colors.cardBg : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: isExpanded ? Alignment.centerLeft : Alignment.center,
@@ -1176,7 +1111,7 @@ class AdminShell extends ConsumerWidget {
                   width: 6,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: Colors.greenAccent.shade400, // 🟢 Premium Green Dot
+                    color: Colors.greenAccent.shade400,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -1187,7 +1122,6 @@ class AdminShell extends ConsumerWidget {
     );
   }
 
-  // 💎 PREMIUM MODERN PROFILE MENU (With Add/Edit/Logo options)
   void _showGlassProfileMenu({
     required BuildContext context,
     required String name,
@@ -1198,6 +1132,7 @@ class AdminShell extends ConsumerWidget {
     required bool isDark,
     ActiveStoreState? activeStore,
     Map<String, dynamic>? adminData,
+    required WidgetRef ref,
   }) {
     showGeneralDialog(
       context: context,
@@ -1205,7 +1140,6 @@ class AdminShell extends ConsumerWidget {
       barrierLabel: "ProfileMenu",
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (ctx, anim1, anim2) {
-        final bgColor = context.colors.cardBg;
         final borderColor = context.colors.border;
         final iconColor = context.colors.textSecondary;
         final textColor = context.colors.textPrimary;
@@ -1222,49 +1156,115 @@ class AdminShell extends ConsumerWidget {
               child: Material(
                 color: Colors.transparent,
                 child: Container(
-                  width: 320,
+                  width: 340,
                   decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: borderColor),
+                    color: context.colors.scaffoldBg,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.grey.shade200,
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
+                        blurRadius: 40,
+                        spreadRadius: -5,
+                        offset: const Offset(0, 15),
                       ),
                     ],
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ── HEADER ──
+                      // ── PREMIUM HEADER WITH QR CODE ──
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: roleColor.withValues(alpha: 0.05),
+                          color: context.colors.cardBg,
                           borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(16),
+                            top: Radius.circular(24),
+                          ),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: isDark
+                                  ? Colors.white12
+                                  : Colors.grey.shade200,
+                            ),
                           ),
                         ),
                         child: Column(
                           children: [
-                            CircleAvatar(
-                              radius: 36,
-                              backgroundColor: roleColor.withValues(alpha: 0.2),
-                              child: Icon(
-                                Icons.person,
-                                size: 36,
-                                color: roleColor,
+                            if (activeStore != null ||
+                                rawRole == 'MANAGER') ...[
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => const StoreEntryQRCard(),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: context.colors.success,
+                                      width: 2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: context.colors.success
+                                            .withValues(alpha: 0.2),
+                                        blurRadius: 15,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
+                                  child: QrImageView(
+                                    data:
+                                        "CLICKOUT::${base64Encode(utf8.encode(jsonEncode({"action": "STORE_ENTRY", "tenantId": tId, "branchCode": activeStore?.branchCode ?? adminData?['branchCode'] ?? '', "storeName": activeStore?.storeName ?? companyName, "timestamp": DateTime.now().millisecondsSinceEpoch})))}",
+                                    version: QrVersions.auto,
+                                    size: 110.0,
+                                    backgroundColor: Colors.white,
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
+                              const SizedBox(height: 12),
+                              Text(
+                                "Tap QR to Enlarge & Download",
+                                style: TextStyle(
+                                  color: context.colors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (activeStore == null &&
+                                rawRole != 'MANAGER') ...[
+                              Container(
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: roleColor.withValues(alpha: 0.1),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.business,
+                                  size: 40,
+                                  color: roleColor,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             Text(
                               name,
                               style: TextStyle(
                                 color: textColor,
                                 fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
                             Text(
@@ -1279,7 +1279,6 @@ class AdminShell extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      Divider(color: borderColor, height: 1, thickness: 1),
 
                       // ── MENUS ──
                       Padding(
@@ -1367,7 +1366,22 @@ class AdminShell extends ConsumerWidget {
                                   );
                                 },
                               ),
+                              Divider(color: borderColor, height: 16),
                             ],
+
+                            // 🚪 SECURE LOGOUT BUTTON
+                            _buildMenuTile(
+                              icon: Icons.power_settings_new_rounded,
+                              title: "Secure Logout",
+                              iconColor: Colors.redAccent,
+                              textColor: Colors.redAccent,
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                ref
+                                    .read(authControllerProvider.notifier)
+                                    .logout();
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -1412,8 +1426,6 @@ class AdminShell extends ConsumerWidget {
   }
 }
 
-// 🖼️ NAYA: LOGO UPLOAD WIDGET (File Picker & Firebase Storage)
-// 🛠️ FIX: Changed to ConsumerStatefulWidget to access Riverpod ref
 class LogoUploadDialog extends ConsumerStatefulWidget {
   final String tenantId;
   const LogoUploadDialog({super.key, required this.tenantId});
@@ -1438,14 +1450,9 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
     setState(() => _isUploading = true);
     try {
       final bytes = await image.readAsBytes();
-      // 🛠️ FIX: Store logos are now uniquely named by BranchCode to prevent overwriting
       String fileName = 'company_logo.png';
       if (type == 'store') {
-        // If uploading for a store, we need the branch code.
-        // (You'll need to pass activeStore?.branchCode down to this widget when calling it from the menu)
-        // For now, if we don't have it, we use a generic name, but for proper multiple stores, it must be unique.
-        fileName =
-            'store_logo.png'; // We will update this fully when we connect the PDF invoice logic
+        fileName = 'store_logo.png';
       }
 
       final storageRef = FirebaseStorage.instance.ref(
@@ -1463,7 +1470,6 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
           .doc(widget.tenantId)
           .update({fieldName: url});
 
-      // 🔄 FIX: Ab ye Riverpod wale ref ko hi call karega bina error ke
       ref.invalidate(adminRoleProvider);
       ref.invalidate(tenantProfileProvider(widget.tenantId));
 
@@ -1476,13 +1482,14 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
         );
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Upload Failed: $e"),
             backgroundColor: Colors.redAccent,
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -1490,59 +1497,196 @@ class _LogoUploadDialogState extends ConsumerState<LogoUploadDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final c = context.colors;
-    return AlertDialog(
-      backgroundColor: c.cardBg,
-      title: Text(
-        "Upload Brand Assets",
-        style: TextStyle(color: c.textPrimary, fontWeight: FontWeight.bold),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_isUploading)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(),
-            ),
-          if (!_isUploading) ...[
-            ListTile(
-              leading: const Icon(Icons.business, color: Colors.blueAccent),
-              title: Text(
-                "Company Logo",
-                style: TextStyle(color: c.textPrimary),
-              ),
-              subtitle: Text(
-                "Main HQ Brand Logo",
-                style: TextStyle(color: c.textSecondary, fontSize: 12),
-              ),
-              trailing: ElevatedButton(
-                onPressed: () => _uploadLogo('company'),
-                child: const Text("UPLOAD"),
-              ),
-            ),
-            Divider(color: c.border),
-            ListTile(
-              leading: const Icon(Icons.storefront, color: Colors.green),
-              title: Text("Store Logo", style: TextStyle(color: c.textPrimary)),
-              subtitle: Text(
-                "Invoice/Receipt Logo",
-                style: TextStyle(color: c.textSecondary, fontSize: 12),
-              ),
-              trailing: ElevatedButton(
-                onPressed: () => _uploadLogo('store'),
-                child: const Text("UPLOAD"),
-              ),
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(20),
+      child: Container(
+        width: 500,
+        decoration: BoxDecoration(
+          color: c.scaffoldBg,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? c.success.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.1),
+              blurRadius: 40,
+              spreadRadius: -10,
             ),
           ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: c.cardBg,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+                border: Border(
+                  bottom: BorderSide(
+                    color: isDark ? Colors.white12 : Colors.grey.shade200,
+                  ),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: c.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.image_outlined,
+                      color: c.success,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Upload Brand Assets",
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          "Manage your company and store logos.",
+                          style: TextStyle(
+                            color: c.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: c.textSecondary),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: _isUploading
+                  ? const Padding(
+                      padding: EdgeInsets.all(40),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : Column(
+                      children: [
+                        _buildPremiumUploadTile(
+                          context: context,
+                          title: "Company Logo",
+                          subtitle: "Main HQ Brand Logo",
+                          icon: Icons.business,
+                          iconColor: Colors.blueAccent,
+                          onTap: () => _uploadLogo('company'),
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildPremiumUploadTile(
+                          context: context,
+                          title: "Store Logo",
+                          subtitle: "Invoice & Receipt Logo",
+                          icon: Icons.storefront,
+                          iconColor: Colors.amber.shade600,
+                          onTap: () => _uploadLogo('store'),
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPremiumUploadTile({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    final c = context.colors;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: c.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade300,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: c.textPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: TextStyle(color: c.textSecondary, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: c.success,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: onTap,
+            child: const Text(
+              "UPLOAD",
+              style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+            ),
+          ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text("CLOSE", style: TextStyle(color: c.textSecondary)),
-        ),
-      ],
     );
   }
 }

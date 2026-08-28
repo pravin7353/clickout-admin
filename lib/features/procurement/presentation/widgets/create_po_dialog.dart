@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/po_engine_service.dart';
-import 'package:clickout_admin/features/auth/auth_provider.dart'; // 🚀 SAAS INJECTION
+import 'package:clickout_admin/features/auth/auth_provider.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
+import '../../../../core/widgets/skeleton_loader.dart';
+import '../../../../core/widgets/error_state.dart';
 
 class CreatePODialog extends ConsumerStatefulWidget {
   final String productId;
@@ -24,34 +27,34 @@ class CreatePODialog extends ConsumerStatefulWidget {
 class _CreatePODialogState extends ConsumerState<CreatePODialog> {
   final _formKey = GlobalKey<FormState>();
   final _qtyCtrl = TextEditingController(text: "100");
-  final _branchCtrl =
-      TextEditingController(); // 🚀 FIX: Removed hardcoded MUM01
+  final _branchCtrl = TextEditingController();
 
   String _selectedSupplier = "";
   DateTime _deliveryDate = DateTime.now().add(const Duration(days: 3));
 
-  // 🚀 LIVE SUPPLIER FETCHING STATE
   List<Map<String, dynamic>> _suppliersList = [];
   bool _isLoadingSuppliers = true;
+  bool _hasErrorSuppliers = false;
 
   @override
   void initState() {
     super.initState();
-
-    // 🚀 FIX: Automatically set the exact branch code of the logged-in user!
     final adminData = ref.read(adminRoleProvider).value;
     final branchCode =
         adminData?['branchCode'] ?? adminData?['storeId'] ?? "HQ";
     _branchCtrl.text = branchCode;
-
     _fetchSuppliers();
   }
 
-  // 📡 Fetch Suppliers from Database
-  // 📡 Fetch Suppliers from Database (🚀 SAAS INJECTED)
+  @override
+  void dispose() {
+    _qtyCtrl.dispose();
+    _branchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchSuppliers() async {
     try {
-      // 🚀 SAAS CONTEXT
       final tenantId = ref.read(adminRoleProvider).value?['tenantId'];
       final role = (ref.read(adminRoleProvider).value?['role'] ?? '')
           .toString()
@@ -59,54 +62,66 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
 
       Query query = FirebaseFirestore.instance.collection('suppliers');
 
-      // 🚀 SAAS ISOLATION
       if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
         query = query.where('tenantId', isEqualTo: tenantId);
       }
 
       final snap = await query.get();
-      setState(() {
-        _suppliersList = snap.docs.map((d) {
-          final data = d.data() as Map<String, dynamic>;
-          data['id'] = d.id;
-          return data;
-        }).toList();
+      if (mounted) {
+        setState(() {
+          _suppliersList = snap.docs.map((d) {
+            final data = d.data() as Map<String, dynamic>;
+            data['id'] = d.id;
+            return data;
+          }).toList();
 
-        if (_suppliersList.isNotEmpty) {
-          _selectedSupplier = _suppliersList.first['id'];
-        }
-        _isLoadingSuppliers = false;
-      });
+          if (_suppliersList.isNotEmpty) {
+            _selectedSupplier = _suppliersList.first['id'];
+          }
+          _isLoadingSuppliers = false;
+          _hasErrorSuppliers = false;
+        });
+      }
     } catch (e) {
-      debugPrint("Error fetching suppliers: $e");
-      if (mounted) setState(() => _isLoadingSuppliers = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingSuppliers = false;
+          _hasErrorSuppliers = true;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isProcessing = ref.watch(poEngineProvider);
-
-    // 🎨 THEME CONSTANTS (Standard Premium Dark)
-    const Color bgDark = Color(0xFF080B08);
-    const Color accentGreen = Color(0xFF00C853);
-    const Color textPrimary = Color(0xFFF0F0F0);
-    const Color textSecondary = Color(0xFF888888);
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: textSecondary.withValues(alpha: 0.2), width: 1),
-      ),
-      backgroundColor: bgDark,
-      elevation: 24,
-      insetPadding: const EdgeInsets.all(16),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(20),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 600),
         child: Container(
           decoration: BoxDecoration(
-            color: bgDark,
-            borderRadius: BorderRadius.circular(16),
+            color: c.scaffoldBg,
+            borderRadius: BorderRadius.circular(24), // 🚀 Premium 24px
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade200,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? c.success.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.1),
+                blurRadius: 40,
+                spreadRadius: -10,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -118,12 +133,14 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: c.cardBg,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
+                    top: Radius.circular(24),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white12 : Colors.grey.shade200,
+                    ),
                   ),
                 ),
                 child: Row(
@@ -131,12 +148,12 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accentGreen.withValues(alpha: 0.1),
+                        color: c.success.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.local_shipping,
-                        color: accentGreen,
+                        color: c.success,
                         size: 26,
                       ),
                     ),
@@ -145,22 +162,22 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             "Generate Purchase Order",
                             style: TextStyle(
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
-                              color: textPrimary,
+                              color: c.textPrimary,
                               letterSpacing: -0.5,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             "Target SKU: ${widget.productName}",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
-                              color: textSecondary,
+                              color: c.textSecondary,
                             ),
                           ),
                         ],
@@ -172,13 +189,13 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.1),
+                        color: c.danger.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         "Shelf Stock: ${widget.currentStock}",
-                        style: const TextStyle(
-                          color: Colors.redAccent,
+                        style: TextStyle(
+                          color: c.danger,
                           fontWeight: FontWeight.w900,
                           fontSize: 11,
                         ),
@@ -197,32 +214,39 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionTitle("SUPPLIER DETAILS"),
-
-                        const Text(
+                        _buildSectionTitle("SUPPLIER DETAILS", c),
+                        Text(
                           "Select Supplier",
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
-                            color: textPrimary,
+                            color: c.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
 
-                        _isLoadingSuppliers
-                            ? const Center(
-                                child: CircularProgressIndicator(
-                                  color: accentGreen,
-                                ),
+                        _hasErrorSuppliers
+                            ? ErrorState(
+                                message: "Failed to load suppliers.",
+                                onRetry: () {
+                                  setState(() {
+                                    _isLoadingSuppliers = true;
+                                    _hasErrorSuppliers = false;
+                                  });
+                                  _fetchSuppliers();
+                                },
                               )
+                            : _isLoadingSuppliers
+                            ? const SkeletonBox(
+                                height: 56,
+                              ) // 🚀 MATCHES INPUT HEIGHT
                             : Autocomplete<Map<String, dynamic>>(
                                 displayStringForOption: (option) =>
                                     option['name'] ?? 'Unknown',
                                 optionsBuilder:
                                     (TextEditingValue textEditingValue) {
-                                      if (textEditingValue.text.isEmpty) {
+                                      if (textEditingValue.text.isEmpty)
                                         return _suppliersList;
-                                      }
                                       return _suppliersList.where((option) {
                                         return option['name']
                                             .toString()
@@ -233,9 +257,8 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                             );
                                       });
                                     },
-                                onSelected: (selection) {
-                                  _selectedSupplier = selection['id'];
-                                },
+                                onSelected: (selection) =>
+                                    _selectedSupplier = selection['id'],
                                 fieldViewBuilder:
                                     (
                                       context,
@@ -246,13 +269,14 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                       return TextFormField(
                                         controller: textEditingController,
                                         focusNode: focusNode,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontWeight: FontWeight.w600,
-                                          color: textPrimary,
+                                          color: c.textPrimary,
                                         ),
                                         decoration: _inputStyle(
                                           icon: Icons.domain,
                                           hintText: "Search Supplier Name...",
+                                          context: context,
                                         ),
                                         validator: (val) =>
                                             val == null || val.isEmpty
@@ -267,38 +291,39 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Divider(
-                            color: textSecondary.withValues(alpha: 0.1),
+                            color: c.textSecondary.withValues(alpha: 0.1),
                             height: 1,
                             thickness: 1,
                           ),
                         ),
 
-                        _buildSectionTitle("ORDER SPECIFICATIONS"),
+                        _buildSectionTitle("ORDER SPECIFICATIONS", c),
                         Row(
                           children: [
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     "Order Quantity",
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
-                                      color: textPrimary,
+                                      color: c.textPrimary,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: _qtyCtrl,
                                     keyboardType: TextInputType.number,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w600,
-                                      color: textPrimary,
+                                      color: c.textPrimary,
                                     ),
                                     decoration: _inputStyle(
                                       icon: Icons.production_quantity_limits,
                                       hintText: "Enter Quantity",
+                                      context: context,
                                     ),
                                     validator: (v) =>
                                         v!.isEmpty ? 'Required' : null,
@@ -311,12 +336,12 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     "Branch Code",
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w700,
-                                      color: textPrimary,
+                                      color: c.textPrimary,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -324,13 +349,14 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                     controller: _branchCtrl,
                                     textCapitalization:
                                         TextCapitalization.characters,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontWeight: FontWeight.w600,
-                                      color: textPrimary,
+                                      color: c.textPrimary,
                                     ),
                                     decoration: _inputStyle(
                                       icon: Icons.store,
                                       hintText: "Branch Code",
+                                      context: context,
                                     ),
                                   ),
                                 ],
@@ -344,12 +370,12 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               "Delivery Date",
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: textPrimary,
+                                color: c.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -365,33 +391,40 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                   builder: (context, child) {
                                     return Theme(
                                       data: Theme.of(context).copyWith(
-                                        colorScheme: const ColorScheme.dark(
-                                          primary: accentGreen,
-                                          onPrimary: Colors.white,
-                                          surface: Color(0xFF111811),
-                                          onSurface: textPrimary,
-                                        ),
-                                        dialogBackgroundColor: bgDark,
+                                        colorScheme: isDark
+                                            ? ColorScheme.dark(
+                                                primary: c.success,
+                                                onPrimary: Colors.white,
+                                                surface: c.cardBg,
+                                                onSurface: c.textPrimary,
+                                              )
+                                            : ColorScheme.light(
+                                                primary: c.success,
+                                                onPrimary: Colors.white,
+                                                surface: c.cardBg,
+                                                onSurface: c.textPrimary,
+                                              ),
+                                        dialogBackgroundColor: c.scaffoldBg,
                                       ),
                                       child: child!,
                                     );
                                   },
                                 );
-                                if (date != null) {
+                                if (date != null)
                                   setState(() => _deliveryDate = date);
-                                }
                               },
                               child: InputDecorator(
                                 decoration: _inputStyle(
                                   icon: Icons.calendar_month,
+                                  context: context,
                                 ),
                                 child: Text(
                                   DateFormat(
                                     'dd MMM yyyy',
                                   ).format(_deliveryDate),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    color: textPrimary,
+                                    color: c.textPrimary,
                                   ),
                                 ),
                               ),
@@ -408,15 +441,12 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 20,
+                  vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: c.cardBg,
                   borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(16),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: Radius.circular(24),
                   ),
                 ),
                 child: Row(
@@ -426,10 +456,10 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                       onPressed: isProcessing
                           ? null
                           : () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         "Cancel",
                         style: TextStyle(
-                          color: textSecondary,
+                          color: c.textSecondary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
@@ -438,14 +468,15 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                     const SizedBox(width: 16),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: accentGreen,
-                        foregroundColor: Colors.white,
+                        backgroundColor: c.success,
+                        foregroundColor: Colors.black, // 🚀 Premium dark text
                         padding: const EdgeInsets.symmetric(
                           horizontal: 32,
                           vertical: 16,
                         ),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       onPressed: isProcessing
@@ -454,9 +485,11 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                               if (!_formKey.currentState!.validate()) return;
                               if (_selectedSupplier.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Select a valid supplier!"),
-                                    backgroundColor: Colors.redAccent,
+                                  SnackBar(
+                                    content: const Text(
+                                      "Select a valid supplier!",
+                                    ),
+                                    backgroundColor: c.danger,
                                   ),
                                 );
                                 return;
@@ -475,21 +508,23 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                                 if (context.mounted) {
                                   Navigator.pop(context);
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
+                                    SnackBar(
+                                      content: const Text(
                                         "✅ PO Raised! Check PENDING APPROVALS.",
                                       ),
-                                      backgroundColor: accentGreen,
+                                      backgroundColor: c.success,
                                     ),
                                   );
                                 }
                               } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text("Error: $e"),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text("Error: $e"),
+                                      backgroundColor: c.danger,
+                                    ),
+                                  );
+                                }
                               }
                             },
                       icon: isProcessing
@@ -497,14 +532,14 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                color: Colors.white,
+                                color: Colors.black,
                                 strokeWidth: 2,
                               ),
                             )
                           : const Icon(Icons.check, size: 18),
-                      label: const Text(
-                        "Generate PO",
-                        style: TextStyle(
+                      label: Text(
+                        isProcessing ? "PROCESSING..." : "Generate PO",
+                        style: const TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: 14,
                         ),
@@ -520,44 +555,49 @@ class _CreatePODialogState extends ConsumerState<CreatePODialog> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, dynamic c) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w900,
-          color: Color(0xFF888888),
+          color: c.textSecondary,
           letterSpacing: 1.5,
         ),
       ),
     );
   }
 
-  InputDecoration _inputStyle({required IconData icon, String? hintText}) {
-    const Color inputBg = Color(0xFF1A221A);
-    const Color accentGreen = Color(0xFF00C853);
-    const Color textSecondary = Color(0xFF888888);
+  InputDecoration _inputStyle({
+    required IconData icon,
+    String? hintText,
+    required BuildContext context,
+  }) {
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
-      prefixIcon: Icon(icon, color: textSecondary, size: 20),
+      hintStyle: TextStyle(color: c.textSecondary.withValues(alpha: 0.5)),
+      prefixIcon: Icon(icon, color: c.textSecondary, size: 20),
       filled: true,
-      fillColor: inputBg,
+      fillColor: isDark
+          ? Colors.white.withValues(alpha: 0.05)
+          : Colors.grey.shade100,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: accentGreen, width: 1.5),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: c.success, width: 1.5),
       ),
     );
   }

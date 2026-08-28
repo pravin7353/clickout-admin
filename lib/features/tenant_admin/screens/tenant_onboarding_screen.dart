@@ -304,7 +304,9 @@ class _TenantOnboardingScreenState
       ),
       prefixIcon: Icon(icon, color: context.colors.textSecondary),
       filled: true,
-      fillColor: context.colors.scaffoldBg,
+      fillColor: Theme.of(context).brightness == Brightness.dark
+          ? context.colors.scaffoldBg
+          : Colors.white, // 🚀 FIX: Solid input background
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -479,6 +481,10 @@ class _TenantOnboardingScreenState
 
                         DropdownButtonFormField<String>(
                           initialValue: _selectedIndustry,
+                          dropdownColor:
+                              Theme.of(context).brightness == Brightness.dark
+                              ? context.colors.cardBg
+                              : Colors.white, // 🚀 FIX: Solid background
                           decoration: _premiumInputStyle(
                             "Industry Type *",
                             Icons.category_outlined,
@@ -578,6 +584,10 @@ class _TenantOnboardingScreenState
                         const SizedBox(height: 20),
                         DropdownButtonFormField<String>(
                           initialValue: _selectedState,
+                          dropdownColor:
+                              Theme.of(context).brightness == Brightness.dark
+                              ? context.colors.cardBg
+                              : Colors.white, // 🚀 FIX: Solid background
                           decoration: _premiumInputStyle(
                             "State *",
                             Icons.map_outlined,

@@ -89,69 +89,112 @@ class AuthController extends Notifier<bool> {
       Map<String, dynamic> data;
 
       if (querySnapshot.docs.isEmpty) {
-        isFirstTimeLogin = true;
-        final String rawName = currentUser.email!.split('@')[0].toUpperCase();
-        final String prefix = rawName.length >= 3
-            ? rawName.substring(0, 3)
-            : rawName;
-        final String newTenantId =
-            '${prefix}_${DateTime.now().millisecondsSinceEpoch}';
+        // 🚀 BUG FIX: RECOVERY EMAIL CHECK (Stop unwanted tenant creation)
+        final recoveryCheckRoot = await FirebaseFirestore.instance
+            .collection('tenants')
+            .where('recoveryEmail', isEqualTo: currentUser.email)
+            .limit(1)
+            .get();
 
-        staffRef = FirebaseFirestore.instance
-            .collection('staff')
-            .doc(currentUser.uid);
-        final batch = FirebaseFirestore.instance.batch();
+        final recoveryCheckMap = await FirebaseFirestore.instance
+            .collection('tenants')
+            .where('contact.recoveryEmail', isEqualTo: currentUser.email)
+            .limit(1)
+            .get();
 
-        batch.set(
-          FirebaseFirestore.instance.collection('tenants').doc(newTenantId),
-          {
-            'tenantId': newTenantId,
-            'companyName':
-                '${currentUser.email!.split('@')[0].toUpperCase()} ENTERPRISES',
-            'ownerName': currentUser.email!.split('@')[0],
-            'establishedYear': DateTime.now().year,
-            'isOnboardingComplete': false,
-            'status': 'ACTIVE',
-            'subscriptionPlan': 'trial',
-            'billingStatus': 'active',
-            'trialStartAt': FieldValue.serverTimestamp(),
-            'activeStores': 0,
-            'industries': [],
-            'goods_or_services': [],
-            'licenses': [],
-            'contact': {
-              'email': currentUser.email,
-              'phone': '',
-              'recoveryEmail': '',
-              'recoveryPhone': '',
-            },
-            'location': {'address': '', 'city': '', 'state': '', 'pincode': ''},
-            'bankDetails': {
-              'accountName': '',
-              'accountNo': '',
-              'ifsc': '',
-              'upi': '',
-              'bankName': '',
-              'isCustom': false,
-            },
+        if (recoveryCheckRoot.docs.isNotEmpty ||
+            recoveryCheckMap.docs.isNotEmpty) {
+          // 🛡️ User is logging in with a Backup/Recovery Email!
+          final existingTenant = recoveryCheckRoot.docs.isNotEmpty
+              ? recoveryCheckRoot.docs.first
+              : recoveryCheckMap.docs.first;
+
+          staffRef = FirebaseFirestore.instance
+              .collection('staff')
+              .doc(currentUser.uid);
+          data = {
+            'uid': currentUser.uid,
+            'email': currentUser.email,
+            'role': 'TENANT_ADMIN', // 👑 Grant Owner Access to original tenant
+            'tenantId': existingTenant.id,
+            'name': currentUser.email!.split('@')[0],
+            'isActive': true,
+            'isDeleted': false,
             'createdAt': FieldValue.serverTimestamp(),
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-        );
+          };
+          await staffRef.set(data);
+          isFirstTimeLogin = false; // Bypass onboarding, go to dashboard
+        } else {
+          // 🏢 NORMAL FLOW: Brand New Signup -> Create New Tenant
+          isFirstTimeLogin = true;
+          final String rawName = currentUser.email!.split('@')[0].toUpperCase();
+          final String prefix = rawName.length >= 3
+              ? rawName.substring(0, 3)
+              : rawName;
+          final String newTenantId =
+              '${prefix}_${DateTime.now().millisecondsSinceEpoch}';
 
-        data = {
-          'uid': currentUser.uid,
-          'email': currentUser.email,
-          'role': 'TENANT_ADMIN',
-          'tenantId': newTenantId,
-          'name': currentUser.email!.split('@')[0],
-          'isActive': true,
-          'isDeleted': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        };
-        batch.set(staffRef, data);
+          staffRef = FirebaseFirestore.instance
+              .collection('staff')
+              .doc(currentUser.uid);
+          final batch = FirebaseFirestore.instance.batch();
 
-        await batch.commit();
+          batch.set(
+            FirebaseFirestore.instance.collection('tenants').doc(newTenantId),
+            {
+              'tenantId': newTenantId,
+              'companyName':
+                  '${currentUser.email!.split('@')[0].toUpperCase()} ENTERPRISES',
+              'ownerName': currentUser.email!.split('@')[0],
+              'establishedYear': DateTime.now().year,
+              'isOnboardingComplete': false,
+              'status': 'ACTIVE',
+              'subscriptionPlan': 'trial',
+              'billingStatus': 'active',
+              'trialStartAt': FieldValue.serverTimestamp(),
+              'activeStores': 0,
+              'industries': [],
+              'goods_or_services': [],
+              'licenses': [],
+              'contact': {
+                'email': currentUser.email,
+                'phone': '',
+                'recoveryEmail': '',
+                'recoveryPhone': '',
+              },
+              'location': {
+                'address': '',
+                'city': '',
+                'state': '',
+                'pincode': '',
+              },
+              'bankDetails': {
+                'accountName': '',
+                'accountNo': '',
+                'ifsc': '',
+                'upi': '',
+                'bankName': '',
+                'isCustom': false,
+              },
+              'createdAt': FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
+            },
+          );
+
+          data = {
+            'uid': currentUser.uid,
+            'email': currentUser.email,
+            'role': 'TENANT_ADMIN',
+            'tenantId': newTenantId,
+            'name': currentUser.email!.split('@')[0],
+            'isActive': true,
+            'isDeleted': false,
+            'createdAt': FieldValue.serverTimestamp(),
+          };
+          batch.set(staffRef, data);
+
+          await batch.commit();
+        }
       } else {
         staffRef = querySnapshot.docs.first.reference;
         data = querySnapshot.docs.first.data();

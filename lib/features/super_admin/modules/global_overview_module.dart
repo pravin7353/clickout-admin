@@ -6,6 +6,8 @@ import '../widgets/kpi_card.dart';
 import '../widgets/audit_feed_item.dart';
 import '../providers/fraud_feed_provider.dart'; // ⚡ NEW: Real threat provider
 import '../providers/revenue_provider.dart'; // ⚡ NEW: Real MRR provider
+import '../../../core/widgets/skeleton_loader.dart'; // 🚀 Added Skeleton
+import '../../../core/widgets/error_state.dart'; // 🚀 Added Error State
 
 final saasTenantsProvider =
     StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
@@ -64,36 +66,19 @@ class GlobalOverviewModule extends ConsumerWidget {
               children: List.generate(
                 4,
                 (i) => Expanded(
-                  child: Container(
-                    margin: EdgeInsets.only(right: i == 3 ? 0 : 16),
-                    height: 110,
-                    decoration: BoxDecoration(
-                      color: context.surfaceGlass.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: context.borderSubtle.withValues(alpha: 0.2),
-                      ),
-                    ),
+                  child: Padding(
+                    padding: EdgeInsets.only(right: i == 3 ? 0 : 16),
+                    child: const SkeletonBox(
+                      height: 110,
+                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                    ), // 🚀 FIX: Used generic SkeletonBox
                   ),
                 ),
               ),
             ),
-            error: (err, stack) => Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Error: $err',
-                    style: TextStyle(color: context.riskHigh),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => ref.invalidate(saasTenantsProvider),
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Retry'),
-                  ),
-                ],
-              ),
+            error: (err, stack) => ErrorState(
+              message: 'Failed to load platform operations data.',
+              onRetry: () => ref.invalidate(saasTenantsProvider),
             ),
             data: (tenants) {
               int activeTenants = tenants
@@ -262,18 +247,18 @@ class GlobalOverviewModule extends ConsumerWidget {
                               .snapshots(),
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
-                              return Center(
-                                child: Text(
-                                  'Error loading feed',
-                                  style: TextStyle(color: context.riskHigh),
-                                ),
-                              );
+                              return const ErrorState(
+                                message: 'Failed to stream live audit logs.',
+                              ); // 🚀 FIX: Used ErrorState
                             }
                             if (!snapshot.hasData) {
-                              return Center(
-                                child: CircularProgressIndicator(
-                                  color: context.accentNeon,
-                                  strokeWidth: 2,
+                              return ListView.builder(
+                                itemCount: 5,
+                                itemBuilder: (_, __) => const Padding(
+                                  padding: EdgeInsets.only(bottom: 12),
+                                  child: SkeletonBox(
+                                    height: 48,
+                                  ), // 🚀 FIX: Used Skeleton for list
                                 ),
                               );
                             }

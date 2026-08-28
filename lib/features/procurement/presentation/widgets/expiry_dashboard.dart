@@ -3,13 +3,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'package:clickout_admin/core/utils/hierarchy_filter.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
 
 import '../../services/stock_service.dart';
 import 'offer_creation_dialog.dart';
 import 'create_po_dialog.dart';
 import '../../../coach/widgets/info_button.dart';
 
-// 🚀 CHANGED: StatefulWidget to ConsumerStatefulWidget
 class ExpiryAlertDashboard extends ConsumerStatefulWidget {
   const ExpiryAlertDashboard({super.key});
 
@@ -31,24 +31,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   DateTime? _lastCacheTime;
   final ScrollController _horizontalScrollController = ScrollController();
 
-  // 🎨 DYNAMIC PREMIUM THEME (Simple & Clean Look)
-  Color get bgDark => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF080B08)
-      : const Color(0xFFF4F5F7); // 🚀 Light Gray (Clean look)
-  Color get cardDark => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF111811)
-      : const Color(0xFFFFFFFF); // 🚀 Pure White
-  Color get accentGreen => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF00C853)
-      : const Color(0xFF2E7D32);
-  Color get accentOrange => const Color(0xFFFF6D00); // 🚀 Deep Sunset Orange
-  Color get textPrimary =>
-      Theme.of(context).textTheme.bodyLarge?.color ?? Colors.black;
-  Color get textSecondary =>
-      Theme.of(context).textTheme.labelLarge?.color ?? Colors.grey;
-  Color get accentRed => const Color(0xFFFE8181);
-
-  // 🧠 SMART DATE PARSER: 100% Crash-Proof (Handles Timestamp, MM/YYYY, DD/MM/YYYY)
   DateTime? _parseExpiryDate(dynamic rawDate) {
     if (rawDate == null) return null;
     if (rawDate is Timestamp) return rawDate.toDate();
@@ -57,14 +39,8 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
       try {
         final parts = rawDate.replaceAll('-', '/').split('/');
         if (parts.length == 2) {
-          // Format: MM/YYYY
-          return DateTime(
-            int.parse(parts[1]),
-            int.parse(parts[0]) + 1,
-            0,
-          ); // End of month
+          return DateTime(int.parse(parts[1]), int.parse(parts[0]) + 1, 0);
         } else if (parts.length == 3) {
-          // Format: DD/MM/YYYY
           return DateTime(
             int.parse(parts[2]),
             int.parse(parts[1]),
@@ -88,11 +64,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
     {'name': 'Expiry', 'icon': Icons.hourglass_bottom, 'filter': 'Expiry'},
     {'name': 'Stock', 'icon': Icons.inventory, 'filter': 'Stock'},
     {'name': 'ATL', 'icon': Icons.trending_down, 'filter': 'ATL'},
-    {
-      'name': 'Offers',
-      'icon': Icons.local_offer,
-      'filter': 'Offers',
-    }, // 🚀 ADDED: Offers sorting option
+    {'name': 'Offers', 'icon': Icons.local_offer, 'filter': 'Offers'},
   ];
 
   @override
@@ -103,15 +75,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
 
   Stream<QuerySnapshot> get _engineStream {
     final query = _searchQuery.trim().toLowerCase();
-
-    // 🚀 SAAS INJECTION: The Wall is Active Here!
     final adminData = ref.watch(adminRoleProvider).value;
     Query baseQuery = HierarchyFilter.apply(
       FirebaseFirestore.instance.collection('products'),
       adminData,
     );
 
-    // 🚀 FIX 1: Forced Cache Engine (includeMetadataChanges) so it loads instantly from local device memory
     if (query.isNotEmpty) {
       if (double.tryParse(query) != null) {
         return baseQuery
@@ -135,11 +104,9 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   }
 
   Future<void> _analyzeRecentTransactions() async {
-    // 🚀 CACHE REDUCED TO 15 SECONDS FOR REAL-TIME REFLECTION
     if (_lastCacheTime != null &&
-        DateTime.now().difference(_lastCacheTime!).inSeconds < 15) {
+        DateTime.now().difference(_lastCacheTime!).inSeconds < 15)
       return;
-    }
 
     setState(() => _isSorting = true);
     try {
@@ -150,7 +117,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
         FirebaseFirestore.instance.collection('orders'),
         adminData,
       );
-
       final ordersSnap = await ordersQuery
           .where(
             'timestamp',
@@ -161,8 +127,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
       Map<String, int> salesCount = {};
       for (var doc in ordersSnap.docs) {
         final data = doc.data() as Map<String, dynamic>;
-
-        // 🚀 FIX: Catching all POS and App successful order statuses
         final pStatus = data['paymentStatus']?.toString().toUpperCase() ?? '';
         final status = data['status']?.toString().toUpperCase() ?? '';
 
@@ -202,7 +166,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
     List<QueryDocumentSnapshot> rawDocs,
   ) {
     List<QueryDocumentSnapshot> filtered = [];
-
     for (var doc in rawDocs) {
       final data = doc.data() as Map<String, dynamic>;
       if (data['isBlocked'] == true) continue;
@@ -222,7 +185,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
       int stA = dataA['physicalStock'] ?? dataA['stock'] ?? 0;
       int stB = dataB['physicalStock'] ?? dataB['stock'] ?? 0;
 
-      // 🚀 CRASH FIX: Ab sorting bhi safe parser use karegi!
       DateTime? expA = _parseExpiryDate(dataA['expiryDate']);
       DateTime? expB = _parseExpiryDate(dataB['expiryDate']);
 
@@ -251,14 +213,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
         return expA.compareTo(expB);
       }
 
-      // 🚀 ADDED: Active offers ko priority dekar top par laao
       if (_selectedSort == 'Offers') {
         bool offerA = dataA['clearanceActive'] == true;
         bool offerB = dataB['clearanceActive'] == true;
-
-        if (offerA && !offerB) return -1; // A upar aayega
-        if (!offerA && offerB) return 1; // B upar aayega
-        return 0; // Agar dono mein offer hai ya dono mein nahi hai, toh wahi position rakho
+        if (offerA && !offerB) return -1;
+        if (!offerA && offerB) return 1;
+        return 0;
       }
 
       return 0;
@@ -271,13 +231,24 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
   Widget build(BuildContext context) {
     bool isMobile = MediaQuery.of(context).size.width < 768;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
 
     return Container(
       padding: EdgeInsets.all(isMobile ? 16 : 24),
       decoration: BoxDecoration(
-        color: cardDark,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: textSecondary.withValues(alpha: 0.1), width: 1),
+        color: c.cardBg,
+        borderRadius: BorderRadius.circular(24), // 🚀 Premium 24px Radius
+        border: Border.all(
+          color: c.textSecondary.withValues(alpha: 0.1),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            spreadRadius: -5,
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -287,14 +258,14 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.memory, color: accentOrange, size: 28),
+                  const Icon(Icons.memory, color: Color(0xFFFF6D00), size: 28),
                   const SizedBox(width: 12),
                   Text(
                     "Quantum Promotion Engine 🌌",
                     style: TextStyle(
                       fontSize: isMobile ? 18 : 22,
                       fontWeight: FontWeight.w900,
-                      color: textPrimary,
+                      color: c.textPrimary,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -312,15 +283,11 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                     _searchQuery = "";
                     _currentPage = 0;
                   }),
-                  icon: const Icon(
-                    Icons.clear,
-                    size: 16,
-                    color: Colors.redAccent,
-                  ),
-                  label: const Text(
+                  icon: Icon(Icons.clear, size: 16, color: c.danger),
+                  label: Text(
                     "Clear Filter",
                     style: TextStyle(
-                      color: Colors.redAccent,
+                      color: c.danger,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -336,14 +303,16 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                 child: Container(
                   height: 50,
                   decoration: BoxDecoration(
-                    color: bgDark,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: textSecondary.withValues(alpha: 0.2)),
+                    color: c.scaffoldBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: c.textSecondary.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: TextField(
                     controller: _searchCtrl,
                     style: TextStyle(
-                      color: textPrimary,
+                      color: c.textPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                     onChanged: (val) => setState(() {
@@ -353,9 +322,9 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                     decoration: InputDecoration(
                       hintText: "Search Product by Name or Barcode...",
                       hintStyle: TextStyle(
-                        color: textSecondary.withValues(alpha: 0.5),
+                        color: c.textSecondary.withValues(alpha: 0.5),
                       ),
-                      prefixIcon: Icon(Icons.search, color: textSecondary),
+                      prefixIcon: Icon(Icons.search, color: c.textSecondary),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(vertical: 14),
                     ),
@@ -369,16 +338,18 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                   height: 50,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: bgDark,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: accentOrange.withValues(alpha: 0.5)),
+                    color: c.scaffoldBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFFF6D00).withValues(alpha: 0.5),
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
                       isExpanded: true,
-                      dropdownColor: cardDark,
+                      dropdownColor: c.cardBg,
                       value: _selectedSort,
-                      icon: Icon(Icons.sort, color: accentOrange),
+                      icon: const Icon(Icons.sort, color: Color(0xFFFF6D00)),
                       items: _sortOptions
                           .map(
                             (opt) => DropdownMenuItem<String>(
@@ -388,7 +359,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                   Icon(
                                     opt['icon'],
                                     size: 16,
-                                    color: accentOrange,
+                                    color: const Color(0xFFFF6D00),
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
@@ -396,7 +367,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
-                                      color: textPrimary,
+                                      color: c.textPrimary,
                                     ),
                                   ),
                                 ],
@@ -424,10 +395,10 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
           const SizedBox(height: 25),
 
           _isSorting
-              ? Padding(
-                  padding: const EdgeInsets.all(50),
+              ? const Padding(
+                  padding: EdgeInsets.all(50),
                   child: Center(
-                    child: CircularProgressIndicator(color: accentOrange),
+                    child: CircularProgressIndicator(color: Color(0xFFFF6D00)),
                   ),
                 )
               : StreamBuilder<QuerySnapshot>(
@@ -435,10 +406,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting &&
                         !snapshot.hasData) {
-                      return Center(
+                      return const Center(
                         child: Padding(
-                          padding: const EdgeInsets.all(50.0),
-                          child: CircularProgressIndicator(color: accentOrange),
+                          padding: EdgeInsets.all(50.0),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFF6D00),
+                          ),
                         ),
                       );
                     }
@@ -488,11 +461,9 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
 
                     return LayoutBuilder(
                       builder: (context, constraints) {
-                        // 🚀 FIX: Prevent infinite width crash on shrink
                         double safeWidth = constraints.maxWidth;
-                        if (safeWidth.isInfinite) {
+                        if (safeWidth.isInfinite)
                           safeWidth = MediaQuery.of(context).size.width - 48;
-                        }
                         final double tableWidth = safeWidth < 1000
                             ? 1000
                             : safeWidth;
@@ -519,14 +490,14 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                     decoration: BoxDecoration(
                                       color: isDark
                                           ? const Color(0xFF131A13)
-                                          : const Color(
-                                              0xFF9EC2B6,
-                                            ), // 🚀 Requested Custom Header Color
+                                          : const Color(0xFF9EC2B6),
                                       borderRadius: const BorderRadius.vertical(
                                         top: Radius.circular(12),
                                       ),
                                       border: Border.all(
-                                        color: textSecondary.withValues(alpha: 0.1),
+                                        color: c.textSecondary.withValues(
+                                          alpha: 0.1,
+                                        ),
                                       ),
                                     ),
                                     child: Row(
@@ -537,7 +508,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             "Product/Service Info",
                                             style: TextStyle(
                                               fontWeight: FontWeight.w900,
-                                              color: textPrimary,
+                                              color: c.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -547,7 +518,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             "Expiry Status",
                                             style: TextStyle(
                                               fontWeight: FontWeight.w900,
-                                              color: textPrimary,
+                                              color: c.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -557,7 +528,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             "Offer Status",
                                             style: TextStyle(
                                               fontWeight: FontWeight.w900,
-                                              color: textPrimary,
+                                              color: c.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -567,7 +538,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             "Stock",
                                             style: TextStyle(
                                               fontWeight: FontWeight.w900,
-                                              color: textPrimary,
+                                              color: c.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -577,7 +548,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             "Action",
                                             style: TextStyle(
                                               fontWeight: FontWeight.w900,
-                                              color: textPrimary,
+                                              color: c.textPrimary,
                                             ),
                                           ),
                                         ),
@@ -607,8 +578,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                           data['clearanceActive'] == true;
 
                                       int daysLeft = 999;
-
-                                      // 🚀 CRASH FIX: Ab yahan Smart Parser use ho raha hai!
                                       DateTime? parsedExpiry = _parseExpiryDate(
                                         data['expiryDate'],
                                       );
@@ -617,7 +586,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             .difference(DateTime.now())
                                             .inDays;
                                       }
-
                                       bool isDead = daysLeft < 0;
 
                                       return Dismissible(
@@ -637,25 +605,27 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                             adminData?['tenantId'] ?? 'SYSTEM',
                                             adminData?['email'] ?? 'Unknown',
                                           );
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "✅ $name Blocked & Logged!",
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  "✅ $name Blocked & Logged!",
+                                                ),
+                                                backgroundColor: c.danger,
                                               ),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
+                                            );
+                                          }
                                         },
                                         background: Container(
-                                          color: Colors.redAccent,
+                                          color: c.danger,
                                           alignment: Alignment.centerLeft,
                                           padding: const EdgeInsets.only(
                                             left: 20,
                                           ),
-                                          child: Row(
-                                            children: const [
+                                          child: const Row(
+                                            children: [
                                               Icon(
                                                 Icons.block,
                                                 color: Colors.white,
@@ -680,19 +650,19 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: index % 2 == 0
-                                                ? bgDark
-                                                : cardDark,
+                                                ? c.scaffoldBg
+                                                : c.cardBg,
                                             border: Border(
                                               bottom: BorderSide(
-                                                color: textSecondary
+                                                color: c.textSecondary
                                                     .withValues(alpha: 0.1),
                                               ),
                                               left: BorderSide(
-                                                color: textSecondary
+                                                color: c.textSecondary
                                                     .withValues(alpha: 0.1),
                                               ),
                                               right: BorderSide(
-                                                color: textSecondary
+                                                color: c.textSecondary
                                                     .withValues(alpha: 0.1),
                                               ),
                                             ),
@@ -711,14 +681,16 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                         fontWeight:
                                                             FontWeight.bold,
                                                         fontSize: 14,
-                                                        color: textPrimary,
+                                                        color: c.textPrimary,
                                                       ),
                                                     ),
                                                     Text(
                                                       "7-Day Sales: ${_salesDataCache[productId] ?? _salesDataCache[data['barcode']?.toString()] ?? 0}",
-                                                      style: TextStyle(
+                                                      style: const TextStyle(
                                                         fontSize: 11,
-                                                        color: accentOrange,
+                                                        color: Color(
+                                                          0xFFFF6D00,
+                                                        ),
                                                         fontWeight:
                                                             FontWeight.bold,
                                                       ),
@@ -727,7 +699,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                       "Price: ₹$price",
                                                       style: TextStyle(
                                                         fontSize: 11,
-                                                        color: accentGreen,
+                                                        color: c.success,
                                                         fontWeight:
                                                             FontWeight.bold,
                                                       ),
@@ -737,7 +709,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                       "👉 Swipe right to Block",
                                                       style: TextStyle(
                                                         fontSize: 10,
-                                                        color: textSecondary,
+                                                        color: c.textSecondary,
                                                         fontStyle:
                                                             FontStyle.italic,
                                                       ),
@@ -775,8 +747,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                           ]
                                                         : (daysLeft <= 3
                                                               ? [
-                                                                  Colors
-                                                                      .redAccent,
+                                                                  c.danger,
                                                                   Colors
                                                                       .red
                                                                       .shade700,
@@ -904,9 +875,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                         ? '₹$flat OFF'
                                                                         : 'FLAT OFF';
                                                                     offerGradient = [
-                                                                      const Color(
-                                                                        0xFF00C853,
-                                                                      ),
+                                                                      c.success,
                                                                       Colors
                                                                           .green
                                                                           .shade700,
@@ -972,8 +941,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                     offerDisplayName =
                                                                         'FLASH';
                                                                     offerGradient = [
-                                                                      Colors
-                                                                          .redAccent,
+                                                                      c.danger,
                                                                       Colors
                                                                           .red
                                                                           .shade700,
@@ -1013,14 +981,15 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                     decoration: BoxDecoration(
                                                                       color: offerGradient
                                                                           .first
-                                                                          .withValues(alpha: 
-                                                                            0.1,
+                                                                          .withValues(
+                                                                            alpha:
+                                                                                0.1,
                                                                           ),
                                                                       border: Border.all(
                                                                         color: offerGradient
                                                                             .first
-                                                                            .withValues(alpha: 
-                                                                              0.5,
+                                                                            .withValues(
+                                                                              alpha: 0.5,
                                                                             ),
                                                                         width:
                                                                             1,
@@ -1075,18 +1044,18 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                                         (
                                                                                           ctx,
                                                                                         ) => AlertDialog(
-                                                                                          backgroundColor: cardDark,
+                                                                                          backgroundColor: c.cardBg,
                                                                                           title: Text(
                                                                                             "Remove Offer?",
                                                                                             style: TextStyle(
-                                                                                              color: textPrimary,
+                                                                                              color: c.textPrimary,
                                                                                               fontWeight: FontWeight.bold,
                                                                                             ),
                                                                                           ),
                                                                                           content: Text(
                                                                                             "Are you sure you want to deactivate this offer? Customer will no longer see this discount.",
                                                                                             style: TextStyle(
-                                                                                              color: textSecondary,
+                                                                                              color: c.textSecondary,
                                                                                             ),
                                                                                           ),
                                                                                           actions: [
@@ -1104,7 +1073,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                                             ),
                                                                                             ElevatedButton(
                                                                                               style: ElevatedButton.styleFrom(
-                                                                                                backgroundColor: Colors.redAccent,
+                                                                                                backgroundColor: c.danger,
                                                                                               ),
                                                                                               onPressed: () => Navigator.pop(
                                                                                                 ctx,
@@ -1129,11 +1098,13 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                                   ScaffoldMessenger.of(
                                                                                     context,
                                                                                   ).showSnackBar(
-                                                                                    SnackBar(
-                                                                                      content: const Text(
+                                                                                    const SnackBar(
+                                                                                      content: Text(
                                                                                         "✅ Offer Removed Successfully!",
                                                                                       ),
-                                                                                      backgroundColor: accentOrange,
+                                                                                      backgroundColor: Color(
+                                                                                        0xFFFF6D00,
+                                                                                      ),
                                                                                     ),
                                                                                   );
                                                                                 }
@@ -1144,8 +1115,8 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                                 4,
                                                                               ),
                                                                               decoration: BoxDecoration(
-                                                                                color: offerGradient.first.withValues(alpha: 
-                                                                                  0.2,
+                                                                                color: offerGradient.first.withValues(
+                                                                                  alpha: 0.2,
                                                                                 ),
                                                                                 borderRadius: BorderRadius.circular(
                                                                                   4,
@@ -1180,14 +1151,20 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                   height: 34,
                                                                   width: 130,
                                                                   decoration: BoxDecoration(
-                                                                    color: accentOrange
-                                                                        .withValues(alpha: 
-                                                                          0.1,
+                                                                    color:
+                                                                        const Color(
+                                                                          0xFFFF6D00,
+                                                                        ).withValues(
+                                                                          alpha:
+                                                                              0.1,
                                                                         ),
                                                                     border: Border.all(
-                                                                      color: accentOrange
-                                                                          .withValues(alpha: 
-                                                                            0.5,
+                                                                      color:
+                                                                          const Color(
+                                                                            0xFFFF6D00,
+                                                                          ).withValues(
+                                                                            alpha:
+                                                                                0.5,
                                                                           ),
                                                                       width: 1,
                                                                     ),
@@ -1196,7 +1173,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                           6,
                                                                         ),
                                                                   ),
-                                                                  child: Row(
+                                                                  child: const Row(
                                                                     mainAxisAlignment:
                                                                         MainAxisAlignment
                                                                             .center,
@@ -1206,14 +1183,15 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                                             .sell,
                                                                         size:
                                                                             14,
-                                                                        color:
-                                                                            accentOrange,
+                                                                        color: Color(
+                                                                          0xFFFF6D00,
+                                                                        ),
                                                                       ),
-                                                                      const SizedBox(
+                                                                      SizedBox(
                                                                         width:
                                                                             4,
                                                                       ),
-                                                                      const FittedBox(
+                                                                      FittedBox(
                                                                         fit: BoxFit
                                                                             .scaleDown,
                                                                         child: Text(
@@ -1245,8 +1223,8 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                     fontWeight: FontWeight.w900,
                                                     fontSize: 16,
                                                     color: stock <= 20
-                                                        ? accentRed
-                                                        : textPrimary,
+                                                        ? c.danger
+                                                        : c.textPrimary,
                                                   ),
                                                 ),
                                               ),
@@ -1274,11 +1252,15 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                       height: 34,
                                                       width: 130,
                                                       decoration: BoxDecoration(
-                                                        color: accentGreen
-                                                            .withValues(alpha: 0.1),
+                                                        color: c.success
+                                                            .withValues(
+                                                              alpha: 0.1,
+                                                            ),
                                                         border: Border.all(
-                                                          color: accentGreen
-                                                              .withValues(alpha: 0.5),
+                                                          color: c.success
+                                                              .withValues(
+                                                                alpha: 0.5,
+                                                              ),
                                                           width: 1,
                                                         ),
                                                         borderRadius:
@@ -1295,7 +1277,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                             Icons
                                                                 .add_shopping_cart,
                                                             size: 14,
-                                                            color: accentGreen,
+                                                            color: c.success,
                                                           ),
                                                           const SizedBox(
                                                             width: 4,
@@ -1307,7 +1289,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                               "RAISE PO",
                                                               style: TextStyle(
                                                                 color:
-                                                                    accentGreen,
+                                                                    c.success,
                                                                 fontSize: 11,
                                                                 fontWeight:
                                                                     FontWeight
@@ -1338,10 +1320,12 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                         vertical: 12,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: bgDark,
+                                        color: c.scaffoldBg,
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
-                                          color: textSecondary.withValues(alpha: 0.1),
+                                          color: c.textSecondary.withValues(
+                                            alpha: 0.1,
+                                          ),
                                         ),
                                       ),
                                       child: Row(
@@ -1351,16 +1335,16 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                           Text(
                                             "Showing ${startIndex + 1} - $endIndex of ${processedProducts.length} Entries",
                                             style: TextStyle(
-                                              color: textSecondary,
+                                              color: c.textSecondary,
                                               fontWeight: FontWeight.bold,
                                             ),
                                           ),
                                           Row(
                                             children: [
                                               IconButton(
-                                                icon: Icon(
+                                                icon: const Icon(
                                                   Icons.chevron_left,
-                                                  color: accentOrange,
+                                                  color: Color(0xFFFF6D00),
                                                 ),
                                                 onPressed: _currentPage > 0
                                                     ? () => setState(
@@ -1375,22 +1359,24 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
                                                       vertical: 6,
                                                     ),
                                                 decoration: BoxDecoration(
-                                                  color: accentOrange,
+                                                  color: const Color(
+                                                    0xFFFF6D00,
+                                                  ),
                                                   borderRadius:
                                                       BorderRadius.circular(6),
                                                 ),
                                                 child: Text(
                                                   "${_currentPage + 1} / $totalPages",
                                                   style: TextStyle(
-                                                    color: bgDark,
+                                                    color: c.scaffoldBg,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
                                               ),
                                               IconButton(
-                                                icon: Icon(
+                                                icon: const Icon(
                                                   Icons.chevron_right,
-                                                  color: accentOrange,
+                                                  color: Color(0xFFFF6D00),
                                                 ),
                                                 onPressed:
                                                     _currentPage <
@@ -1420,7 +1406,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
     );
   }
 
-  // 💎 PREMIUM SAAS PILL BADGE (Matches Reference Image)
   Widget _buildSolidBadge(
     String text,
     IconData icon,
@@ -1430,8 +1415,8 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: primaryColor.withValues(alpha: 0.1), // 🚀 Safe tint (No Warning)
-        borderRadius: BorderRadius.circular(20), // 🚀 Pill Shape (Gol)
+        color: primaryColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: primaryColor.withValues(alpha: 0.3),
           width: 1,
@@ -1498,7 +1483,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
     BuildContext context,
     String productId,
     String name,
-    num originalPrice, // 🚀 4th argument (Ye error 1 fix karega)
+    num originalPrice,
   ) async {
     OfferPayload? createdOffer = await showDialog<OfferPayload>(
       context: context,
@@ -1512,10 +1497,7 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
         createdOffer.data,
       );
 
-      // 🚀 UNIVERSAL DISCOUNT ENGINE: Har offer ka 'Effective Unit Price' nikalega Node.js ke liye
       double calculatedOfferPrice = originalPrice.toDouble();
-
-      // Extract universal values safely
       double v1 =
           double.tryParse(createdOffer.data['value1']?.toString() ?? '0') ?? 0;
       double v2 =
@@ -1525,7 +1507,6 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
         case 'PERCENTAGE':
         case 'FLASH_SALE':
         case 'TIERED_QTY':
-          // Tiered mein v2 discount percentage hai, baakiyo mein v1
           double discountPercent = (createdOffer.type == 'TIERED_QTY')
               ? v2
               : v1;
@@ -1536,32 +1517,26 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
           calculatedOfferPrice = originalPrice - v1;
           break;
         case 'BOGO':
-          // Buy 1 Get 1 = 50% effective off per unit
           calculatedOfferPrice = originalPrice / 2;
           break;
         case 'BUY_X_GET_Y':
-          // Pay for X items, get (X + Y) items
           if (v1 > 0 && v2 > 0) {
             calculatedOfferPrice = (originalPrice * v1) / (v1 + v2);
           }
           break;
         case 'BUNDLE_PRICE':
-          // Total Bundle Price (v2) divided by Total Qty (v1)
           if (v1 > 0) {
             calculatedOfferPrice = v2 / v1;
           }
           break;
         case 'CROSS_PRODUCT':
         case 'BUY_X_GET_Y_CROSS':
-          // Cross product target item par apply hota hai, current item full price par hi bikega
           calculatedOfferPrice = originalPrice.toDouble();
           break;
       }
 
-      // 🛡️ Safety check: Price zero se neeche na jaye
       if (calculatedOfferPrice < 0) calculatedOfferPrice = 0;
 
-      // Database me 'offerPrice' push karo taaki Node.js exact discountBurn nikal sake
       await FirebaseFirestore.instance
           .collection('products')
           .doc(productId)
@@ -1577,4 +1552,4 @@ class _ExpiryAlertDashboardState extends ConsumerState<ExpiryAlertDashboard> {
       }
     }
   }
-} // 🚀 FIX: YE AAKHRI BRACKET MISSING THA (Ye error 2 fix karega)
+}

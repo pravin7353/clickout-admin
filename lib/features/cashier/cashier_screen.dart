@@ -8,11 +8,13 @@ import 'widgets/pos_scanner_dialog.dart';
 import '../auth/auth_provider.dart';
 import 'services/pos_order_service.dart';
 
-// 🚨 BHAILOG DHYAN DE: Local Paths for Admin
+// 🚨 Local Paths for Admin
 import '../../core/services/cart_item.dart';
 import 'providers/cart_provider.dart';
 import '../coach/widgets/info_button.dart';
 import '../../core/theme/app_theme.dart';
+import 'package:clickout_admin/core/widgets/skeleton_loader.dart';
+import 'package:clickout_admin/core/widgets/error_state.dart';
 
 // ── UI DATA MODELS ──
 class CartGroup {
@@ -49,11 +51,14 @@ class CashierScreen extends ConsumerStatefulWidget {
 
 class _CashierScreenState extends ConsumerState<CashierScreen> {
   bool _isInitializing = true;
+  bool _hasError = false;
   List<Map<String, dynamic>> _inventory = [];
   List<Map<String, dynamic>> _searchResults = [];
 
   String _paymentMode = 'CASH';
   bool _isBilling = false;
+  int _instantDiscountPercent = 0; // 🚀 ADDED: Instant Offer State
+
   final TextEditingController _searchCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -91,12 +96,18 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
 
       final allItems = prodSnap.docs.map((d) => d.data()).toList();
 
-      setState(() {
-        _inventory = allItems;
-        _isInitializing = false;
-      });
+      if (mounted) {
+        setState(() {
+          _inventory = allItems;
+          _isInitializing = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isInitializing = false);
+      if (mounted)
+        setState(() {
+          _isInitializing = false;
+          _hasError = true;
+        });
     }
   }
 
@@ -224,6 +235,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   Future<void> _generateInvoice() async {
     final cartState = ref.read(posCartProvider);
     if (cartState.isEmpty || cartState.calcResult == null) return;
+
     setState(() => _isBilling = true);
 
     try {
@@ -231,20 +243,44 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       final String tId = adminData?['tenantId'] ?? '';
       final String bCode = adminData?['branchCode'] ?? '';
 
-      if (tId.isEmpty || bCode.isEmpty)
+      if (tId.isEmpty || bCode.isEmpty) {
         throw "Admin session sync error. Please refresh.";
+      }
 
       double calcTotalTax = cartState.items.values.fold(
         0.0,
         (sum, item) =>
             sum + (item.originalPrice * item.gst / 100 * item.quantity),
       );
-      final itemsList = cartState.items.values.map((e) => e.toJson()).toList();
+
+      // 🚀 APPLY INSTANT OFFER LOGIC TO PAYLOAD
+      double discountFactor = 1.0 - (_instantDiscountPercent / 100.0);
+      final itemsList = cartState.items.values.map((e) {
+        final json = e.toJson();
+        if (_instantDiscountPercent > 0) {
+          double currentPrice =
+              double.tryParse(
+                json['price']?.toString() ??
+                    json['discountedPrice']?.toString() ??
+                    json['originalPrice']?.toString() ??
+                    '0',
+              ) ??
+              0.0;
+          double discountedPrice = currentPrice * discountFactor;
+          json['price'] = discountedPrice;
+          json['discountedPrice'] = discountedPrice;
+        }
+        return json;
+      }).toList();
+
+      double finalGrandTotal =
+          cartState.calcResult!.newGrandTotal * discountFactor;
+      double finalGstTotal = calcTotalTax * discountFactor;
 
       await PosOrderService().createPosOrder(
         items: itemsList,
-        totalAmount: cartState.calcResult!.newGrandTotal,
-        gstTotal: calcTotalTax,
+        totalAmount: finalGrandTotal,
+        gstTotal: finalGstTotal,
         paymentMode: _paymentMode,
         tenantId: tId,
         branchCode: bCode,
@@ -254,91 +290,124 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       );
 
       ref.read(posCartProvider.notifier).clearCart();
+
+      if (!mounted) return;
+
       setState(() {
         _phoneCtrl.clear();
+        _instantDiscountPercent = 0; // Reset offer after billing
       });
 
-      if (mounted) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: context.colors.cardBg,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 28),
-                SizedBox(width: 10),
-                Text(
-                  "Bill Created!",
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            content: Text(
-              "Order saved successfully. Print thermal receipt?",
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black87,
-                fontSize: 16,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text(
-                  "Next Customer",
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Sending to Thermal Printer..."),
-                      backgroundColor: Colors.blue,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.print, size: 18),
-                label: const Text(
-                  "PRINT BILL",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: context.colors.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              SizedBox(width: 10),
+              Text(
+                "Bill Created!",
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ],
           ),
+          content: Text(
+            "Order saved successfully. Print thermal receipt?",
+            style: TextStyle(
+              color: isDark ? Colors.white70 : Colors.black87,
+              fontSize: 16,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                "Next Customer",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Sending to Thermal Printer..."),
+                    backgroundColor: Colors.blue,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.print, size: 18),
+              label: const Text(
+                "PRINT BILL",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
-      );
     } finally {
-      setState(() => _isBilling = false);
+      if (mounted) {
+        setState(() => _isBilling = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isInitializing)
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_hasError) {
+      return Scaffold(
+        backgroundColor: context.colors.scaffoldBg,
+        body: ErrorState(
+          message: "Failed to load inventory. Check connection.",
+          onRetry: () {
+            setState(() {
+              _isInitializing = true;
+              _hasError = false;
+            });
+            _loadInventoryToMemory();
+          },
+        ),
+      );
+    }
+
+    if (_isInitializing) {
+      return Scaffold(
+        backgroundColor: context.colors.scaffoldBg,
+        body: const Padding(
+          padding: EdgeInsets.all(24),
+          child: SkeletonBox(
+            height: double.infinity,
+            width: double.infinity,
+            borderRadius: BorderRadius.all(Radius.circular(16)),
+          ),
+        ),
+      );
+    }
 
     final cartState = ref.watch(posCartProvider);
     final theme = Theme.of(context);
@@ -445,7 +514,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
       ),
     );
 
-    // ── RIGHT PANEL WIDGET (🚀 FIX: Pura Scrollable Cart + Footer Ek Saath) ──
+    // ── RIGHT PANEL WIDGET ──
     Widget rightContent = ListView(
       padding: EdgeInsets.zero,
       physics: const BouncingScrollPhysics(),
@@ -497,10 +566,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           ),
                         ) ??
                         false;
-                    if (confirm)
-                      ref
-                          .read(posCartProvider.notifier)
-                          .clearCart(); // 🚀 FIX: Used ref directly to avoid scope issues
+                    if (confirm) ref.read(posCartProvider.notifier).clearCart();
                   },
                   child: Text("Clear All", style: TextStyle(color: _redBrand)),
                 ),
@@ -525,9 +591,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildPosCartItemCard(
                     group,
-                    ref.read(
-                      posCartProvider.notifier,
-                    ), // 🚀 FIX: Used ref to pass the notifier
+                    ref.read(posCartProvider.notifier),
                     isDark,
                     cardCol,
                     bgCol,
@@ -540,7 +604,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             ),
           ),
 
-        // 3. CHECKOUT FOOTER (Scrolls naturally at the end)
+        // 3. CHECKOUT FOOTER
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -567,11 +631,66 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 ),
               ),
               const SizedBox(height: 16),
+
+              // 🚀 NEW: INSTANT OFFER DROPDOWN
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "Discount Applied",
+                    "Instant Offer (%)",
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        value: _instantDiscountPercent,
+                        dropdownColor: cardCol,
+                        icon: const Icon(
+                          Icons.local_offer,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
+                        items: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+                            .map(
+                              (e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(
+                                  e == 0 ? "None" : "$e% OFF",
+                                  style: const TextStyle(
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _instantDiscountPercent = v ?? 0),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Engine Discount",
                     style: TextStyle(
                       color: Color(0xFF16A34A),
                       fontWeight: FontWeight.bold,
@@ -586,7 +705,31 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                   ),
                 ],
               ),
+
+              if (_instantDiscountPercent > 0) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Instant Offer Applied",
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      "- ₹${((cartState.calcResult?.newGrandTotal ?? 0) * (_instantDiscountPercent / 100)).toStringAsFixed(2)}",
+                      style: const TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -599,7 +742,7 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                     ),
                   ),
                   Text(
-                    "₹${cartState.calcResult?.newGrandTotal.toStringAsFixed(2) ?? '0.00'}",
+                    "₹${((cartState.calcResult?.newGrandTotal ?? 0) * (1 - (_instantDiscountPercent / 100))).toStringAsFixed(2)}",
                     style: GoogleFonts.dmSans(
                       fontWeight: FontWeight.bold,
                       fontSize: 26,
@@ -777,7 +920,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -821,7 +963,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                         ),
                       ],
                     ),
-
                     if (hasOffer &&
                         group.baseItem != null &&
                         group.baseItem!.flashExpiry > 0)
@@ -830,7 +971,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                 ),
               ),
               const SizedBox(width: 6),
-
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -877,12 +1017,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                           }
                           await cartNotifier.increment(group.baseKey);
                         } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(e.toString()),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(e.toString()),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
                         }
                       },
                       bgCol,
@@ -891,7 +1033,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       isAdd: true,
                     ),
                     const SizedBox(width: 10),
-
                     Text(
                       "₹${((group.baseItem?.totalPrice ?? 0) + (group.overflowItem?.totalPrice ?? 0)).toStringAsFixed(0)}",
                       style: GoogleFonts.dmSans(
@@ -901,7 +1042,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-
                     IconButton(
                       onPressed: () => cartNotifier.removeItem(group.baseKey),
                       icon: const Icon(Icons.delete_outline, size: 18),
@@ -917,7 +1057,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
               ),
             ],
           ),
-
           if (group.baseItem != null &&
               group.baseItem!.offerHint.isNotEmpty) ...[
             const SizedBox(height: 6),
@@ -1083,12 +1222,14 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
             try {
               await ref.read(posCartProvider.notifier).addItem(data, 1);
             } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(e.toString()),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             }
           },
           child: const Text(
@@ -1103,7 +1244,6 @@ class _CashierScreenState extends ConsumerState<CashierScreen> {
   Widget _buildCustomItemState(Color cardCol, Color text1Col) {
     return Center(
       child: SingleChildScrollView(
-        // 🛡️ NAYA FIX: Keyboard/Mobile Screen Overflow Blocker
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

@@ -157,20 +157,34 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.existingData != null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
-      ),
-      backgroundColor: bgDark,
-      elevation: 24,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(20),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: const BoxConstraints(
+          maxWidth: 750,
+        ), // 🛠️ FIX: Standardized width to match Edit SKU precisely
         child: Container(
           decoration: BoxDecoration(
             color: bgDark,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade200,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? accentGreen.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.1),
+                blurRadius: 40,
+                spreadRadius: -10,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -182,12 +196,9 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: cardDark,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  border: Border(
-                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    top: Radius.circular(24),
                   ),
                 ),
                 child: Row(
@@ -243,50 +254,56 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                 ),
               ),
 
-              // ⬜ FORM BODY SECTION
-              Flexible(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.all(30),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle("PRODUCT IDENTITY"),
-                        _ResponsiveRow(
-                          children: [
-                            _buildTextField(
+              // ⬜ FORM BODY SECTION (TALLER 2-COLUMN GRID)
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 24,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ROW 1: Identity
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
                               label: "Barcode (Primary Key)",
                               controller: _barcodeCtrl,
                               icon: Icons.barcode_reader,
                               readOnly: isEdit,
-                              hintText: "Scan or enter barcode",
+                              hintText: "Scan or enter",
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
-                              validator: (v) => v!.isEmpty
-                                  ? 'Barcode is strictly required'
-                                  : null,
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
                             ),
-                            _buildTextField(
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 2,
+                            child: _buildTextField(
                               label: "Product Name",
                               controller: _nameCtrl,
                               icon: Icons.inventory_2_outlined,
                               hintText: "Example: Tata Salt 1kg",
-                              validator: (v) => v!.isEmpty
-                                  ? 'Product name is required'
-                                  : null,
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
                             ),
-                          ],
-                        ),
-                        _buildDivider(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
 
-                        _buildSectionTitle("PRICING"),
-                        _ResponsiveRow(
-                          children: [
-                            _buildTextField(
-                              label: "Selling Price (Bikri Bhav)",
+                      // ROW 2: Pricing
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              label: "Selling Price (₹)",
                               controller: _priceCtrl,
                               icon: Icons.sell_outlined,
                               hintText: "0.00",
@@ -299,19 +316,14 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   RegExp(r'^\d+\.?\d{0,2}'),
                                 ),
                               ],
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Price is required';
-                                }
-                                if (double.tryParse(v) == null ||
-                                    double.parse(v) <= 0) {
-                                  return 'Price must be > 0';
-                                }
-                                return null;
-                              },
+                              validator: (v) =>
+                                  (v == null || v.isEmpty) ? 'Required' : null,
                             ),
-                            _buildTextField(
-                              label: "Unit Cost (Kharidi Bhav)",
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: _buildTextField(
+                              label: "Unit Cost (₹) (APKA KHARIDI BHAV)",
                               controller: _unitCostCtrl,
                               icon: Icons.account_balance_wallet_outlined,
                               hintText: "0.00",
@@ -324,23 +336,20 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   RegExp(r'^\d+\.?\d{0,2}'),
                                 ),
                               ],
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Cost is required';
-                                }
-                                if (double.tryParse(v) == null ||
-                                    double.parse(v) <= 0) {
-                                  return 'Cost must be > 0';
-                                }
-                                return null;
-                              },
+                              validator: (v) =>
+                                  (v == null || v.isEmpty) ? 'Required' : null,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        _ResponsiveRow(
-                          children: [
-                            Column(
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ROW 3: Tax & Weight
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
@@ -370,6 +379,7 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                         style: TextStyle(
                                           fontWeight: FontWeight.w600,
                                           color: textPrimary,
+                                          fontSize: 14,
                                         ),
                                       ),
                                     );
@@ -379,48 +389,41 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                 ),
                               ],
                             ),
-                            const SizedBox(), // Empty container to keep GST slab aligned left
-                          ],
-                        ),
-                        _buildDivider(),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: _buildTextField(
+                              label: "Weight / Volume",
+                              controller: _weightCtrl,
+                              icon: Icons.scale_rounded,
+                              hintText: "500g / 1L",
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
 
-                        _buildSectionTitle("INVENTORY"),
-                        _ResponsiveRow(
-                          children: [
-                            _buildTextField(
+                      // ROW 4: Inventory & Expiry
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
                               label: "Physical Stock",
                               controller: _stockCtrl,
                               icon: Icons.layers_outlined,
-                              hintText: "Enter number of units",
+                              hintText: "Units",
                               keyboardType: TextInputType.number,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                               ],
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return 'Stock is required';
-                                }
-                                if (int.tryParse(v) == null ||
-                                    int.parse(v) < 0) {
-                                  return 'Stock cannot be negative';
-                                }
-                                return null;
-                              },
+                              validator: (v) =>
+                                  (v == null || v.isEmpty) ? 'Required' : null,
                             ),
-                            _buildTextField(
-                              label: "Weight / Volume",
-                              controller: _weightCtrl,
-                              icon: Icons.scale_rounded,
-                              hintText: "500g / 1kg / 1L",
-                            ),
-                          ],
-                        ),
-                        _buildDivider(),
-
-                        _buildSectionTitle("LIFECYCLE"),
-                        _ResponsiveRow(
-                          children: [
-                            Column(
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
@@ -439,42 +442,41 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: textPrimary,
+                                    fontSize: 14,
                                   ),
                                   decoration:
                                       _inputStyle(
                                         icon: Icons.calendar_month_outlined,
-                                        hintText: "Select Date (Optional)",
+                                        hintText: "Optional",
+                                        readOnly: true,
                                       ).copyWith(
                                         suffixIcon: Icon(
                                           Icons.arrow_drop_down,
                                           color: textSecondary,
+                                          size: 20,
                                         ),
                                       ),
                                 ),
                               ],
                             ),
-                            const SizedBox(),
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // 🟩 FOOTER SECTION
+              // 🟩 PREMIUM FOOTER
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 20,
+                  vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: cardDark,
                   borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(16),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: Radius.circular(24),
                   ),
                 ),
                 child: Row(
@@ -500,38 +502,45 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton.icon(
+                    ElevatedButton(
                       onPressed: _isLoading ? null : _saveProduct,
-                      icon: _isLoading
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: bgDark,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.check, size: 18),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentGreen,
-                        foregroundColor: bgDark,
+                        foregroundColor: Colors.black, // Premium contrast
                         padding: const EdgeInsets.symmetric(
                           horizontal: 32,
                           vertical: 16,
                         ),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      label: Text(
-                        isEdit ? "Update Product" : "Save Product",
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.black,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isEdit
+                                      ? "Update Master SKU"
+                                      : "Register Master SKU",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
                 ),
@@ -539,32 +548,6 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-          color: textSecondary,
-          letterSpacing: 1.5,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Divider(
-        height: 1,
-        thickness: 1,
-        color: textSecondary.withValues(alpha: 0.1),
       ),
     );
   }
@@ -611,36 +594,53 @@ class _AddProductDialogState extends ConsumerState<AddProductDialog> {
     );
   }
 
+  // 🛠️ PREMIUM SPACIOUS INPUT STYLE
   InputDecoration _inputStyle({
     required IconData icon,
     String? hintText,
     bool readOnly = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       hintText: hintText,
       hintStyle: TextStyle(
-        color: textSecondary.withValues(alpha: 0.5),
-        fontWeight: FontWeight.normal,
+        color: isDark ? Colors.white24 : Colors.black26,
+        fontSize: 14,
       ),
-      prefixIcon: Icon(icon, color: textSecondary, size: 20),
+      prefixIcon: Icon(icon, color: Colors.grey, size: 20),
       filled: true,
-      fillColor: readOnly ? bgDark : inputBg,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      fillColor: readOnly
+          ? (isDark ? Colors.white10 : Colors.grey.shade100)
+          : (isDark
+                ? cardDark
+                : Colors.white), // 🚀 FIX: Solid white in light theme
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ), // 🛠️ NORMAL PADDING
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: accentGreen, width: 1.5),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: accentGreen),
       ),
-      errorBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
   }

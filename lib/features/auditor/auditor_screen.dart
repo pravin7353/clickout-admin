@@ -1,28 +1,23 @@
-// lib/features/dashboard/auditor_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-// ignore: unused_import
 import 'dart:convert';
-// ignore: unused_import, avoid_web_libraries_in_flutter
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
 import 'providers/auditor_provider.dart';
 import 'providers/ledger_provider.dart';
 import '../auditor/widgets/cash_reconciliation_cart.dart';
 import 'widgets/risk_alert_strip.dart';
-//import 'widgets/time_intelligence_card.dart';
 import 'widgets/audit_vault_screen.dart';
 import '../invoice/invoice_rules_dialog.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 import '../auditor/service/audit_export_service.dart';
-import '../../core/theme/app_theme.dart'; // 🚀 Added Theme Extension
+import '../../core/theme/app_theme.dart';
 import '../../core/subscription/providers/subscription_provider.dart';
 import '../../core/subscription/engine/subscription_access_engine.dart';
-
-// 🚀 INVOICE SERVICE IMPORT
 import '../invoice/pdf_invoice_service.dart';
 
 class AuditorScreen extends ConsumerWidget {
@@ -45,17 +40,12 @@ class AuditorScreen extends ConsumerWidget {
     }
 
     try {
-      // CA Grade Headers
       String csv =
           "Company Name,Branch Code,GSTIN,Bill Time,Exit Time,Order ID,Payment Mode,UPI Txn ID,Product Name,Qty,Unit Price,Gross Amount,Taxable Value,GST %,CGST Amount,SGST Amount,Item Total,Exit Status\n";
-
-      // 🚀 SaaS Fix: Cache store details to prevent N+1 queries during export
       Map<String, Map<String, String>> storeCache = {};
 
       for (var doc in records) {
         final data = doc.data() as Map<String, dynamic>;
-
-        // 🚀 DYNAMIC ROW-LEVEL STORE FETCHER
         String rowBranch = data['branchCode']?.toString() ?? "STORE";
         String companyName = "CLICKOUT RETAIL";
         String gstin = "N/A";
@@ -89,8 +79,6 @@ class AuditorScreen extends ConsumerWidget {
         }
 
         String branchCode = rowBranch;
-
-        // Timestamps
         DateTime billDate =
             (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
         String billTime = DateFormat('dd MMM yyyy HH:mm:ss').format(billDate);
@@ -102,7 +90,6 @@ class AuditorScreen extends ConsumerWidget {
             ? DateFormat('dd MMM yyyy HH:mm:ss').format(xDate)
             : 'PENDING';
 
-        // Order Details
         String mode = data['paymentMode'] ?? 'UPI';
         String upiTxn =
             data['upiTransactionId'] ?? data['transactionId'] ?? 'N/A';
@@ -110,7 +97,6 @@ class AuditorScreen extends ConsumerWidget {
             data['exitStatus'] ?? data['paymentStatus'] ?? 'PENDING';
         List<dynamic> items = data['cartItems'] ?? data['items'] ?? [];
 
-        // 🚀 Ensure commas in string are safely escaped for CSV
         String safeCompany = '"$companyName"';
         String safeBranch = '"$branchCode"';
         String safeGstin = '"$gstin"';
@@ -121,7 +107,6 @@ class AuditorScreen extends ConsumerWidget {
           continue;
         }
 
-        // Item Level Breakdown (The Math Engine)
         for (var item in items) {
           String itemName =
               item['name']?.toString().replaceAll('"', '""') ?? 'Unknown Item';
@@ -138,10 +123,8 @@ class AuditorScreen extends ConsumerWidget {
                     '0',
               ) ??
               0.0;
-
           double grossAmt = price * qty;
 
-          // GST Extraction
           double gstRate = 0.0;
           if (item['gst'] != null && item['gst'].toString().isNotEmpty) {
             String rawGst = item['gst'].toString().replaceAll(
@@ -151,7 +134,6 @@ class AuditorScreen extends ConsumerWidget {
             gstRate = double.tryParse(rawGst) ?? 0.0;
           }
 
-          // Tax Math
           double taxableValue = grossAmt / (1 + (gstRate / 100));
           double totalGst = grossAmt - taxableValue;
           double cgst = totalGst / 2;
@@ -161,7 +143,6 @@ class AuditorScreen extends ConsumerWidget {
               '$safeCompany,$safeBranch,$safeGstin,"$billTime","$exitTime","${doc.id}","$mode","$upiTxn","$itemName","$qty","${price.toStringAsFixed(2)}","${grossAmt.toStringAsFixed(2)}","${taxableValue.toStringAsFixed(2)}","$gstRate","${cgst.toStringAsFixed(2)}","${sgst.toStringAsFixed(2)}","${grossAmt.toStringAsFixed(2)}","$status"\n';
         }
 
-        // 🚀 DELTA FIX: ADD EXCHANGE DEDUCTION AS A LINE ITEM TO BALANCE THE SHEET
         if (data['type'] == 'EXCHANGE_INVOICE' &&
             data['exchangedItem'] != null) {
           var exItem = data['exchangedItem'];
@@ -181,14 +162,13 @@ class AuditorScreen extends ConsumerWidget {
                     '0',
               ) ??
               0.0;
-          double exGross = -(exPrice * exQty); // Negative for return
+          double exGross = -(exPrice * exQty);
 
           csv +=
               '$safeCompany,$safeBranch,$safeGstin,"$billTime","$exitTime","${doc.id}","$mode","$upiTxn","$exName","$exQty","-${exPrice.toStringAsFixed(2)}","${exGross.toStringAsFixed(2)}","${exGross.toStringAsFixed(2)}","0","0","0","${exGross.toStringAsFixed(2)}","$status"\n';
         }
       }
 
-      // Download Trigger
       final bytes = utf8.encode(csv);
       final blob = html.Blob([bytes]);
       final url = html.Url.createObjectUrlFromBlob(blob);
@@ -223,38 +203,87 @@ class AuditorScreen extends ConsumerWidget {
         .toString()
         .toUpperCase();
 
-    // 🚀 Billed-By Logic
+    // 🚀 FIXED Logic for Billed By & Exited By
     String cashierId = 'Self Checkout';
-    if (paymentMode == 'CASH') {
+    if (paymentMode == 'CASH' || data['generatedBy'] == 'CASHIER') {
       cashierId =
           data['scannedByName']?.toString() ??
           data['cashierName']?.toString() ??
           data['collectedBy']?.toString() ??
           data['cashierId']?.toString() ??
-          'Unknown Cashier';
+          'Admin/Manager';
     }
 
+    bool isDirectPOS =
+        data['orderType'] == 'DIRECT_POS' ||
+        data['generatedBy'] == 'CASHIER' ||
+        data['source'] == 'ADMIN_DIRECT_SCAN';
     String rawGuard =
         data['verifiedByGuardId']?.toString() ??
         data['exitVerifiedBy']?.toString() ??
         '';
-    String guardId = rawGuard.isNotEmpty ? rawGuard : 'Pending/None';
+
+    // 🚀 THE MAGIC: Auto-Approve dikhayega agar Assisted Checkout wala bill hai, customer checkouts ke liye Pending dikhayega.
+    String guardId = rawGuard.isNotEmpty
+        ? rawGuard
+        : (isDirectPOS ? 'Auto-Approved (Staff)' : 'Pending/None');
+
     double fraudScore = (data['fraudScore'] ?? 0.0).toDouble();
     List<dynamic> itemsList = data['cartItems'] ?? data['items'] ?? [];
 
-    // 🧠 100% SYNCED: Fetching directly from Database
+    double computedTaxable = 0.0;
+    double computedGst = 0.0;
+    double computedGross = 0.0;
+
+    for (var item in itemsList) {
+      int qty =
+          int.tryParse(
+            item['qty']?.toString() ?? item['quantity']?.toString() ?? '1',
+          ) ??
+          1;
+      double itemOrig =
+          double.tryParse(
+            item['originalPrice']?.toString() ?? item['mrp']?.toString() ?? '0',
+          ) ??
+          0.0;
+      double price =
+          double.tryParse(item['price']?.toString() ?? '') ??
+          double.tryParse(item['unitPrice']?.toString() ?? '') ??
+          double.tryParse(item['discountedPrice']?.toString() ?? '') ??
+          itemOrig;
+      double itemTotal = qty * price;
+      computedGross += itemTotal;
+
+      double gstRate = 0.0;
+      if (item['gst'] != null) {
+        gstRate =
+            double.tryParse(
+              item['gst'].toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+            ) ??
+            0.0;
+      }
+      double base = itemTotal / (1 + (gstRate / 100));
+      computedTaxable += base;
+      computedGst += (itemTotal - base);
+    }
+
     double calculatedSubtotal =
-        double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
+        double.tryParse(data['totalAmount']?.toString() ?? '0') ??
+        computedGross;
+
     double totalBasePrice =
         double.tryParse(data['taxableValue']?.toString() ?? '0') ?? 0.0;
+    if (totalBasePrice == 0.0) totalBasePrice = computedTaxable;
+
     double totalGSTAmount =
         double.tryParse(data['gstTotal']?.toString() ?? '0') ?? 0.0;
+    if (totalGSTAmount == 0.0) totalGSTAmount = computedGst;
+
     double totalSavings =
         double.tryParse(data['totalSavings']?.toString() ?? '0') ?? 0.0;
     double totalBagWeight =
         double.tryParse(data['totalWeight']?.toString() ?? '0') ?? 0.0;
 
-    // 🚀 ORIGINAL BUSINESS LOGIC (Exchange aur Discount Zinda Hai!)
     double discount =
         double.tryParse(data['discount']?.toString() ?? '0') ?? 0.0;
     double exchangeDeduction = 0.0;
@@ -277,7 +306,6 @@ class AuditorScreen extends ConsumerWidget {
       exchangeDeduction = exPrice * exQty;
     }
 
-    // Final calculations based on DB
     double dbTotal =
         double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
     double finalTotal = dbTotal > 0
@@ -295,19 +323,26 @@ class AuditorScreen extends ConsumerWidget {
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        // 🚀 DYNAMIC RECEIPT THEME
+        final Color recBg = isDark ? const Color(0xFF141414) : Colors.white;
+        final Color recText = isDark ? Colors.white : Colors.black87;
+        final Color recTextDim = isDark ? Colors.white54 : Colors.black54;
+        final Color recDiv = isDark ? Colors.white24 : Colors.black12;
+
         return Align(
           alignment: Alignment.centerRight,
           child: Material(
             elevation: 24,
             borderRadius: const BorderRadius.horizontal(
-              left: Radius.circular(20),
-            ),
+              left: Radius.circular(24),
+            ), // Premium 24px
             child: Container(
               width: MediaQuery.of(context).size.width > 600
                   ? 500
                   : double.infinity,
               height: MediaQuery.of(context).size.height,
-              color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+              color: isDark ? const Color(0xFF1E1E1E) : const Color(0xFFF8F9FA),
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,9 +380,8 @@ class AuditorScreen extends ConsumerWidget {
                               color: Colors.redAccent,
                             ),
                             tooltip: "Download PDF Invoice",
-                            onPressed: () {
-                              PdfInvoiceService.printInvoice(data, orderId);
-                            },
+                            onPressed: () =>
+                                PdfInvoiceService.printInvoice(data, orderId),
                           ),
                           IconButton(
                             icon: const Icon(Icons.close, color: Colors.grey),
@@ -357,7 +391,7 @@ class AuditorScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const Divider(height: 15),
+                  const Divider(height: 25),
 
                   Row(
                     children: [
@@ -367,6 +401,7 @@ class AuditorScreen extends ConsumerWidget {
                           cashierId,
                           Icons.point_of_sale,
                           Colors.blue,
+                          isDark,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -376,6 +411,7 @@ class AuditorScreen extends ConsumerWidget {
                           guardId,
                           Icons.security,
                           Colors.orange,
+                          isDark,
                         ),
                       ),
                     ],
@@ -415,8 +451,10 @@ class AuditorScreen extends ConsumerWidget {
                                 ),
                                 Text(
                                   "Delta Invoice Generated: ${data['exchangeRef'] ?? 'Unknown'}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white
+                                        : Colors.black87,
                                     fontSize: 13,
                                   ),
                                 ),
@@ -443,14 +481,16 @@ class AuditorScreen extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: const Color(
-                          0xFF141414,
-                        ), // 🔲 PITCH BLACK REALISTIC RECEIPT BG
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white12),
+                        color: recBg, // 🚀 Syncs with Light/Dark Mode
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? Colors.white12 : Colors.grey.shade300,
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.4 : 0.05,
+                            ),
                             blurRadius: 15,
                           ),
                         ],
@@ -492,24 +532,39 @@ class AuditorScreen extends ConsumerWidget {
                                             result['storeName'])
                                         .toString()
                                         .toUpperCase();
-                                result['gstin'] =
-                                    sData['gstin']?.toString() ??
-                                    result['gstin'];
+
+                                // 🚀 EXACT FIRESTORE SCHEMA MAPPING
                                 result['phone'] =
-                                    sData['primaryContact'] ??
-                                    sData['mobile'] ??
-                                    sData['phone'] ??
-                                    result['phone'];
+                                    sData['managerPhone'] ??
+                                    (sData['contactNumbers'] != null &&
+                                            (sData['contactNumbers'] as List)
+                                                .isNotEmpty
+                                        ? sData['contactNumbers'][0]
+                                        : result['phone']);
+
+                                String gst =
+                                    sData['gstNumber'] ?? sData['gstin'] ?? '';
+                                if (gst.isEmpty && sData['licenses'] is List) {
+                                  for (var c in sData['licenses']) {
+                                    if (c['type'] == 'GSTIN') {
+                                      gst = c['number'] ?? '';
+                                      break;
+                                    }
+                                  }
+                                }
+                                if (gst.isNotEmpty) result['gstin'] = gst;
+
+                                var loc =
+                                    sData['location'] as Map<String, dynamic>?;
                                 String baseAddr =
+                                    loc?['address'] ??
+                                    sData['completeStoreAddress'] ??
                                     sData['address'] ??
-                                    sData['fullAddress'] ??
                                     "";
-                                String city = sData['city'] ?? "";
+                                String city =
+                                    loc?['city'] ?? sData['city'] ?? "";
                                 String pin =
-                                    sData['pincode'] ??
-                                    sData['zip'] ??
-                                    sData['zipCode'] ??
-                                    "";
+                                    loc?['pincode'] ?? sData['pincode'] ?? "";
                                 List<String> addrParts = [];
                                 if (baseAddr.isNotEmpty)
                                   addrParts.add(baseAddr);
@@ -529,6 +584,13 @@ class AuditorScreen extends ConsumerWidget {
                               if (tSnap.exists) {
                                 var tData =
                                     tSnap.data() as Map<String, dynamic>;
+                                if (result['gstin'] == 'N/A' ||
+                                    result['gstin'].isEmpty) {
+                                  result['gstin'] =
+                                      tData['gstin'] ??
+                                      tData['gstNumber'] ??
+                                      'N/A';
+                                }
                                 var config =
                                     tData['invoiceConfig']
                                         as Map<String, dynamic>? ??
@@ -579,20 +641,6 @@ class AuditorScreen extends ConsumerWidget {
                                 ],
                               };
 
-                          String storeDisplayName = meta['storeName'];
-                          String gstin = meta['gstin'];
-                          String branchCode =
-                              (data['branchCode'] ??
-                                      data['branchId'] ??
-                                      data['storeId'])
-                                  ?.toString() ??
-                              "STORE";
-                          String address = meta['address'];
-                          String phone = meta['phone'];
-                          String invPrefix = meta['invPrefix'];
-                          List<String> terms = List<String>.from(meta['terms']);
-                          String documentTitle = meta['documentTitle'];
-
                           DateTime billingDate =
                               (data['timestamp'] as Timestamp?)?.toDate() ??
                               DateTime.now();
@@ -627,7 +675,7 @@ class AuditorScreen extends ConsumerWidget {
                           Widget buildRecRow(
                             String label,
                             String value, {
-                            Color color = Colors.white,
+                            Color? color,
                           }) {
                             return Padding(
                               padding: const EdgeInsets.symmetric(
@@ -639,9 +687,9 @@ class AuditorScreen extends ConsumerWidget {
                                 children: [
                                   Text(
                                     label,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.white54,
+                                      color: recTextDim,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -649,7 +697,7 @@ class AuditorScreen extends ConsumerWidget {
                                     value,
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: color,
+                                      color: color ?? recText,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -663,73 +711,74 @@ class AuditorScreen extends ConsumerWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                // 🏢 1. STORE HEADER
                                 Text(
-                                  documentTitle,
+                                  meta['documentTitle'],
                                   style: const TextStyle(
-                                    color: Colors.greenAccent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w900,
                                     letterSpacing: 1.5,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                const Icon(
+                                const SizedBox(height: 6),
+                                Icon(
                                   Icons.storefront,
-                                  size: 32,
-                                  color: Colors.white,
+                                  size: 36,
+                                  color: recText,
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
-                                  storeDisplayName,
+                                  meta['storeName'],
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w900,
                                     fontSize: 18,
-                                    color: Colors.white,
+                                    color: recText,
                                     letterSpacing: 1,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
-                                if (address != "N/A")
+                                if (meta['address'] != "N/A")
                                   Text(
-                                    address,
+                                    meta['address'],
                                     textAlign: TextAlign.center,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
-                                      color: Colors.white70,
+                                      color: recTextDim,
                                     ),
                                   ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  "Ph: $phone  |  GSTIN: $gstin",
-                                  style: const TextStyle(
+                                  "Ph: ${meta['phone']}  |  GSTIN: ${meta['gstin']}",
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white70,
+                                    color: recTextDim,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  "Branch: $branchCode",
-                                  style: const TextStyle(
+                                  "Branch: ${data['branchCode'] ?? "STORE"}",
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white54,
+                                    color: recTextDim,
                                   ),
                                 ),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 12.0),
+
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12.0,
+                                  ),
                                   child: Text(
                                     "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                     style: TextStyle(
-                                      color: Colors.white24,
+                                      color: recDiv,
                                       letterSpacing: 2,
                                     ),
                                     maxLines: 1,
                                   ),
                                 ),
 
-                                // 📄 2. INVOICE META (Fixed invoice DB Fetch)
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -742,10 +791,10 @@ class AuditorScreen extends ConsumerWidget {
                                         RichText(
                                           text: TextSpan(
                                             children: [
-                                              const TextSpan(
+                                              TextSpan(
                                                 text: "Inv No: ",
                                                 style: TextStyle(
-                                                  color: Colors.white54,
+                                                  color: recTextDim,
                                                   fontSize: 11,
                                                 ),
                                               ),
@@ -753,9 +802,9 @@ class AuditorScreen extends ConsumerWidget {
                                                 text:
                                                     data['invoiceNo']
                                                         ?.toString() ??
-                                                    "$invPrefix${orderId.length >= 8 ? orderId.substring(0, 8).toUpperCase() : orderId}",
-                                                style: const TextStyle(
-                                                  color: Colors.white,
+                                                    "${meta['invPrefix']}${orderId.length >= 8 ? orderId.substring(0, 8).toUpperCase() : orderId}",
+                                                style: TextStyle(
+                                                  color: recText,
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -767,10 +816,10 @@ class AuditorScreen extends ConsumerWidget {
                                         RichText(
                                           text: TextSpan(
                                             children: [
-                                              const TextSpan(
+                                              TextSpan(
                                                 text: "Date: ",
                                                 style: TextStyle(
-                                                  color: Colors.white54,
+                                                  color: recTextDim,
                                                   fontSize: 11,
                                                 ),
                                               ),
@@ -778,8 +827,8 @@ class AuditorScreen extends ConsumerWidget {
                                                 text: DateFormat(
                                                   'dd-MM-yyyy',
                                                 ).format(billingDate),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
+                                                style: TextStyle(
+                                                  color: recText,
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -791,10 +840,10 @@ class AuditorScreen extends ConsumerWidget {
                                         RichText(
                                           text: TextSpan(
                                             children: [
-                                              const TextSpan(
+                                              TextSpan(
                                                 text: "Time: ",
                                                 style: TextStyle(
-                                                  color: Colors.white54,
+                                                  color: recTextDim,
                                                   fontSize: 11,
                                                 ),
                                               ),
@@ -802,8 +851,8 @@ class AuditorScreen extends ConsumerWidget {
                                                 text: DateFormat(
                                                   'hh:mm a',
                                                 ).format(billingDate),
-                                                style: const TextStyle(
-                                                  color: Colors.white,
+                                                style: TextStyle(
+                                                  color: recText,
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -820,17 +869,17 @@ class AuditorScreen extends ConsumerWidget {
                                         RichText(
                                           text: TextSpan(
                                             children: [
-                                              const TextSpan(
+                                              TextSpan(
                                                 text: "Pay Mode: ",
                                                 style: TextStyle(
-                                                  color: Colors.white54,
+                                                  color: recTextDim,
                                                   fontSize: 11,
                                                 ),
                                               ),
                                               TextSpan(
                                                 text: paymentMode,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
+                                                style: TextStyle(
+                                                  color: recText,
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.bold,
                                                 ),
@@ -843,17 +892,17 @@ class AuditorScreen extends ConsumerWidget {
                                           RichText(
                                             text: TextSpan(
                                               children: [
-                                                const TextSpan(
+                                                TextSpan(
                                                   text: "Txn ID: ",
                                                   style: TextStyle(
-                                                    color: Colors.white54,
+                                                    color: recTextDim,
                                                     fontSize: 11,
                                                   ),
                                                 ),
                                                 TextSpan(
                                                   text: upiTxnId,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
+                                                  style: TextStyle(
+                                                    color: recText,
                                                     fontSize: 11,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -867,17 +916,16 @@ class AuditorScreen extends ConsumerWidget {
                                   ],
                                 ),
 
-                                // 👤 3. CUSTOMER DETAILS
                                 if (data['customerName'] != null ||
                                     data['customerPhone'] != null) ...[
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
                                       vertical: 8.0,
                                     ),
                                     child: Text(
                                       "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                       style: TextStyle(
-                                        color: Colors.white24,
+                                        color: recDiv,
                                         letterSpacing: 2,
                                       ),
                                       maxLines: 1,
@@ -889,28 +937,29 @@ class AuditorScreen extends ConsumerWidget {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
-                                        const Text(
+                                        Text(
                                           "BILLED TO:",
                                           style: TextStyle(
                                             fontSize: 10,
-                                            color: Colors.white54,
+                                            color: recTextDim,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
                                           cName,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.white,
+                                            color: recText,
+                                            fontWeight: FontWeight.w800,
                                           ),
                                         ),
                                         if (cPhone.isNotEmpty)
                                           Text(
                                             "Ph: $cPhone",
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.white70,
+                                              color: recTextDim,
                                             ),
                                           ),
                                       ],
@@ -918,21 +967,22 @@ class AuditorScreen extends ConsumerWidget {
                                   ),
                                 ],
 
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 12.0),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12.0,
+                                  ),
                                   child: Text(
                                     "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                     style: TextStyle(
-                                      color: Colors.white24,
+                                      color: recDiv,
                                       letterSpacing: 2,
                                     ),
                                     maxLines: 1,
                                   ),
                                 ),
 
-                                // 🛒 4. ITEMS TABLE HEADER
                                 Row(
-                                  children: const [
+                                  children: [
                                     Expanded(
                                       flex: 4,
                                       child: Text(
@@ -940,7 +990,7 @@ class AuditorScreen extends ConsumerWidget {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white54,
+                                          color: recTextDim,
                                         ),
                                       ),
                                     ),
@@ -952,7 +1002,7 @@ class AuditorScreen extends ConsumerWidget {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white54,
+                                          color: recTextDim,
                                         ),
                                       ),
                                     ),
@@ -964,7 +1014,7 @@ class AuditorScreen extends ConsumerWidget {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white54,
+                                          color: recTextDim,
                                         ),
                                       ),
                                     ),
@@ -976,7 +1026,7 @@ class AuditorScreen extends ConsumerWidget {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.white54,
+                                          color: recTextDim,
                                         ),
                                       ),
                                     ),
@@ -984,15 +1034,14 @@ class AuditorScreen extends ConsumerWidget {
                                 ),
                                 const SizedBox(height: 8),
 
-                                // 🛒 5. ITEMS LIST
                                 if (itemsList.isEmpty)
-                                  const Center(
+                                  Center(
                                     child: Padding(
-                                      padding: EdgeInsets.all(10),
+                                      padding: const EdgeInsets.all(10),
                                       child: Text(
                                         "No items recorded.",
                                         style: TextStyle(
-                                          color: Colors.white54,
+                                          color: recTextDim,
                                           fontStyle: FontStyle.italic,
                                         ),
                                       ),
@@ -1065,10 +1114,10 @@ class AuditorScreen extends ConsumerWidget {
                                                 flex: 4,
                                                 child: Text(
                                                   itemName,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.w600,
+                                                    color: recText,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
                                               ),
@@ -1077,9 +1126,9 @@ class AuditorScreen extends ConsumerWidget {
                                                 child: Text(
                                                   "$qty",
                                                   textAlign: TextAlign.center,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.white,
+                                                    color: recText,
                                                   ),
                                                 ),
                                               ),
@@ -1088,9 +1137,9 @@ class AuditorScreen extends ConsumerWidget {
                                                 child: Text(
                                                   price.toStringAsFixed(2),
                                                   textAlign: TextAlign.right,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.white,
+                                                    color: recText,
                                                   ),
                                                 ),
                                               ),
@@ -1099,9 +1148,10 @@ class AuditorScreen extends ConsumerWidget {
                                                 child: Text(
                                                   itemTotal.toStringAsFixed(2),
                                                   textAlign: TextAlign.right,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.white,
+                                                    color: recText,
+                                                    fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
                                               ),
@@ -1114,9 +1164,9 @@ class AuditorScreen extends ConsumerWidget {
                                               ),
                                               child: Text(
                                                 "HSN: ${item['hsn'] ?? 'N/A'} | GST: ${gstRate.toStringAsFixed(0)}%",
-                                                style: const TextStyle(
-                                                  fontSize: 9,
-                                                  color: Colors.white38,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: recTextDim,
                                                 ),
                                               ),
                                             ),
@@ -1125,38 +1175,36 @@ class AuditorScreen extends ConsumerWidget {
                                     );
                                   }),
 
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8.0,
+                                  ),
                                   child: Text(
                                     "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                     style: TextStyle(
-                                      color: Colors.white24,
+                                      color: recDiv,
                                       letterSpacing: 2,
                                     ),
                                     maxLines: 1,
                                   ),
                                 ),
 
-                                // 💰 6. TAX, DISCOUNTS & TOTALS (Full Unified UI)
                                 buildRecRow(
                                   "Gross Subtotal:",
                                   "₹${calculatedSubtotal.toStringAsFixed(2)}",
                                 ),
-
                                 if (exchangeDeduction > 0)
                                   buildRecRow(
                                     "Returned: $exchangeItemName",
                                     "-₹${exchangeDeduction.toStringAsFixed(2)}",
-                                    color: Colors.purpleAccent,
+                                    color: Colors.purple,
                                   ),
-
                                 if (discount > 0)
                                   buildRecRow(
                                     "Discount Applied:",
                                     "-₹${discount.toStringAsFixed(2)}",
-                                    color: Colors.greenAccent,
+                                    color: Colors.green,
                                   ),
-
                                 buildRecRow(
                                   "Taxable Value:",
                                   "₹${totalBasePrice.toStringAsFixed(2)}",
@@ -1165,7 +1213,6 @@ class AuditorScreen extends ConsumerWidget {
                                   "Total GST:",
                                   "₹${totalGSTAmount.toStringAsFixed(2)}",
                                 ),
-
                                 buildRecRow(
                                   "Total Bag Weight:",
                                   totalBagWeight >= 1000
@@ -1173,12 +1220,14 @@ class AuditorScreen extends ConsumerWidget {
                                       : "${totalBagWeight.toStringAsFixed(0)} g",
                                 ),
 
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8.0,
+                                  ),
                                   child: Text(
                                     "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                     style: TextStyle(
-                                      color: Colors.white24,
+                                      color: recDiv,
                                       letterSpacing: 2,
                                     ),
                                     maxLines: 1,
@@ -1189,12 +1238,11 @@ class AuditorScreen extends ConsumerWidget {
                                   buildRecRow(
                                     "TOTAL SAVINGS:",
                                     "₹${totalSavings.toStringAsFixed(2)}",
-                                    color: Colors.greenAccent,
+                                    color: Colors.green,
                                   ),
                                   const SizedBox(height: 5),
                                 ],
 
-                                // 🏆 7. GRAND TOTAL
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -1209,8 +1257,8 @@ class AuditorScreen extends ConsumerWidget {
                                         fontWeight: FontWeight.w900,
                                         fontSize: 16,
                                         color: finalTotal < 0
-                                            ? Colors.purpleAccent
-                                            : Colors.white,
+                                            ? Colors.purple
+                                            : recText,
                                       ),
                                     ),
                                     Text(
@@ -1221,44 +1269,45 @@ class AuditorScreen extends ConsumerWidget {
                                         fontWeight: FontWeight.w900,
                                         fontSize: 24,
                                         color: finalTotal < 0
-                                            ? Colors.purpleAccent
-                                            : Colors.white,
+                                            ? Colors.purple
+                                            : recText,
                                       ),
                                     ),
                                   ],
                                 ),
 
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8.0,
+                                  ),
                                   child: Text(
                                     "- - - - - - - - - - - - - - - - - - - - - - - - - - -",
                                     style: TextStyle(
-                                      color: Colors.white24,
+                                      color: recDiv,
                                       letterSpacing: 2,
                                     ),
                                     maxLines: 1,
                                   ),
                                 ),
 
-                                // 🙏 8. FOOTER (DYNAMIC T&C)
                                 const Text(
                                   "Thank You for Shopping with Us!",
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.white70,
+                                    color: Colors.green,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
-                                ...terms.map(
+                                ...meta['terms'].map(
                                   (t) => Padding(
                                     padding: const EdgeInsets.only(bottom: 2.0),
                                     child: Text(
                                       t.trim(),
                                       textAlign: TextAlign.center,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 9,
-                                        color: Colors.white38,
+                                        color: recTextDim,
                                       ),
                                     ),
                                   ),
@@ -1276,10 +1325,10 @@ class AuditorScreen extends ConsumerWidget {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(
-                        0xFF2A2A2A,
-                      ), // 🔲 GREY COMBINATION THEME
-                      borderRadius: BorderRadius.circular(12),
+                      color: isDark
+                          ? const Color(0xFF2A2A2A)
+                          : Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: fraudScore > 50
                             ? Colors.redAccent.withValues(alpha: 0.3)
@@ -1300,19 +1349,21 @@ class AuditorScreen extends ConsumerWidget {
                                     fontWeight: FontWeight.bold,
                                     color: fraudScore > 50
                                         ? Colors.redAccent
-                                        : Colors.green.shade400,
+                                        : Colors.green.shade600,
                                     fontSize: 12,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
-                                const InfoButton(
+                                InfoButton(
                                   title: "AI Fraud Score",
-                                  en: "A 0–100 risk score from our AI engine. Above 50 means suspicious patterns — weight mismatch, rapid checkout, or unusual cart items.",
-                                  hi: "0 se 100 tak ka risk number. 50 se zyada matlab order mein kuch suspicious hai — weight mismatch, bahut jaldi checkout, ya unusual items.",
+                                  en: "A 0–100 risk score. Above 50 means suspicious patterns.",
+                                  hi: "0-100 risk score.",
+                                  iconColor: isDark
+                                      ? Colors.white54
+                                      : Colors.black54,
                                 ),
                               ],
                             ),
-
                             const SizedBox(height: 2),
                             Text(
                               fraudScore > 50
@@ -1323,12 +1374,13 @@ class AuditorScreen extends ConsumerWidget {
                                     ? Colors.red
                                     : Colors.green,
                                 fontSize: 12,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
                         ),
                         Container(
-                          padding: const EdgeInsets.all(10),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: fraudScore > 50 ? Colors.red : Colors.green,
                             shape: BoxShape.circle,
@@ -1355,10 +1407,9 @@ class AuditorScreen extends ConsumerWidget {
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.greenAccent.shade700,
-                          foregroundColor: Colors
-                              .black, // Dark text for contrast on neon green
+                          foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         icon: const Icon(
@@ -1395,7 +1446,6 @@ class AuditorScreen extends ConsumerWidget {
     );
   }
 
-  // 💰 🚀 THE DELTA PAYMENT COLLECTOR
   void _collectPayment(
     BuildContext context,
     String orderId,
@@ -1465,15 +1515,12 @@ class AuditorScreen extends ConsumerWidget {
     Map<String, dynamic> data,
   ) async {
     try {
-      // 🧠 STEP 1: SMART INVOICE ENGINE (Checks if already exists)
       String invoiceNo = data['invoiceNo']?.toString() ?? '';
-
       if (invoiceNo.isEmpty) {
         String tenantId = data['tenantId']?.toString() ?? '';
         String branchCode = data['branchCode']?.toString() ?? 'STORE';
-        String prefix = "INV/"; // Default Fallback
+        String prefix = "INV/";
 
-        // 🔄 THE LOOP: Fetch Custom Admin Prefix from Database
         if (tenantId.isNotEmpty && tenantId != 'ALL' && tenantId != 'GLOBAL') {
           var tDoc = await FirebaseFirestore.instance
               .collection('tenants')
@@ -1486,13 +1533,11 @@ class AuditorScreen extends ConsumerWidget {
                 config['invoicePrefix']?.toString().trim() ?? '';
             if (adminPrefix.isNotEmpty) {
               prefix = adminPrefix;
-              // Formatting: Add slash or dash if Admin forgot to put it at the end
               if (!prefix.endsWith('/') && !prefix.endsWith('-')) prefix += '/';
             }
           }
         }
 
-        // 📅 STEP 2: Generate YY-YY and MM-DD
         final now = DateTime.now();
         int startYear = now.month >= 4 ? now.year : now.year - 1;
         String fyStr =
@@ -1502,7 +1547,6 @@ class AuditorScreen extends ConsumerWidget {
         String todayKey =
             "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
 
-        // ⚡ STEP 3: Atomic Daily Counter (Safe from Race Conditions)
         String tenantPrefix = tenantId.isNotEmpty && tenantId != 'ALL'
             ? tenantId
             : 'GLOBAL';
@@ -1524,24 +1568,23 @@ class AuditorScreen extends ConsumerWidget {
           }
         });
 
-        // 🎯 STEP 4: Combine everything (e.g., MART/26-27/04-23-01)
         invoiceNo = "$prefix$fyStr/$dateStr-${seq.toString().padLeft(2, '0')}";
       }
 
-      // 💾 STEP 5: SAVE EVERYTHING TO DATABASE
-      await FirebaseFirestore.instance.collection('orders').doc(orderId).update(
-        {
-          'paymentStatus': 'PAID',
-          'paymentMode': mode,
-          'exitStatus': 'APPROVED',
-          'verifiedAt': FieldValue.serverTimestamp(),
-          'invoiceNo': invoiceNo, // 🔥 THE MISSING FIELD HAS BEEN ADDED!
-        },
-      );
+      await FirebaseFirestore.instance
+          .collection('orders')
+          .doc(orderId)
+          .update({
+            'paymentStatus': 'PAID',
+            'paymentMode': mode,
+            'exitStatus': 'APPROVED',
+            'verifiedAt': FieldValue.serverTimestamp(),
+            'invoiceNo': invoiceNo,
+          });
 
-      if (dialogContext.mounted) Navigator.pop(dialogContext); // Close alert
+      if (dialogContext.mounted) Navigator.pop(dialogContext);
       if (mainContext.mounted) {
-        Navigator.pop(mainContext); // Close autopsy panel
+        Navigator.pop(mainContext);
         ScaffoldMessenger.of(mainContext).showSnackBar(
           const SnackBar(
             content: Text("✅ Payment Collected! Gatepass Activated."),
@@ -1558,20 +1601,22 @@ class AuditorScreen extends ConsumerWidget {
     }
   }
 
-  // 🚀 FALLBACK FIX: Shows Phone Number if Name is missing
   Widget _buildStaffFetcherCard(
     String label,
     String uid,
     IconData icon,
     Color color,
+    bool isDark,
   ) {
     if (uid == 'ONLINE PAY') {
       return Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade200),
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? Colors.white12 : Colors.grey.shade200,
+          ),
         ),
         child: Row(
           children: [
@@ -1604,11 +1649,13 @@ class AuditorScreen extends ConsumerWidget {
     }
 
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        color: isDark ? const Color(0xFF2A2A2A) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? Colors.white12 : Colors.grey.shade200,
+        ),
       ),
       child: Row(
         children: [
@@ -1636,13 +1683,11 @@ class AuditorScreen extends ConsumerWidget {
                     ),
                   )
                 else
-                  // 🚀 SaaS Fix: Removed N+1 FutureBuilder to prevent UI freeze and read explosions.
-                  // We now directly render the denormalized name/ID stored in the order document.
                   Text(
                     uid,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w900,
-                      color: Colors.black87,
+                      color: isDark ? Colors.white : Colors.black87,
                       fontSize: 12,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -1655,15 +1700,12 @@ class AuditorScreen extends ConsumerWidget {
     );
   }
 
-  // 🗑️ _buildReceiptRow successfully removed as it is no longer used
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final financialState = ref.watch(dailyFinancialsProvider);
     final ledgerState = ref.watch(ledgerProvider);
     final ledgerNotifier = ref.read(ledgerProvider.notifier);
 
-    // 🎨 DYNAMIC LIGHT/DARK THEME (Apple Premium Aesthetic)
     final Color bgColor = context.colors.scaffoldBg;
     final Color cardColor = context.colors.cardBg;
     final Color textColor = context.colors.textPrimary;
@@ -1720,6 +1762,7 @@ class AuditorScreen extends ConsumerWidget {
                     ],
                   );
 
+                  // 🚀 FIX: The Black Box Button text is now strictly tied to theme text color
                   Widget theBlackBox = GestureDetector(
                     onTap: () => Navigator.push(
                       context,
@@ -1733,22 +1776,19 @@ class AuditorScreen extends ConsumerWidget {
                         vertical: 16,
                       ),
                       decoration: BoxDecoration(
-                        color: context.colors.cardBg,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: context.colors.border,
-                          width: 1,
-                        ),
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: borderColor, width: 1),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.archive, color: Colors.white, size: 20),
-                          SizedBox(width: 12),
+                        children: [
+                          Icon(Icons.archive, color: textColor, size: 20),
+                          const SizedBox(width: 12),
                           Text(
                             "THE BLACK BOX",
                             style: TextStyle(
-                              color: Colors.white,
+                              color: textColor,
                               fontWeight: FontWeight.w900,
                               fontSize: 14,
                               letterSpacing: 2,
@@ -1759,7 +1799,6 @@ class AuditorScreen extends ConsumerWidget {
                     ),
                   );
 
-                  // 🚀 NEW: INVOICE RULES BUTTON
                   Widget invoiceRulesBtn = OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textColor,
@@ -1769,7 +1808,7 @@ class AuditorScreen extends ConsumerWidget {
                         vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     icon: const Icon(Icons.gavel, size: 18),
@@ -1783,7 +1822,6 @@ class AuditorScreen extends ConsumerWidget {
                     ),
                   );
 
-                  // 🚀 FIX: Prevent 'Expanded' crashes inside unbounded columns
                   if (isMobile) {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1850,8 +1888,8 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "Only verified exits",
                                 infoWidget: const InfoButton(
                                   title: "Realized Revenue",
-                                  en: "Total revenue from orders where the customer has physically exited the store. Pending exits are excluded.",
-                                  hi: "Sirf woh orders count hote hain jahan customer store se bahar ja chuka hai. Jo abhi andar hain woh is mein nahi aate.",
+                                  en: "Total revenue from verified exits.",
+                                  hi: "Sirf verify orders.",
                                 ),
                               ),
                               _buildPremiumCard(
@@ -1863,8 +1901,8 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "Paid but pending exit",
                                 infoWidget: const InfoButton(
                                   title: "Financial Leakage",
-                                  en: "Orders where payment was received but store exit is still pending. This amount is at risk if the customer backtracks.",
-                                  hi: "Payment ho gayi par customer abhi tak bahar nahi gaya. Yeh amount risky hai — guard verify kare tab hi safe hoga.",
+                                  en: "Payment done but no exit.",
+                                  hi: "Payment ho gayi par exit nahi.",
                                 ),
                               ),
                               _buildPremiumCard(
@@ -1876,8 +1914,8 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "Security interventions",
                                 infoWidget: const InfoButton(
                                   title: "Guard Rejects",
-                                  en: "Orders flagged and stopped by the security guard at exit. These are mismatched or suspicious transactions requiring investigation.",
-                                  hi: "Guard ne exit pe jo orders rok diye. Yeh mismatch ya suspicious transactions hain — fraud ka pehla signal hota hai.",
+                                  en: "Orders stopped at exit.",
+                                  hi: "Guard ne exit pe roke.",
                                 ),
                               ),
                               _buildPremiumCard(
@@ -1889,8 +1927,8 @@ class AuditorScreen extends ConsumerWidget {
                                 subtitle: "${finData.refundCount} transactions",
                                 infoWidget: const InfoButton(
                                   title: "Refunds Initiated",
-                                  en: "Total money refunded to customers today. Every refund is logged and linked to the original order for full traceability.",
-                                  hi: "Aaj customers ko wapas kiya gaya paisa. Har refund original order se linked hai — audit trail bilkul safe hai.",
+                                  en: "Total money refunded today.",
+                                  hi: "Aaj ke total refunds.",
                                 ),
                               ),
                             ],
@@ -1902,7 +1940,6 @@ class AuditorScreen extends ConsumerWidget {
                       LayoutBuilder(
                         builder: (context, constraints) {
                           bool isMobile = constraints.maxWidth < 800;
-                          // 🚀 FIX: Safe Layout - No Expanded inside ScrollView for mobile vertical view
                           if (isMobile) {
                             return Column(
                               children: [
@@ -1938,22 +1975,23 @@ class AuditorScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 24),
 
-                      // 🚀 REMOVED: const TimeIntelligenceCard(),
-                      // const SizedBox(height: 24),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: cardColor,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(
+                            24,
+                          ), // 🚀 Premium 24px
                           border: Border.all(color: borderColor),
                           boxShadow: [
-                            if (!isDark)
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 15,
-                                offset: const Offset(0, 4),
+                            BoxShadow(
+                              color: Colors.black.withValues(
+                                alpha: isDark ? 0.2 : 0.05,
                               ),
+                              blurRadius: 15,
+                              offset: const Offset(0, 4),
+                            ),
                           ],
                         ),
                         child: Column(
@@ -2008,30 +2046,30 @@ class AuditorScreen extends ConsumerWidget {
                                 ledgerState.isLoading)
                               const Center(child: CircularProgressIndicator())
                             else if (ledgerState.records.isEmpty)
-                              const Center(
+                              Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(20.0),
+                                  padding: const EdgeInsets.all(20.0),
                                   child: Text(
                                     "No records found.",
-                                    style: TextStyle(color: Colors.grey),
+                                    style: TextStyle(color: textDimColor),
                                   ),
                                 ),
                               )
                             else ...[
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 8.0),
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
                                 child: Row(
                                   children: [
                                     Icon(
                                       Icons.swipe,
                                       size: 14,
-                                      color: Colors.grey,
+                                      color: textDimColor,
                                     ),
-                                    SizedBox(width: 8),
+                                    const SizedBox(width: 8),
                                     Text(
                                       "Swipe/Scroll horizontally to view full table",
                                       style: TextStyle(
-                                        color: Colors.grey,
+                                        color: textDimColor,
                                         fontSize: 11,
                                         fontStyle: FontStyle.italic,
                                       ),
@@ -2039,10 +2077,8 @@ class AuditorScreen extends ConsumerWidget {
                                   ],
                                 ),
                               ),
-                              // 🚀 FIX: Removed RawScrollbar which causes layout crashes on Web
-                              // Simplified horizontal scroll wrapper for DataTable
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 child: SizedBox(
                                   width: double.infinity,
                                   child: SingleChildScrollView(
@@ -2153,11 +2189,10 @@ class AuditorScreen extends ConsumerWidget {
                                                 >((states) {
                                                   if (states.contains(
                                                     WidgetState.hovered,
-                                                  )) {
+                                                  ))
                                                     return Colors.greenAccent
                                                         .withValues(alpha: 0.1);
-                                                  }
-                                                  if (isDark) {
+                                                  if (isDark)
                                                     return idx % 2 == 0
                                                         ? const Color.fromARGB(
                                                             255,
@@ -2171,11 +2206,10 @@ class AuditorScreen extends ConsumerWidget {
                                                             31,
                                                             31,
                                                           );
-                                                  } else {
+                                                  else
                                                     return idx % 2 == 0
                                                         ? Colors.grey.shade50
                                                         : Colors.white;
-                                                  }
                                                 }),
                                             cells: [
                                               DataCell(
@@ -2267,7 +2301,6 @@ class AuditorScreen extends ConsumerWidget {
                                                     Color btnColor =
                                                         Colors.grey;
 
-                                                    // 🚀 LOGIC FOR EXACT BUTTON STATUSES
                                                     if (pStatus == 'REFUNDED') {
                                                       btnText = "Refunded";
                                                       btnColor =
@@ -2391,7 +2424,7 @@ class AuditorScreen extends ConsumerWidget {
                                             ),
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
-                                                  BorderRadius.circular(8),
+                                                  BorderRadius.circular(12),
                                             ),
                                           ),
                                           onPressed: () => ref
@@ -2427,7 +2460,7 @@ class AuditorScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24), // 🚀 Premium 24px
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade300,
         ),
@@ -2457,8 +2490,8 @@ class AuditorScreen extends ConsumerWidget {
               const SizedBox(width: 8),
               const InfoButton(
                 title: "Online Payment Collection",
-                en: "Total UPI/online amount expected from today's verified transactions. Cross-check this with your payment gateway (Razorpay/PhonePe) dashboard.",
-                hi: "Aaj ke verified UPI payments ka total. Razorpay/PhonePe se match karo — koi gap ho toh turant investigate karo.",
+                en: "Total UPI/online amount expected from today's verified transactions.",
+                hi: "Aaj ke verified UPI payments ka total.",
               ),
             ],
           ),
@@ -2472,7 +2505,7 @@ class AuditorScreen extends ConsumerWidget {
                     const Text(
                       "SETTLEMENT_EXPECTED",
                       style: TextStyle(
-                        color: Colors.white54,
+                        color: Colors.grey,
                         fontSize: 12,
                         fontFamily: 'monospace',
                       ),
@@ -2540,7 +2573,7 @@ class AuditorScreen extends ConsumerWidget {
         border: Border.all(
           color: isDark ? Colors.white12 : Colors.grey.shade300,
         ),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2589,7 +2622,7 @@ class AuditorScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(24), // 🚀 Premium 24px
         border: Border.all(
           color: isDark ? Colors.white10 : Colors.grey.shade300,
         ),
@@ -2696,9 +2729,8 @@ class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
   }
 
   String get _displayLabel {
-    if (_selected == 'Quarterly') {
+    if (_selected == 'Quarterly')
       return 'Quarterly (${_quarterLabel(DateTime.now())})';
-    }
     return _selected;
   }
 
@@ -2737,7 +2769,6 @@ class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── DROPDOWN ──────────────────────────────────────────────
         PopupMenuButton<String>(
           initialValue: _selected,
           onSelected: (val) => setState(() => _selected = val),
@@ -2777,16 +2808,6 @@ class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
                               : FontWeight.normal,
                         ),
                       ),
-                      if (opt['label'] == 'Quarterly') ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '(${_quarterLabel(DateTime.now())})',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
@@ -2818,10 +2839,7 @@ class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
             ),
           ),
         ),
-
         const SizedBox(width: 8),
-
-        // ── DOWNLOAD BUTTON ───────────────────────────────────────
         _isLoading
             ? SizedBox(
                 width: 34,
@@ -2832,7 +2850,6 @@ class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
                 message: 'Download $_displayLabel Report',
                 child: InkWell(
                   onTap: () async {
-                    // ⚡ Basic ledger sabke liye; AI Verdict sirf Growth+ ke liye
                     final plan = ref.read(subscriptionPlanProvider);
                     final isTrial = ref.read(isTrialActiveProvider);
                     final includeVerdict =
@@ -2850,12 +2867,12 @@ class _SmartExportButtonState extends ConsumerState<_SmartExportButton> {
                     );
                     setState(() => _isLoading = false);
                   },
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12), // 🚀 Premium Radius
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: accent.withValues(alpha: 0.3)),
                     ),
                     child: Icon(

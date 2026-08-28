@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Premium Theme Imported
 import 'create_po_dialog.dart';
 
 class StockAlertWidget extends StatefulWidget {
@@ -23,7 +24,6 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
       return FirebaseFirestore.instance
           .collection('products')
           .where('physicalStock', isLessThanOrEqualTo: 20)
-          // 🚀 COST FIX: Low-stock alert list pehle bina limit ke tha.
           .limit(50)
           .snapshots();
     }
@@ -31,7 +31,6 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
       return FirebaseFirestore.instance
           .collection('products')
           .where('barcode', isEqualTo: query)
-          // 🚀 COST FIX: barcode ideally unique hai, safety limit lagaya.
           .limit(5)
           .snapshots();
     }
@@ -39,20 +38,39 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
         .collection('products')
         .where('searchKey', isGreaterThanOrEqualTo: query)
         .where('searchKey', isLessThanOrEqualTo: '$query\uf8ff')
-        .limit(20) // Limit search results initially
+        .limit(20)
         .snapshots();
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.3), width: 2),
+        color: c.cardBg,
+        borderRadius: BorderRadius.circular(24), // 🚀 Premium 24px Radius
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade200,
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.orange.withValues(alpha: 0.05), blurRadius: 10),
+          BoxShadow(
+            color: isDark
+                ? Colors.orange.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            spreadRadius: -5,
+          ),
         ],
       ),
       child: Column(
@@ -61,16 +79,16 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.inventory_2, color: Colors.orange),
-                  SizedBox(width: 10),
+                  const Icon(Icons.inventory_2, color: Colors.orange),
+                  const SizedBox(width: 10),
                   Text(
                     "Shelf Radar 📉",
                     style: TextStyle(
                       fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2B3674),
+                      fontWeight: FontWeight.w900,
+                      color: c.textPrimary,
                     ),
                   ),
                 ],
@@ -84,34 +102,57 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
                       _currentPage = 0;
                     });
                   },
-                  child: const Text("Clear Search"),
+                  child: Text(
+                    "Clear Search",
+                    style: TextStyle(
+                      color: c.danger,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 16),
 
           // 🔍 SEARCH BAR
           Container(
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.grey.shade200),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.grey.shade300,
+              ),
             ),
             child: TextField(
               controller: _searchCtrl,
+              style: TextStyle(
+                color: c.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
               onChanged: (val) => setState(() {
                 _searchQuery = val;
                 _currentPage = 0;
               }),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: "Search Product or Barcode...",
-                prefixIcon: Icon(Icons.search, color: Colors.grey, size: 20),
+                hintStyle: TextStyle(
+                  color: c.textSecondary.withValues(alpha: 0.5),
+                ),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: c.textSecondary,
+                  size: 20,
+                ),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
-          const SizedBox(height: 15),
+          const SizedBox(height: 16),
 
           StreamBuilder<QuerySnapshot>(
             stream: _radarStream,
@@ -119,18 +160,18 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: CircularProgressIndicator(),
+                    padding: EdgeInsets.all(30),
+                    child: CircularProgressIndicator(color: Colors.orange),
                   ),
                 );
               }
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
+                return Padding(
+                  padding: const EdgeInsets.all(20),
                   child: Text(
-                    "No products found.",
+                    "No low-stock products found.",
                     style: TextStyle(
-                      color: Colors.grey,
+                      color: c.textSecondary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -142,7 +183,7 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
               // 🚀 REAL-TIME PAGINATION MATH
               final totalPages = (allProducts.length / _pageSize).ceil();
               if (_currentPage >= totalPages && totalPages > 0) {
-                _currentPage = totalPages - 1; // Safety check
+                _currentPage = totalPages - 1;
               }
 
               final startIndex = _currentPage * _pageSize;
@@ -157,7 +198,8 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: pageProducts.length,
-                    separatorBuilder: (context, index) => const Divider(),
+                    separatorBuilder: (context, index) =>
+                        Divider(color: c.textSecondary.withValues(alpha: 0.1)),
                     itemBuilder: (context, index) {
                       final data =
                           pageProducts[index].data() as Map<String, dynamic>;
@@ -169,22 +211,25 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                           name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
+                            color: c.textPrimary,
                           ),
                         ),
                         subtitle: Text(
                           "Stock: $physical Units",
                           style: TextStyle(
-                            color: physical <= 10 ? Colors.red : Colors.grey,
+                            color: physical <= 10 ? c.danger : c.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         trailing: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blueAccent,
-                            side: const BorderSide(color: Colors.blueAccent),
+                            foregroundColor: c.ctaBackground,
+                            side: BorderSide(
+                              color: c.ctaBackground.withValues(alpha: 0.5),
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -214,14 +259,14 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
 
                   // ⏭️ PAGINATION CONTROLS
                   if (totalPages > 1) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           "Total Alerts: ${allProducts.length}",
-                          style: const TextStyle(
-                            color: Colors.grey,
+                          style: TextStyle(
+                            color: c.textSecondary,
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
@@ -229,19 +274,26 @@ class _StockAlertWidgetState extends State<StockAlertWidget> {
                         Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.chevron_left),
+                              icon: Icon(
+                                Icons.chevron_left,
+                                color: c.textPrimary,
+                              ),
                               onPressed: _currentPage > 0
                                   ? () => setState(() => _currentPage--)
                                   : null,
                             ),
                             Text(
                               "Page ${_currentPage + 1} of $totalPages",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: c.textPrimary,
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.chevron_right),
+                              icon: Icon(
+                                Icons.chevron_right,
+                                color: c.textPrimary,
+                              ),
                               onPressed: _currentPage < totalPages - 1
                                   ? () => setState(() => _currentPage++)
                                   : null,

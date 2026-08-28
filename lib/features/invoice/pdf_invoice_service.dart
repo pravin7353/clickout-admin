@@ -1,320 +1,470 @@
-// lib/services/invoice/pdf_invoice_service.dart
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 Added for DB fetch
 
 class PdfInvoiceService {
   static Future<void> printInvoice(
-    Map<String, dynamic> orderData,
+    Map<String, dynamic> data,
     String orderId,
   ) async {
-    final pdf = await _generatePdf(orderData, orderId);
-    // Web par ye browser ka print/save as PDF dialog open kar dega
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-      name: 'Invoice_$orderId',
-    );
-  }
-
-  static Future<pw.Document> _generatePdf(
-    Map<String, dynamic> data,
-    String id,
-  ) async {
     final pdf = pw.Document();
+    final format = PdfPageFormat.roll80;
 
-    // 🚀 Load Roboto Font for "₹" Symbol
-    final ttf = await PdfGoogleFonts.robotoRegular();
-    final ttfBold = await PdfGoogleFonts.robotoBold();
+    // 🧠 DEFAULT META
+    String storeName =
+        data['storeName']?.toString().toUpperCase() ?? 'CLICKOUT RETAIL';
+    String address = 'N/A';
+    String phone = 'N/A';
+    String gstin = 'N/A';
+    String invPrefix = 'INV/';
+    List<String> terms = [
+      "1. Exchange within 7 days with original receipt.",
+      "2. Goods once sold will not be refunded.",
+    ];
 
-    // 🖼️ FIX: Fetch Logo from Network before building PDF
-    pw.ImageProvider? logoImage;
+    // 🚀 SMART FIREBASE FETCH (Maps exact fields from your UI)
     try {
-      String? logoUrl = data['storeLogoUrl'] ?? data['companyLogoUrl'];
-      if (logoUrl != null && logoUrl.isNotEmpty) {
-        logoImage = await networkImage(logoUrl);
-      }
-    } catch (e) {
-      print("PDF Logo Fetch Error: $e");
-    }
+      String bc =
+          (data['branchCode'] ?? data['branchId'] ?? data['storeId'])
+              ?.toString()
+              .trim() ??
+          '';
+      if (bc.isNotEmpty && bc != 'STORE') {
+        var sSnap = await FirebaseFirestore.instance
+            .collection('stores')
+            .where('branchCode', isEqualTo: bc)
+            .limit(1)
+            .get();
+        if (sSnap.docs.isNotEmpty) {
+          var sData = sSnap.docs.first.data();
+          storeName = (sData['storeName'] ?? sData['branchName'] ?? storeName)
+              .toString()
+              .toUpperCase();
 
-    DateTime date = DateTime.now();
-    if (data['timestamp'] != null) {
-      if (data['timestamp'] is Timestamp) {
-        date = (data['timestamp'] as Timestamp).toDate();
-      }
-    } else if (data['createdAt'] != null) {
-      if (data['createdAt'] is Timestamp) {
-        date = (data['createdAt'] as Timestamp).toDate();
-      }
-    }
+          // Mapped to exact UI labels and Firestore structure
+          phone =
+              sData['managerPhone'] ??
+              (sData['contactNumbers'] != null &&
+                      sData['contactNumbers'].isNotEmpty
+                  ? sData['contactNumbers'][0]
+                  : phone);
 
-    final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(date);
-    final items = (data['items'] as List<dynamic>? ?? []);
+          String gst = sData['gstNumber'] ?? sData['gstin'] ?? '';
+          if (gst.isEmpty && sData['licenses'] is List) {
+            for (var c in sData['licenses']) {
+              if (c['type'] == 'GSTIN') {
+                gst = c['number'] ?? '';
+                break;
+              }
+            }
+          }
+          if (gst.isNotEmpty) gstin = gst;
 
-    double totalMRP =
-        double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
-    double totalGSTAmount = 0;
-    double totalBasePrice = 0;
-    double totalOriginalMRP = 0;
-    double manualTotalWeight = 0;
-
-    try {
-      for (var item in items) {
-        double itemOriginalPrice =
-            double.tryParse(item['originalPrice']?.toString() ?? '0') ?? 0.0;
-        double itemFinalPrice =
-            double.tryParse(item['price']?.toString() ?? '') ??
-            double.tryParse(item['discountedPrice']?.toString() ?? '') ??
-            itemOriginalPrice;
-
-        double itemQty =
-            double.tryParse(item['qty']?.toString() ?? '') ??
-            double.tryParse(item['quantity']?.toString() ?? '0') ??
-            0.0;
-
-        totalOriginalMRP += (itemOriginalPrice * itemQty);
-
-        // 🛠️ SMART GST EXTRACTOR
-        double gstRate = 0.0;
-        if (item['gst'] != null && item['gst'].toString().isNotEmpty) {
-          String rawGst = item['gst'].toString().replaceAll(
-            RegExp(r'[^0-9.]'),
-            '',
-          );
-          gstRate = double.tryParse(rawGst) ?? 0.0;
+          var loc = sData['location'] as Map<String, dynamic>?;
+          String baseAddr =
+              loc?['address'] ??
+              sData['completeStoreAddress'] ??
+              sData['address'] ??
+              "";
+          String city = loc?['city'] ?? sData['city'] ?? "";
+          String pin = loc?['pincode'] ?? sData['pincode'] ?? "";
+          List<String> addrParts = [];
+          if (baseAddr.isNotEmpty) addrParts.add(baseAddr);
+          if (city.isNotEmpty) addrParts.add(city);
+          if (pin.isNotEmpty) addrParts.add(pin);
+          if (addrParts.isNotEmpty) address = addrParts.join(", ");
         }
+      }
 
-        // 🛠️ WEIGHT LOGIC
-        double w =
-            double.tryParse(item['total_item_weight']?.toString() ?? '') ??
-            double.tryParse(item['weight_per_unit']?.toString() ?? '') ??
-            double.tryParse(item['weight']?.toString() ?? '0') ??
-            0.0;
-
-        manualTotalWeight += (w * itemQty);
-
-        double basePricePerUnit = itemFinalPrice / (1 + (gstRate / 100));
-        double totalBaseForLine = basePricePerUnit * itemQty;
-        double gstAmountForLine = (itemFinalPrice * itemQty) - totalBaseForLine;
-
-        totalBasePrice += totalBaseForLine;
-        totalGSTAmount += gstAmountForLine;
+      // 🏢 TENANT FALLBACK (For GST & Terms)
+      String tid = data['tenantId']?.toString().trim() ?? '';
+      if (tid.isNotEmpty && tid != 'ALL') {
+        var tSnap = await FirebaseFirestore.instance
+            .collection('tenants')
+            .doc(tid)
+            .get();
+        if (tSnap.exists) {
+          var tData = tSnap.data() as Map<String, dynamic>;
+          if (gstin == 'N/A' || gstin.isEmpty) {
+            gstin = tData['gstin'] ?? tData['gstNumber'] ?? 'N/A';
+          }
+          var config = tData['invoiceConfig'] as Map<String, dynamic>? ?? {};
+          invPrefix =
+              config['prefix']?.toString() ??
+              config['invoicePrefix']?.toString() ??
+              invPrefix;
+          if (config['terms'] != null &&
+              config['terms'].toString().isNotEmpty) {
+            terms = config['terms'].toString().split(RegExp(r'\\n|\n'));
+          }
+        }
       }
     } catch (e) {
-      print("PDF Math Error: $e");
+      // Silent fallback
     }
 
-    double dbTotalWeight =
+    final DateTime date = (data['timestamp'] != null)
+        ? (data['timestamp'] as dynamic).toDate()
+        : DateTime.now();
+    final String invoiceNo =
+        data['invoiceNo']?.toString() ??
+        "$invPrefix${orderId.toUpperCase().substring(0, 8)}";
+    final String payMode = data['paymentMode']?.toString() ?? 'CASH';
+
+    final List<dynamic> items = data['cartItems'] ?? data['items'] ?? [];
+
+    double computedTaxable = 0.0;
+    double computedGst = 0.0;
+    double computedGross = 0.0;
+
+    for (var item in items) {
+      int qty =
+          int.tryParse(
+            item['qty']?.toString() ?? item['quantity']?.toString() ?? '1',
+          ) ??
+          1;
+      double itemOrig =
+          double.tryParse(
+            item['originalPrice']?.toString() ?? item['mrp']?.toString() ?? '0',
+          ) ??
+          0.0;
+      double price =
+          double.tryParse(item['price']?.toString() ?? '') ??
+          double.tryParse(item['unitPrice']?.toString() ?? '') ??
+          double.tryParse(item['discountedPrice']?.toString() ?? '') ??
+          itemOrig;
+      double itemTotal = qty * price;
+      computedGross += itemTotal;
+
+      double gstRate = 0.0;
+      if (item['gst'] != null) {
+        gstRate =
+            double.tryParse(
+              item['gst'].toString().replaceAll(RegExp(r'[^0-9.]'), ''),
+            ) ??
+            0.0;
+      }
+      double base = itemTotal / (1 + (gstRate / 100));
+      computedTaxable += base;
+      computedGst += (itemTotal - base);
+    }
+
+    double subtotal =
+        double.tryParse(data['taxableValue']?.toString() ?? '0') ?? 0.0;
+    if (subtotal == 0.0) subtotal = computedTaxable;
+
+    double gstTotal =
+        double.tryParse(data['gstTotal']?.toString() ?? '0') ?? 0.0;
+    if (gstTotal == 0.0) gstTotal = computedGst;
+
+    double grossSubtotal =
+        double.tryParse(data['totalAmount']?.toString() ?? '0') ??
+        computedGross;
+    double discount =
+        double.tryParse(data['discount']?.toString() ?? '0') ?? 0.0;
+    double grandTotal =
+        double.tryParse(data['totalAmount']?.toString() ?? '0') ?? 0.0;
+    double totalBagWeight =
         double.tryParse(data['totalWeight']?.toString() ?? '0') ?? 0.0;
-    double finalTotalWeight = dbTotalWeight > 0
-        ? dbTotalWeight
-        : manualTotalWeight;
-
-    String weightDisplay = finalTotalWeight >= 1000
-        ? "${(finalTotalWeight / 1000).toStringAsFixed(2)} KG"
-        : "${finalTotalWeight.toStringAsFixed(0)} g";
-
-    double totalSavings = totalOriginalMRP - totalMRP;
-    if (totalSavings < 0) totalSavings = 0;
+    double totalSavings =
+        double.tryParse(data['totalSavings']?.toString() ?? '0') ?? 0.0;
 
     pdf.addPage(
       pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        theme: pw.ThemeData.withFont(base: ttf, bold: ttfBold),
+        pageFormat: format,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 15),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
+            mainAxisSize: pw.MainAxisSize.min,
             children: [
+              pw.Center(
+                child: pw.Text(
+                  storeName,
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (address.isNotEmpty && address != 'N/A')
+                pw.Center(
+                  child: pw.Text(
+                    address,
+                    style: const pw.TextStyle(fontSize: 8),
+                    textAlign: pw.TextAlign.center,
+                  ),
+                ),
+              if (phone != 'N/A' || gstin != 'N/A')
+                pw.Center(
+                  child: pw.Text(
+                    "Ph: ${phone == 'N/A' ? '' : phone} | GSTIN: ${gstin == 'N/A' ? '' : gstin}",
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ),
+
+              pw.SizedBox(height: 6),
+              pw.Divider(borderStyle: pw.BorderStyle.dashed, thickness: 1),
+              pw.SizedBox(height: 4),
+
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  // 🖼️ FIX: Logo load hua toh Logo dikhega, warna "CLICKOUT" ki jagah seedha Dukaan ka naam aayega!
-                  if (logoImage != null)
-                    pw.Image(
-                      logoImage,
-                      width: 120,
-                      height: 50,
-                      fit: pw.BoxFit.contain,
-                    )
-                  else
-                    pw.Text(
-                      data['storeName'] ??
-                          data['companyName'] ??
-                          "RETAIL INVOICE",
+                  pw.Text(
+                    "Inv: $invoiceNo",
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    DateFormat('dd/MM/yy HH:mm').format(date),
+                    style: const pw.TextStyle(fontSize: 8),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                "Pay Mode: $payMode",
+                style: const pw.TextStyle(fontSize: 8),
+              ),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(borderStyle: pw.BorderStyle.dashed, thickness: 1),
+              pw.SizedBox(height: 4),
+
+              pw.Row(
+                children: [
+                  pw.Expanded(
+                    flex: 4,
+                    child: pw.Text(
+                      "ITEM",
                       style: pw.TextStyle(
-                        fontSize: 24,
+                        fontSize: 8,
                         fontWeight: pw.FontWeight.bold,
-                        color: PdfColors.red,
                       ),
                     ),
+                  ),
+                  pw.Expanded(
+                    flex: 1,
+                    child: pw.Text(
+                      "QTY",
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  pw.Expanded(
+                    flex: 2,
+                    child: pw.Text(
+                      "RATE",
+                      textAlign: pw.TextAlign.right,
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  pw.Expanded(
+                    flex: 2,
+                    child: pw.Text(
+                      "AMT",
+                      textAlign: pw.TextAlign.right,
+                      style: pw.TextStyle(
+                        fontSize: 8,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Divider(borderStyle: pw.BorderStyle.dashed, thickness: 1),
+              pw.SizedBox(height: 4),
+
+              ...items.map((item) {
+                String name = item['name']?.toString() ?? 'Item';
+                int qty =
+                    int.tryParse(
+                      item['qty']?.toString() ??
+                          item['quantity']?.toString() ??
+                          '1',
+                    ) ??
+                    1;
+                double itemOrig =
+                    double.tryParse(
+                      item['originalPrice']?.toString() ??
+                          item['mrp']?.toString() ??
+                          '0',
+                    ) ??
+                    0.0;
+                double price =
+                    double.tryParse(item['price']?.toString() ?? '') ??
+                    double.tryParse(item['unitPrice']?.toString() ?? '') ??
+                    double.tryParse(
+                      item['discountedPrice']?.toString() ?? '',
+                    ) ??
+                    itemOrig;
+                double total = qty * price;
+
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 4),
+                  child: pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(
+                        flex: 4,
+                        child: pw.Text(
+                          name,
+                          style: const pw.TextStyle(fontSize: 8),
+                        ),
+                      ),
+                      pw.Expanded(
+                        flex: 1,
+                        child: pw.Text(
+                          "$qty",
+                          textAlign: pw.TextAlign.center,
+                          style: const pw.TextStyle(fontSize: 8),
+                        ),
+                      ),
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(
+                          price.toStringAsFixed(2),
+                          textAlign: pw.TextAlign.right,
+                          style: const pw.TextStyle(fontSize: 8),
+                        ),
+                      ),
+                      pw.Expanded(
+                        flex: 2,
+                        child: pw.Text(
+                          total.toStringAsFixed(2),
+                          textAlign: pw.TextAlign.right,
+                          style: pw.TextStyle(
+                            fontSize: 8,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(borderStyle: pw.BorderStyle.dashed, thickness: 1),
+              pw.SizedBox(height: 4),
+
+              _buildTotalRow(
+                "Gross Subtotal:",
+                grossSubtotal.toStringAsFixed(2),
+              ),
+              _buildTotalRow("Taxable Value:", subtotal.toStringAsFixed(2)),
+              _buildTotalRow("Total GST:", gstTotal.toStringAsFixed(2)),
+              if (totalBagWeight > 0)
+                _buildTotalRow(
+                  "Total Weight:",
+                  totalBagWeight >= 1000
+                      ? "${(totalBagWeight / 1000).toStringAsFixed(2)} KG"
+                      : "${totalBagWeight.toStringAsFixed(0)} g",
+                ),
+              if (discount > 0)
+                _buildTotalRow("Discount:", "-${discount.toStringAsFixed(2)}"),
+              if (totalSavings > 0)
+                _buildTotalRow(
+                  "Total Savings:",
+                  "Rs. ${totalSavings.toStringAsFixed(2)}",
+                ),
+
+              pw.SizedBox(height: 4),
+              pw.Divider(borderStyle: pw.BorderStyle.dashed, thickness: 1),
+              pw.SizedBox(height: 4),
+
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
                   pw.Text(
-                    "TAX INVOICE",
+                    "GRAND TOTAL",
                     style: pw.TextStyle(
-                      fontSize: 18,
+                      fontSize: 10,
+                      fontWeight: pw.FontWeight.bold,
+                    ),
+                  ),
+                  pw.Text(
+                    "Rs. ${grandTotal.toStringAsFixed(2)}",
+                    style: pw.TextStyle(
+                      fontSize: 14,
                       fontWeight: pw.FontWeight.bold,
                     ),
                   ),
                 ],
               ),
-              pw.Divider(),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text("Billed To: ${data['userName'] ?? 'Customer'}"),
-                      pw.Text("Mode: ${data['paymentMode'] ?? 'Online'}"),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      // 🚀 FIX: Actual Generated Invoice Number Print Hoga
-                      pw.Text("Invoice #: ${data['invoiceNo'] ?? id}"),
-                      pw.Text("Date: $dateStr"),
-                      // 🚀 FIX: PDF me Cashier / Manager ka naam
-                      pw.Text("Billed By: ${data['cashierName'] ?? 'Manager'}"),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 20),
 
-              pw.Table.fromTextArray(
-                context: context,
-                border: null,
-                headerDecoration: const pw.BoxDecoration(color: PdfColors.red),
-                headerStyle: const pw.TextStyle(
-                  color: PdfColors.white,
-                  fontSize: 10,
+              pw.SizedBox(height: 4),
+              pw.Divider(borderStyle: pw.BorderStyle.dashed, thickness: 1),
+              pw.SizedBox(height: 8),
+
+              pw.Center(
+                child: pw.Text(
+                  "Thank you for shopping with us!",
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
-                data: <List<String>>[
-                  <String>[
-                    'Item',
-                    'Qty',
-                    'Weight',
-                    'MRP',
-                    'Taxable',
-                    'GST',
-                    'Total',
-                  ],
-                  ...items.map((e) {
-                    double mrp =
-                        double.tryParse(e['price']?.toString() ?? '') ??
-                        double.tryParse(
-                          e['discountedPrice']?.toString() ?? '',
-                        ) ??
-                        double.tryParse(
-                          e['originalPrice']?.toString() ?? '0',
-                        ) ??
-                        0.0;
-
-                    double qty =
-                        double.tryParse(e['qty']?.toString() ?? '') ??
-                        double.tryParse(e['quantity']?.toString() ?? '0') ??
-                        0.0;
-
-                    double gstRate = 0.0;
-                    if (e['gst'] != null && e['gst'].toString().isNotEmpty) {
-                      String raw = e['gst'].toString().replaceAll(
-                        RegExp(r'[^0-9.]'),
-                        '',
-                      );
-                      gstRate = double.tryParse(raw) ?? 0.0;
-                    }
-
-                    double base = (mrp / (1 + (gstRate / 100)));
-                    double total = mrp * qty;
-                    double gstAmt = total - (base * qty);
-
-                    double itemWgt =
-                        double.tryParse(
-                          e['total_item_weight']?.toString() ?? '',
-                        ) ??
-                        (double.tryParse(
-                                  e['weight_per_unit']?.toString() ?? '',
-                                ) ??
-                                double.tryParse(
-                                  e['weight']?.toString() ?? '0',
-                                ) ??
-                                0.0) *
-                            qty;
-
-                    String itemWgtStr = itemWgt >= 1000
-                        ? "${(itemWgt / 1000).toStringAsFixed(2)}kg"
-                        : "${itemWgt.toStringAsFixed(0)}g";
-
-                    return [
-                      e['name']?.toString() ?? 'Unknown Item',
-                      qty.toStringAsFixed(0),
-                      itemWgtStr,
-                      mrp.toStringAsFixed(2),
-                      (base * qty).toStringAsFixed(2),
-                      gstAmt.toStringAsFixed(2),
-                      total.toStringAsFixed(2),
-                    ];
-                  }),
-                ],
               ),
-              pw.SizedBox(height: 20),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        "Taxable Value:  ₹${totalBasePrice.toStringAsFixed(2)}",
-                      ),
-                      pw.Text(
-                        "Total GST:  ₹${totalGSTAmount.toStringAsFixed(2)}",
-                      ),
-                      pw.Text(
-                        "Total Bag Weight:  $weightDisplay",
-                        style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey700,
-                        ),
-                      ),
-                      pw.Divider(),
-                      if (totalSavings > 0) ...[
-                        pw.Text(
-                          "TOTAL SAVINGS:  ₹${totalSavings.toStringAsFixed(2)}",
-                          style: pw.TextStyle(
-                            fontWeight: pw.FontWeight.bold,
-                            fontSize: 14,
-                            color: PdfColors.green,
-                          ),
-                        ),
-                        pw.SizedBox(height: 5),
-                      ],
-                      pw.Text(
-                        "GRAND TOTAL:  ₹${totalMRP.toStringAsFixed(2)}",
-                        style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      pw.Text(
-                        "(Incl. of all taxes)",
-                        style: const pw.TextStyle(
-                          fontSize: 10,
-                          color: PdfColors.grey,
-                        ),
-                      ),
-                    ],
+              pw.SizedBox(height: 4),
+              ...terms.map(
+                (t) => pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 2),
+                  child: pw.Center(
+                    child: pw.Text(
+                      t.trim(),
+                      textAlign: pw.TextAlign.center,
+                      style: const pw.TextStyle(fontSize: 6),
+                    ),
                   ),
-                ],
+                ),
+              ),
+              pw.SizedBox(height: 6),
+              pw.Center(
+                child: pw.Text(
+                  "Powered by ClickOut OS",
+                  style: const pw.TextStyle(
+                    fontSize: 6,
+                    color: PdfColors.grey600,
+                  ),
+                ),
               ),
             ],
           );
         },
       ),
     );
-    return pdf;
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Invoice_$invoiceNo',
+    );
+  }
+
+  static pw.Widget _buildTotalRow(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: const pw.TextStyle(fontSize: 8)),
+          pw.Text(
+            value,
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+      ),
+    );
   }
 }

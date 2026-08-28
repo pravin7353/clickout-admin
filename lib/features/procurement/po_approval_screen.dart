@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
-import 'package:clickout_admin/core/utils/hierarchy_filter.dart'; // 🚀 CRITICAL FOR ISOLATION
+import 'package:clickout_admin/core/utils/hierarchy_filter.dart';
 import 'providers/po_engine_service.dart';
 import 'presentation/widgets/po_export_dialog.dart';
 import 'presentation/widgets/expiry_dashboard.dart';
@@ -13,7 +13,7 @@ import 'presentation/add_distributor_dialog.dart';
 import 'presentation/distributor_list_screen.dart';
 import 'presentation/widgets/quantum_metrics_widget.dart';
 import '../coach/widgets/info_button.dart';
-import '../../../core/theme/app_theme.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
 
 class POApprovalScreen extends ConsumerStatefulWidget {
   const POApprovalScreen({super.key});
@@ -23,17 +23,15 @@ class POApprovalScreen extends ConsumerStatefulWidget {
 }
 
 class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
-  // 🚀 DISABLED AI TAB: Default tab is now 'Pending Approvals' (Tab 1)
   int _selectedTab = 1;
   bool _isUploadingCsv = false;
 
-  // 🚀 NEW: Standard Pagination Setup
   int _poCurrentPage = 0;
   final int _poPageSize = 5;
   final ScrollController _poScrollController = ScrollController();
 
-  // 🚀 ANTI-FLICKER CACHE: Stores last valid docs to survive empty cache snapshots
   List<QueryDocumentSnapshot>? _cachedValidDocs;
+  final Map<String, String> _supplierCache = {};
 
   @override
   void dispose() {
@@ -41,21 +39,16 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     super.dispose();
   }
 
-  // 🚀 CACHE ENGINE: Prevents infinite Firestore reads for Suppliers
-  final Map<String, String> _supplierCache = {};
-
   Future<String> _getSupplierName(String? supplierId) async {
     if (supplierId == null || supplierId.isEmpty) return 'Unknown';
     if (_supplierCache.containsKey(supplierId)) {
       return _supplierCache[supplierId]!;
     }
-
     try {
       final doc = await FirebaseFirestore.instance
           .collection('suppliers')
           .doc(supplierId)
           .get();
-      // Asli naam lo, agar missing hai toh ID fallback karo
       final name = doc.exists
           ? (doc.data()?['name'] ?? supplierId)
           : supplierId;
@@ -66,12 +59,10 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     }
   }
 
-  // 🚀 THE BULLETPROOF STREAM (Exactly like Expiry Dashboard)
   Stream<QuerySnapshot> get _engineStream {
     final adminData = ref.watch(adminRoleProvider).value;
     if (adminData == null) return const Stream.empty();
 
-    // 🔒 100% STRICT ISOLATION via HierarchyFilter
     Query baseQuery;
     if (_selectedTab == 0) {
       baseQuery = HierarchyFilter.apply(
@@ -85,7 +76,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
       );
     }
 
-    // 🚀 We fetch snapshots WITHOUT orderBy to prevent Firebase Index Loading loops!
     return baseQuery.snapshots(includeMetadataChanges: true);
   }
 
@@ -131,47 +121,38 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("✅ $count Distributors Imported Successfully!"),
-            backgroundColor: Colors.green,
+            backgroundColor: context.colors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("🚨 Error: $e"), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text("🚨 Error: $e"),
+            backgroundColor: context.colors.danger,
+          ),
         );
       }
     } finally {
-      setState(() => _isUploadingCsv = false);
+      if (mounted) setState(() => _isUploadingCsv = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🚀 Watch kept (without storing) so this screen still rebuilds when the
-    // PO engine status changes, even though the value itself isn't read here.
     ref.watch(poEngineProvider);
     final isMobile = MediaQuery.of(context).size.width < 900;
     final adminData = ref.watch(adminRoleProvider).value;
     final realStoreId =
         adminData?['branchCode'] ?? adminData?['storeId'] ?? "HQ";
 
-    // 🎨 DYNAMIC LIGHT/DARK THEME
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final Color bgDark = context.colors.scaffoldBg;
-    final Color cardDark = context.colors.cardBg;
-    final Color accentGreen = isDark
-        ? const Color(0xFF00C853)
-        : const Color(0xFF2E7D32);
-    final Color accentOrange = const Color(0xFFFF6D00); // 🚀 Sunset Amber
-    final Color textPrimary = context.colors.textPrimary;
-    final Color textSecondary = context.colors.textSecondary;
-    final Color tableHeaderBg = context.colors.cardBg;
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const Color accentOrange = Color(0xFFFF6D00);
 
     return Scaffold(
-      backgroundColor: bgDark,
+      backgroundColor: c.scaffoldBg,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
@@ -194,7 +175,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                           color: accentOrange.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.business_center,
                           color: accentOrange,
                           size: 32,
@@ -211,7 +192,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                 style: TextStyle(
                                   fontSize: isMobile ? 22 : 28,
                                   fontWeight: FontWeight.w900,
-                                  color: textPrimary,
+                                  color: c.textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -226,7 +207,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                           Text(
                             "Smart Sourcing & Global Vendor Intelligence",
                             style: TextStyle(
-                              color: textSecondary,
+                              color: c.textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
@@ -242,18 +223,18 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                     children: [
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: cardDark,
-                          foregroundColor: textPrimary,
+                          backgroundColor: c.cardBg,
+                          foregroundColor: c.textPrimary,
                           elevation: 0,
                           side: BorderSide(
-                            color: textSecondary.withValues(alpha: 0.2),
+                            color: c.textSecondary.withValues(alpha: 0.2),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
                             vertical: 16,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         onPressed: _isUploadingCsv
@@ -267,7 +248,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : Icon(
+                            : const Icon(
                                 Icons.cloud_upload_outlined,
                                 size: 20,
                                 color: accentOrange,
@@ -279,32 +260,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       ),
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: cardDark,
-                          foregroundColor: textPrimary,
-                          elevation: 0,
-                          side: BorderSide(
-                            color: textSecondary.withValues(alpha: 0.2),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        onPressed: () => showDialog(
-                          context: context,
-                          builder: (ctx) => const AddDistributorDialog(),
-                        ),
-                        icon: const Icon(Icons.domain_add_outlined, size: 20),
-                        label: const Text(
-                          "Add Distributor",
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
                           backgroundColor: isDark
                               ? Colors.white
                               : const Color(0xFF2B3674),
@@ -312,13 +267,17 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                               ? const Color(0xFF2B3674)
                               : Colors.white,
                           elevation: 0,
-                          side: BorderSide(color: Colors.grey.shade300),
+                          side: BorderSide(
+                            color: isDark
+                                ? Colors.transparent
+                                : Colors.grey.shade300,
+                          ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
                             vertical: 16,
                           ),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                         ),
                         onPressed: () => Navigator.push(
@@ -345,11 +304,12 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                 child: ExpiryAlertDashboard(),
               ),
               const SizedBox(height: 40),
-              Divider(color: textSecondary.withValues(alpha: 0.2)),
+              Divider(color: c.textSecondary.withValues(alpha: 0.2)),
               const SizedBox(height: 20),
 
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
                 child: Row(
                   children: [
                     _buildTabButton(
@@ -357,6 +317,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       "Pending Approvals",
                       Icons.pending_actions,
                       Colors.orange,
+                      c,
                     ),
                     const SizedBox(width: 4),
                     const InfoButton(
@@ -370,6 +331,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       "PO History",
                       Icons.history,
                       Colors.green,
+                      c,
                     ),
                     const SizedBox(width: 4),
                     const InfoButton(
@@ -382,15 +344,14 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
               ),
               const SizedBox(height: 20),
 
-              // 🚀 THE ULTIMATE STREAM BUILDER
               StreamBuilder<QuerySnapshot>(
                 stream: _engineStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
-                    return Center(
+                    return const Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(40),
+                        padding: EdgeInsets.all(40),
                         child: CircularProgressIndicator(color: accentOrange),
                       ),
                     );
@@ -407,15 +368,14 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
 
                   if (rawDocs.isEmpty &&
                       snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
+                    return const Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(40),
+                        padding: EdgeInsets.all(40),
                         child: CircularProgressIndicator(color: accentOrange),
                       ),
                     );
                   }
 
-                  // 🧠 IN-MEMORY FILTERING
                   List<QueryDocumentSnapshot> docs = [];
                   for (var doc in rawDocs) {
                     final data = doc.data() as Map<String, dynamic>;
@@ -440,7 +400,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                     }
                   }
 
-                  // Safe Sort by Latest Date
                   docs.sort((a, b) {
                     final aData = a.data() as Map<String, dynamic>;
                     final bData = b.data() as Map<String, dynamic>;
@@ -460,7 +419,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                     return bTime.compareTo(aTime);
                   });
 
-                  // 🚀 NEW PAGINATION ENGINE (5 Items limit, No Load More)
                   final totalPages = (docs.length / _poPageSize).ceil();
                   if (_poCurrentPage >= totalPages && totalPages > 0) {
                     _poCurrentPage = totalPages - 1;
@@ -479,12 +437,23 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(40),
                       decoration: BoxDecoration(
-                        color: cardDark,
-                        borderRadius: BorderRadius.circular(20),
+                        color: c.cardBg,
+                        borderRadius: BorderRadius.circular(
+                          24,
+                        ), // 🚀 Premium 24px Radius
                         border: Border.all(
-                          color: textSecondary.withValues(alpha: 0.2),
+                          color: c.textSecondary.withValues(alpha: 0.2),
                           width: 1,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(
+                              alpha: isDark ? 0.2 : 0.05,
+                            ),
+                            blurRadius: 20,
+                            spreadRadius: -5,
+                          ),
+                        ],
                       ),
                       child: Column(
                         children: [
@@ -511,9 +480,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                     );
                   }
 
-                  // ==========================================
-                  // 📦 TABLE UI (Tab 1 & 2)
-                  // ==========================================
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       double safeWidth = constraints.maxWidth;
@@ -528,11 +494,24 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                         children: [
                           Container(
                             decoration: BoxDecoration(
-                              color: cardDark,
-                              borderRadius: BorderRadius.circular(16),
+                              color: c.cardBg,
+                              borderRadius: BorderRadius.circular(
+                                24,
+                              ), // 🚀 Premium 24px Radius
                               border: Border.all(
-                                color: textSecondary.withValues(alpha: 0.1),
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.05)
+                                    : Colors.grey.shade200,
                               ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(
+                                    alpha: isDark ? 0.2 : 0.05,
+                                  ),
+                                  blurRadius: 20,
+                                  spreadRadius: -5,
+                                ),
+                              ],
                             ),
                             child: Scrollbar(
                               controller: _poScrollController,
@@ -546,10 +525,9 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                   width: tableWidth,
                                   child: DataTable(
                                     headingRowColor: WidgetStateProperty.all(
-                                      tableHeaderBg,
+                                      c.cardBg,
                                     ),
-                                    dataRowMaxHeight:
-                                        double.infinity, // Allows items to wrap
+                                    dataRowMaxHeight: double.infinity,
                                     dataRowMinHeight: 70,
                                     dividerThickness: 0.5,
                                     columns: [
@@ -558,7 +536,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                           "Date & Time",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: textPrimary,
+                                            color: c.textPrimary,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -568,7 +546,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                           "Supplier Details",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: textPrimary,
+                                            color: c.textPrimary,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -578,7 +556,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                           "Order Items & Qty",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: textPrimary,
+                                            color: c.textPrimary,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -588,7 +566,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                           "Actions / Status",
                                           style: TextStyle(
                                             fontWeight: FontWeight.w900,
-                                            color: textPrimary,
+                                            color: c.textPrimary,
                                             fontSize: 12,
                                           ),
                                         ),
@@ -614,7 +592,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                 'dd MMM yyyy\nhh:mm a',
                                               ).format(date),
                                               style: TextStyle(
-                                                color: textPrimary,
+                                                color: c.textPrimary,
                                                 fontWeight: FontWeight.w600,
                                                 fontSize: 13,
                                               ),
@@ -641,7 +619,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                     Text(
                                                       supSnap.data ??
                                                           'Loading...',
-                                                      style: TextStyle(
+                                                      style: const TextStyle(
                                                         color: accentOrange,
                                                         fontWeight:
                                                             FontWeight.bold,
@@ -674,7 +652,8 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                         child: Text(
                                                           "• ${item['name']} (Req: ${item['orderQty']} units)",
                                                           style: TextStyle(
-                                                            color: textPrimary,
+                                                            color:
+                                                                c.textPrimary,
                                                             fontSize: 13,
                                                             fontWeight:
                                                                 FontWeight.w500,
@@ -712,7 +691,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                       ElevatedButton.icon(
                                                         style: ElevatedButton.styleFrom(
                                                           backgroundColor:
-                                                              accentGreen,
+                                                              c.success,
                                                           foregroundColor:
                                                               Colors.white,
                                                           padding:
@@ -720,6 +699,12 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                                 horizontal: 16,
                                                                 vertical: 12,
                                                               ),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8,
+                                                                ),
+                                                          ),
                                                         ),
                                                         icon: const Icon(
                                                           Icons.send,
@@ -789,12 +774,12 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                                       ScaffoldMessenger.of(
                                                                         context,
                                                                       ).showSnackBar(
-                                                                        const SnackBar(
-                                                                          content: Text(
+                                                                        SnackBar(
+                                                                          content: const Text(
                                                                             "✅ PO Moved to History!",
                                                                           ),
                                                                           backgroundColor:
-                                                                              Colors.green,
+                                                                              c.success,
                                                                         ),
                                                                       );
                                                                     }
@@ -803,18 +788,19 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                               );
                                                             }
                                                           } catch (e) {
-                                                            ScaffoldMessenger.of(
-                                                              context,
-                                                            ).showSnackBar(
-                                                              SnackBar(
-                                                                content: Text(
-                                                                  "🚨 Error: $e",
+                                                            if (mounted) {
+                                                              ScaffoldMessenger.of(
+                                                                context,
+                                                              ).showSnackBar(
+                                                                SnackBar(
+                                                                  content: Text(
+                                                                    "🚨 Error: $e",
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      c.danger,
                                                                 ),
-                                                                backgroundColor:
-                                                                    Colors
-                                                                        .redAccent,
-                                                              ),
-                                                            );
+                                                              );
+                                                            }
                                                           }
                                                         },
                                                       ),
@@ -827,15 +813,19 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                           vertical: 6,
                                                         ),
                                                     decoration: BoxDecoration(
-                                                      color: accentGreen
-                                                          .withValues(alpha: 0.1),
+                                                      color: c.success
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          ),
                                                       borderRadius:
                                                           BorderRadius.circular(
                                                             20,
                                                           ),
                                                       border: Border.all(
-                                                        color: accentGreen
-                                                            .withValues(alpha: 0.3),
+                                                        color: c.success
+                                                            .withValues(
+                                                              alpha: 0.3,
+                                                            ),
                                                       ),
                                                     ),
                                                     child: Row(
@@ -844,7 +834,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                       children: [
                                                         Icon(
                                                           Icons.verified,
-                                                          color: accentGreen,
+                                                          color: c.success,
                                                           size: 14,
                                                         ),
                                                         const SizedBox(
@@ -853,7 +843,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                                         Text(
                                                           "Approved by ${data['approvedBy'] ?? 'Admin'}",
                                                           style: TextStyle(
-                                                            color: accentGreen,
+                                                            color: c.success,
                                                             fontSize: 10,
                                                             fontWeight:
                                                                 FontWeight.w900,
@@ -871,7 +861,6 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                               ),
                             ),
                           ),
-                          // 🚀 PAGINATION FOOTER
                           const SizedBox(height: 16),
                           if (totalPages > 1)
                             Container(
@@ -880,10 +869,10 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: cardDark,
-                                borderRadius: BorderRadius.circular(12),
+                                color: c.cardBg,
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: textSecondary.withValues(alpha: 0.1),
+                                  color: c.textSecondary.withValues(alpha: 0.1),
                                 ),
                               ),
                               child: Row(
@@ -893,7 +882,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                   Text(
                                     "Showing ${startIndex + 1} - $endIndex of ${docs.length} Entries",
                                     style: TextStyle(
-                                      color: textSecondary,
+                                      color: c.textSecondary,
                                       fontWeight: FontWeight.bold,
                                       fontSize: 13,
                                     ),
@@ -901,7 +890,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                   Row(
                                     children: [
                                       IconButton(
-                                        icon: Icon(
+                                        icon: const Icon(
                                           Icons.chevron_left,
                                           color: accentOrange,
                                         ),
@@ -917,21 +906,23 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
                                           vertical: 6,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: accentOrange.withValues(alpha: 0.1),
+                                          color: accentOrange.withValues(
+                                            alpha: 0.1,
+                                          ),
                                           borderRadius: BorderRadius.circular(
                                             6,
                                           ),
                                         ),
                                         child: Text(
                                           "${_poCurrentPage + 1} / $totalPages",
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             color: accentOrange,
                                             fontWeight: FontWeight.w900,
                                           ),
                                         ),
                                       ),
                                       IconButton(
-                                        icon: Icon(
+                                        icon: const Icon(
                                           Icons.chevron_right,
                                           color: accentOrange,
                                         ),
@@ -965,6 +956,7 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     String title,
     IconData icon,
     Color activeColor,
+    dynamic c,
   ) {
     bool isSelected = _selectedTab == index;
     Color themeColor = isSelected
@@ -973,18 +965,15 @@ class _POApprovalScreenState extends ConsumerState<POApprovalScreen> {
     return InkWell(
       onTap: () => setState(() {
         _selectedTab = index;
-        _poCurrentPage = 0; // 🚀 FIX: Reset pagination to page 1
-        _cachedValidDocs =
-            null; // 🚀 FIX: Flush cache on tab switch to stop Ghost Data Leak!
+        _poCurrentPage = 0;
+        _cachedValidDocs = null;
       }),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? themeColor.withValues(alpha: 0.1)
-              : const Color(0xFF111811),
+          color: isSelected ? themeColor.withValues(alpha: 0.1) : c.cardBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected

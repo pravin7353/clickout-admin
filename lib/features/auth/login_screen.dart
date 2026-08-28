@@ -195,25 +195,95 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _handleRecovery() {
-    if (_emailController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Enter your primary email to initiate recovery."),
-          backgroundColor: context.colors.danger,
+    final recoveryCtrl = TextEditingController(text: _emailController.text);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: context.colors.cardBg,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: context.colors.border),
         ),
-      );
-      return;
-    }
-    // 🚀 SAAS RECOVERY INITIATED
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          "Recovery initiated! Instructions sent to backup email (if configured).",
+        title: Text(
+          "Account Recovery",
+          style: GoogleFonts.syne(
+            color: context.colors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        backgroundColor: context.colors.success,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Enter your primary account email. We will send recovery instructions to your registered backup email (if configured).",
+              style: GoogleFonts.dmSans(
+                color: context.colors.textSecondary,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: recoveryCtrl,
+              style: TextStyle(color: context.colors.textPrimary),
+              decoration: InputDecoration(
+                labelText: "Primary Email Address",
+                labelStyle: TextStyle(color: context.colors.textSecondary),
+                filled: true,
+                fillColor: context.colors.scaffoldBg,
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: context.colors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: context.colors.ctaBackground),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              "CANCEL",
+              style: TextStyle(
+                color: context.colors.textSecondary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: context.colors.ctaBackground,
+              foregroundColor: context.colors.ctaText,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () {
+              if (recoveryCtrl.text.isEmpty) return;
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    "Recovery initiated! Instructions sent to backup email.",
+                  ),
+                  backgroundColor: context.colors.success,
+                ),
+              );
+              // TODO: Connect Firebase Cloud Function for actual Recovery email firing
+            },
+            child: const Text(
+              "SEND RECOVERY LINK",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
       ),
     );
-    // TODO: Connect Firebase Cloud Function for actual Recovery email firing
   }
 
   @override

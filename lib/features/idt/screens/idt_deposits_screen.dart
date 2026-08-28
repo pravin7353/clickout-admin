@@ -3,31 +3,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:qr_flutter/qr_flutter.dart'; // 🚀 Added for actual Barcode/QR generation
 import '../providers/idt_deposit_provider.dart';
 import '../../coach/widgets/info_button.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:barcode_widget/barcode_widget.dart'; // 🚀 UI me 1D Barcode dikhane ke liye
 
 class IdtDepositsScreen extends ConsumerWidget {
-  const IdtDepositsScreen({Key? key}) : super(key: key);
+  const IdtDepositsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final depositState = ref.watch(idtDepositProvider);
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final accentViolet = isDark
-        ? const Color(0xFFB388FF)
-        : const Color(0xFF6200EA);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: c.scaffoldBg,
       body: depositState.isLoading
-          ? Center(child: CircularProgressIndicator(color: accentViolet))
+          ? Center(child: CircularProgressIndicator(color: c.ctaBackground))
           : depositState.errorMsg.isNotEmpty
           ? Center(
               child: Text(
                 depositState.errorMsg,
-                style: const TextStyle(color: Colors.redAccent),
+                style: TextStyle(color: c.danger, fontWeight: FontWeight.bold),
               ),
             )
           : NotificationListener<ScrollNotification>(
@@ -67,7 +69,7 @@ class _ExpiryDateFormatter extends TextInputFormatter {
 
 class FlatDepositTable extends ConsumerStatefulWidget {
   final List<Map<String, dynamic>> records;
-  const FlatDepositTable({Key? key, required this.records}) : super(key: key);
+  const FlatDepositTable({super.key, required this.records});
 
   @override
   ConsumerState<FlatDepositTable> createState() => _FlatDepositTableState();
@@ -87,12 +89,13 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
   final TextEditingController _scanCtrl = TextEditingController();
   final FocusNode _scanFocus = FocusNode();
   final ScrollController _horizontalScrollController = ScrollController();
+  bool _isProcessing = false; // 🚀 FIX: Master Processing-Lock guard
 
   @override
   void initState() {
     super.initState();
     _flattenRecords();
-    _loadDraft(); // 🚀 FEATURE 3: Load Anti-Crash Drafts on Startup
+    _loadDraft();
   }
 
   @override
@@ -113,10 +116,18 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
   }
 
   void _flattenRecords() {
+    // 🚀 FIX: Prevent checkbox shifting when background data updates
+    int oldDbCount = _dbItems.length;
     _dbItems.clear();
-    _selectedIndices.removeWhere(
-      (idx) => idx < _dbItems.length,
-    ); // Keep local selections safe
+
+    List<int> localSelections = [];
+    for (int idx in _selectedIndices) {
+      if (idx >= oldDbCount) {
+        localSelections.add(idx - oldDbCount);
+      }
+    }
+    _selectedIndices.clear();
+
     for (var record in widget.records) {
       List items = record['items'] ?? [];
       for (int i = 0; i < items.length; i++) {
@@ -126,9 +137,12 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
         _dbItems.add(item);
       }
     }
+
+    for (int lIdx in localSelections) {
+      _selectedIndices.add(_dbItems.length + lIdx);
+    }
   }
 
-  // 🚀 FEATURE 3: ANTI-CRASH SAVING
   Future<void> _saveDraft() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -147,7 +161,6 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
         setState(() {
           _localItems.clear();
           _localItems.addAll(decoded.map((e) => Map<String, dynamic>.from(e)));
-          // Auto-select loaded items
           for (int i = 0; i < _localItems.length; i++) {
             _selectedIndices.add(_dbItems.length + i);
           }
@@ -158,7 +171,6 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     }
   }
 
-  // 🚀 FEATURE 2: AUDIO FEEDBACK
   void _playSuccessSound() {
     SystemSound.play(SystemSoundType.click);
     HapticFeedback.lightImpact();
@@ -169,7 +181,6 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     HapticFeedback.heavyImpact();
   }
 
-  // 🚀 FEATURE 1 & 2: SMART MERGE + SOUND
   Future<void> _handleScan(String barcode) async {
     final bc = barcode.trim().replaceAll(RegExp(r'\s+'), '');
     if (bc.isEmpty) {
@@ -180,7 +191,6 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     int existingIndex = _localItems.indexWhere((item) => item['barcode'] == bc);
 
     if (existingIndex >= 0) {
-      // 🔄 AUTO-MERGE DUPLICATE SCANS
       setState(() {
         int currentQty =
             int.tryParse(
@@ -192,7 +202,6 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       _playSuccessSound();
       _saveDraft();
     } else {
-      // ADD NEW
       final pData = await ref.read(idtDepositProvider.notifier).getProduct(bc);
       setState(() {
         _localItems.add({
@@ -215,7 +224,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       if (pData != null) {
         _playSuccessSound();
       } else {
-        _playErrorSound(); // 🚨 UNKNOWN ITEM ALERT
+        _playErrorSound();
       }
       _saveDraft();
     }
@@ -227,95 +236,193 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     );
   }
 
-  // 🚀 FEATURE 4: BARCODE STICKER GENERATOR
+  // 🚀 FIXED & PREMIUM PREVIEW STICKER DIALOG
+  // 🚀 ACTUAL THERMAL STICKER PRINTING ENGINE
+  Future<void> _printThermalSticker(Map<String, dynamic> item) async {
+    final pdf = pw.Document();
+
+    // 🛠️ STRICT PAPER SIZE: 50mm width x 25mm height (Standard 2x1 inch Thermal Sticker)
+    // Margin zero rakha hai taaki thermal printer khud adjust kar le
+    final stickerFormat = PdfPageFormat(
+      50 * PdfPageFormat.mm,
+      25 * PdfPageFormat.mm,
+      marginAll: 2 * PdfPageFormat.mm,
+    );
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: stickerFormat,
+        build: (pw.Context context) {
+          return pw.Column(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                item['name']?.toString().toUpperCase() ?? 'ITEM',
+                style: pw.TextStyle(
+                  fontSize: 8,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+                maxLines: 1,
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                "MRP: Rs. ${item['price'] ?? '0'}",
+                style: pw.TextStyle(
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              // 🚀 CODE-128 BARCODE: Supports any length and alphanumeric characters
+              pw.BarcodeWidget(
+                barcode: pw.Barcode.code128(),
+                data: item['barcode']?.toString() ?? '0000',
+                width: 120,
+                height: 25,
+                drawText: true,
+                textStyle: pw.TextStyle(fontSize: 6),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    // 🖨️ FIRE PRINT COMMAND
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Sticker_${item['barcode']}',
+    );
+  }
+
+  // 🚀 PREMIUM PREVIEW DIALOG WITH 1D BARCODE
   void _showStickerDialog(Map<String, dynamic> item) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "THERMAL STICKER PREVIEW",
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.grey,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
+      builder: (dialogCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          width: 350,
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 40,
+                spreadRadius: -10,
               ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black, width: 2),
-                color: Colors.white,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "THERMAL STICKER PREVIEW",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
               ),
-              width: 250,
-              child: Column(
+              const SizedBox(height: 24),
+
+              // 🔲 EXACT STICKER PREVIEW BOX
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.black, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      item['name']?.toString().toUpperCase() ?? 'UNKNOWN ITEM',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: Colors.black,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "MRP: ₹${item['price'] ?? '0'}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 24,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 🚀 ACTUAL 1D BARCODE (Code 128)
+                    SizedBox(
+                      height: 60,
+                      child: BarcodeWidget(
+                        barcode: Barcode.code128(), // 🛡️ Failsafe Code-128
+                        data: item['barcode']?.toString() ?? '0000',
+                        drawText: true,
+                        color: Colors.black,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Text(
-                    item['name']?.toString().toUpperCase() ?? 'UNKNOWN ITEM',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.black,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "MRP: ₹${item['price'] ?? '0'}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                      fontSize: 22,
-                      color: Colors.black,
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogCtx),
+                    child: const Text(
+                      "CANCEL",
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  // Fake Barcode Graphic
-                  const Icon(Icons.view_week, size: 60, color: Colors.black),
-                  const SizedBox(height: 4),
-                  Text(
-                    item['barcode'] ?? '',
-                    style: const TextStyle(
-                      letterSpacing: 3,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                      fontSize: 14,
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    icon: const Icon(Icons.print, size: 18),
+                    label: const Text(
+                      "PRINT STICKER",
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(dialogCtx);
+                      _printThermalSticker(
+                        item,
+                      ); // 🖨️ TRIGGERS REAL THERMAL PDF
+                    },
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("CLOSE", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-            ),
-            icon: const Icon(Icons.print, size: 18),
-            label: const Text("PRINT STICKER"),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Sending to Thermal Printer 🖨️..."),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
-          ),
-        ],
       ),
     );
   }
@@ -334,9 +441,9 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     });
     _saveDraft();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("Bulk Update Applied!"),
-        backgroundColor: Colors.blue,
+      SnackBar(
+        content: const Text("Bulk Update Applied!"),
+        backgroundColor: context.colors.success,
       ),
     );
   }
@@ -365,24 +472,22 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       try {
         await ref.read(idtDepositProvider.notifier).deleteItems(toDeleteDb);
       } catch (e) {
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: context.colors.danger,
+            ),
           );
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final cardDark = context.colors.cardBg;
-    final accentViolet = isDark
-        ? const Color(0xFFB388FF)
-        : const Color(0xFF6200EA);
-    final inputBg = context.colors.scaffoldBg;
-
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final allItems = [..._dbItems, ..._localItems];
 
     List<Map<String, dynamic>> displayedItems = allItems;
@@ -403,18 +508,19 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       bool isLocalRow = item['isLocal'] == true;
 
       return DataRow(
-        color: WidgetStateProperty.all(
-          isLocalRow
-              ? Colors.green.withValues(alpha: 0.05)
-              : (index % 2 == 0
-                    ? Colors.transparent
-                    : accentViolet.withValues(alpha: 0.04)),
-        ),
+        color: WidgetStateProperty.resolveWith<Color?>((states) {
+          if (states.contains(WidgetState.hovered))
+            return c.success.withValues(alpha: 0.05);
+          if (isLocalRow) return c.success.withValues(alpha: 0.08);
+          return index % 2 == 0
+              ? Colors.transparent
+              : c.cardBg.withValues(alpha: 0.3);
+        }),
         cells: [
           DataCell(
             Checkbox(
               value: _selectedIndices.contains(index),
-              activeColor: accentViolet,
+              activeColor: c.ctaBackground,
               onChanged: (v) {
                 setState(() {
                   if (v == true)
@@ -428,16 +534,19 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
           DataCell(
             Text(
               item['barcode'] ?? '',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: c.textPrimary,
+              ),
             ),
           ),
-          DataCell(_compactInput(item, 'name', width: 200)),
-          DataCell(_compactInput(item, 'quantity', width: 60, isNum: true)),
-          DataCell(_compactInput(item, 'price', width: 75, isNum: true)),
+          DataCell(_compactInput(item, 'name', width: 220)),
+          DataCell(_compactInput(item, 'quantity', width: 70, isNum: true)),
+          DataCell(_compactInput(item, 'price', width: 85, isNum: true)),
           DataCell(
             Tooltip(
               message: "Kharidi Bhav",
-              child: _compactInput(item, 'unitCost', width: 75, isNum: true),
+              child: _compactInput(item, 'unitCost', width: 85, isNum: true),
             ),
           ),
           DataCell(
@@ -445,28 +554,36 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
               message: "Already Available Stock",
               child: Text(
                 item['physicalStock']?.toString() ?? '0',
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey,
+                  color: c.textSecondary,
                 ),
               ),
             ),
           ),
-          DataCell(_compactInput(item, 'weight', width: 80)),
-          DataCell(_compactInput(item, 'hsn', width: 85)),
+          DataCell(_compactInput(item, 'weight', width: 90)),
+          DataCell(_compactInput(item, 'hsn', width: 90)),
           DataCell(
             SizedBox(
               width: 95,
-              height: 36,
+              height: 40,
               child: DropdownButtonFormField<String>(
                 value: _gstSlabs.contains(item['gst']?.toString())
                     ? item['gst'].toString()
                     : null,
+                style: TextStyle(
+                  color: c.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+                dropdownColor: c.cardBg,
                 decoration: InputDecoration(
                   filled: true,
-                  fillColor: inputBg,
+                  fillColor: isDark
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : Colors.grey.shade100,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -485,7 +602,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
             _compactInput(
               item,
               'expiryDate',
-              width: 95,
+              width: 100,
               hint: "MM/YYYY",
               formatters: [
                 FilteringTextInputFormatter.digitsOnly,
@@ -508,11 +625,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                   onPressed: () => _showStickerDialog(item),
                 ),
                 IconButton(
-                  icon: const Icon(
-                    Icons.delete_outline,
-                    color: Colors.redAccent,
-                    size: 20,
-                  ),
+                  icon: Icon(Icons.delete_outline, color: c.danger, size: 20),
                   tooltip: "Delete Row",
                   onPressed: () async {
                     if (isLocalRow) {
@@ -529,13 +642,14 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                           [item],
                         );
                       } catch (e) {
-                        if (mounted)
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(e.toString()),
-                              backgroundColor: Colors.red,
+                              backgroundColor: c.danger,
                             ),
                           );
+                        }
                       }
                     }
                   },
@@ -551,29 +665,37 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       tableRows.add(
         DataRow(
           color: WidgetStateProperty.all(
-            isDark ? Colors.blue.withValues(alpha: 0.1) : Colors.blue.shade50,
+            c.ctaBackground.withValues(alpha: 0.08),
           ),
           cells: [
             const DataCell(SizedBox.shrink()),
             DataCell(
               SizedBox(
-                height: 36,
+                height: 40,
                 child: TextField(
                   controller: _scanCtrl,
                   focusNode: _scanFocus,
                   autofocus: true,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 13,
+                    color: c.textPrimary,
                   ),
                   decoration: InputDecoration(
                     hintText: "Scan Barcode...",
-                    prefixIcon: const Icon(Icons.qr_code_scanner, size: 16),
+                    hintStyle: TextStyle(
+                      color: c.textSecondary.withValues(alpha: 0.5),
+                    ),
+                    prefixIcon: Icon(
+                      Icons.qr_code_scanner,
+                      size: 16,
+                      color: c.ctaBackground,
+                    ),
                     filled: true,
-                    fillColor: theme.cardColor,
+                    fillColor: c.cardBg,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide(color: Colors.blueAccent),
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: c.ctaBackground),
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10),
                   ),
@@ -585,7 +707,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
               Text(
                 "Scan barcode to add row...",
                 style: TextStyle(
-                  color: Colors.grey.shade500,
+                  color: c.textSecondary,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -607,16 +729,17 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // 🟦 PREMIUM HEADER & BULK TOOLS
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           decoration: BoxDecoration(
-            color: cardDark,
-            border: Border(bottom: BorderSide(color: theme.dividerColor)),
+            color: c.cardBg,
+            border: Border(bottom: BorderSide(color: c.border)),
           ),
           child: Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 12,
+            runSpacing: 12,
             children: [
               Row(
                 mainAxisSize: MainAxisSize.min,
@@ -624,37 +747,43 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                   Text(
                     "IDT Deposits",
                     style: TextStyle(
-                      color: theme.textTheme.bodyLarge?.color,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      color: c.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
                   const InfoButton(
                     title: 'IDT — Inventory Deposit Terminal',
-                    en: 'IDT is your stock intake system. Staff scan products via ClickOut IDT app or You can connect the barcode scanner directly to the system to scan the barcode or Manually you can enter the details → syncs here → Manager verifies → products go LIVE for billing. Prevents unauthorized or unverified stock from entering the system.',
-                    hi: 'IDT matlab Inventory Deposit Terminal. Clickout IDT mobile app se product barcode scan karte hain ya barcode scanner connect karke barcode scan kar sakte hai ya manually details enter karke → yahan sync hota hai → Manager "Verify & Go Live" karta hai → tabhi product billing mein available hota hai. Bina verify ke koi product bill nahi ho sakta — ye ek security layer hai.',
+                    en: 'IDT is your stock intake system. Scan barcodes to add items instantly. Enter mandatory details (Qty, Price, Cost, Wt/Vol), select the rows, and click "Verify & Go Live" to push them to your active store inventory.',
+                    hi: 'IDT stock intake system hai. Barcode scan karein, quantity aur price daalein, aur "Verify & Go Live" daba kar seedha store me live karein.',
                   ),
                 ],
               ),
               const SizedBox(width: 16),
               SizedBox(
                 width: 250,
-                height: 36,
+                height: 40,
                 child: TextField(
                   controller: _searchCtrl,
+                  style: TextStyle(color: c.textPrimary),
                   onChanged: (v) => setState(() {}),
                   decoration: InputDecoration(
                     hintText: "Search deposits...",
+                    hintStyle: TextStyle(
+                      color: c.textSecondary.withValues(alpha: 0.5),
+                    ),
                     prefixIcon: Icon(
                       Icons.search,
-                      color: accentViolet,
+                      color: c.textSecondary,
                       size: 18,
                     ),
                     filled: true,
-                    fillColor: inputBg,
+                    fillColor: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.grey.shade100,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: BorderSide.none,
                     ),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -662,70 +791,108 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                 ),
               ),
               const SizedBox(width: 20),
-              const Text(
-                "BULK TOOL:  ",
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              _buildSmallField(_bulkHsnCtrl, "HSN", inputBg),
-              const SizedBox(width: 8),
-              _buildSmallField(
-                _bulkExpiryCtrl,
-                "MM/YYYY",
-                inputBg,
-                formatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(6),
-                  _ExpiryDateFormatter(),
-                ],
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 90,
-                height: 36,
-                child: DropdownButtonFormField<String>(
-                  value: _bulkGst,
-                  decoration: InputDecoration(
-                    hintText: "GST",
-                    filled: true,
-                    fillColor: inputBg,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(6),
-                      borderSide: BorderSide.none,
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: c.scaffoldBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: c.border),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        "BULK TOOL",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: c.textSecondary,
+                        ),
+                      ),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                  ),
-                  items: _gstSlabs
-                      .map(
-                        (s) => DropdownMenuItem(value: s, child: Text("$s%")),
-                      )
-                      .toList(),
-                  onChanged: (v) => setState(() => _bulkGst = v),
-                ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentViolet,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(0, 36),
-                ),
-                onPressed: _applyBulkUpdate,
-                child: const Text(
-                  "APPLY",
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    _buildSmallField(_bulkHsnCtrl, "HSN", isDark),
+                    const SizedBox(width: 6),
+                    _buildSmallField(
+                      _bulkExpiryCtrl,
+                      "MM/YYYY",
+                      isDark,
+                      formatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
+                        _ExpiryDateFormatter(),
+                      ],
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 90,
+                      height: 36,
+                      child: DropdownButtonFormField<String>(
+                        value: _bulkGst,
+                        style: TextStyle(
+                          color: c.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        dropdownColor: c.cardBg,
+                        decoration: InputDecoration(
+                          hintText: "GST",
+                          hintStyle: TextStyle(color: c.textSecondary),
+                          filled: true,
+                          fillColor: isDark
+                              ? Colors.white.withValues(alpha: 0.05)
+                              : Colors.white,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                          ),
+                        ),
+                        items: _gstSlabs
+                            .map(
+                              (s) => DropdownMenuItem(
+                                value: s,
+                                child: Text("$s%"),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) => setState(() => _bulkGst = v),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: c.ctaBackground,
+                        foregroundColor: c.ctaText,
+                        elevation: 0,
+                        minimumSize: const Size(0, 36),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      onPressed: _applyBulkUpdate,
+                      child: const Text(
+                        "APPLY",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               if (_selectedIndices.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 10),
-                  child: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.redAccent),
-                    onPressed: _deleteSelected,
-                    tooltip: "Delete Selected",
-                  ),
+                IconButton(
+                  icon: Icon(Icons.delete, color: c.danger),
+                  onPressed: _deleteSelected,
+                  tooltip: "Delete Selected",
                 ),
               IconButton(
-                icon: const Icon(Icons.refresh),
+                icon: Icon(Icons.refresh, color: c.textPrimary),
                 onPressed: () =>
                     ref.read(idtDepositProvider.notifier).fetchInitial(),
               ),
@@ -733,18 +900,64 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
           ),
         ),
 
+        // 💡 SMART INSTRUCTION BANNER
+        if (allItems.isEmpty)
+          Container(
+            margin: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: c.ctaBackground.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: c.ctaBackground.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lightbulb_outline, color: c.ctaBackground, size: 28),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "How to use IDT Deposits?",
+                        style: TextStyle(
+                          color: c.ctaBackground,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Connect your barcode scanner and start scanning products. Enter their quantity, price, and cost. Select the rows and click 'Verify & Go Live' to add them to your billing inventory.",
+                        style: TextStyle(color: c.textSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // ⬜ MAIN DATA TABLE
         Expanded(
           child: GestureDetector(
             onTap: () => _scanFocus.requestFocus(),
             child: Container(
-              margin: const EdgeInsets.all(20),
+              margin: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: cardDark,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.dividerColor),
+                color: c.cardBg,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: c.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 child: Scrollbar(
                   controller: _horizontalScrollController,
                   thumbVisibility: true,
@@ -754,37 +967,47 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                     child: SingleChildScrollView(
                       scrollDirection: Axis.vertical,
                       child: DataTable(
+                        headingRowHeight: 56,
                         headingRowColor: WidgetStateProperty.all(
-                          context.colors.cardBg,
+                          isDark
+                              ? const Color(0xFF1E1E1E)
+                              : Colors.grey.shade50,
                         ),
-                        columnSpacing: 20,
-                        horizontalMargin: 16,
+                        columnSpacing: 24,
+                        horizontalMargin: 20,
                         dividerThickness: 0.5,
+                        headingTextStyle: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          color: c.textPrimary,
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
                         columns: [
                           DataColumn(
                             label: Checkbox(
                               value:
                                   _selectedIndices.length == allItems.length &&
                                   allItems.isNotEmpty,
-                              activeColor: accentViolet,
+                              activeColor: c.ctaBackground,
                               onChanged: (v) {
                                 setState(() {
-                                  if (v == true)
+                                  if (v == true) {
                                     _selectedIndices = Set.from(
                                       Iterable.generate(allItems.length),
                                     );
-                                  else
+                                  } else {
                                     _selectedIndices.clear();
+                                  }
                                 });
                               },
                             ),
                           ),
                           const DataColumn(label: Text("BARCODE")),
                           const DataColumn(label: Text("PRODUCT NAME *")),
-                          const DataColumn(
+                          DataColumn(
                             label: Text(
                               "QTY *",
-                              style: TextStyle(color: Colors.deepPurple),
+                              style: TextStyle(color: c.ctaBackground),
                             ),
                           ),
                           const DataColumn(label: Text("PRICE (₹) *")),
@@ -794,12 +1017,12 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                               child: Text("COST (₹) *"),
                             ),
                           ),
-                          const DataColumn(
+                          DataColumn(
                             label: Tooltip(
                               message: "Already Available Stock",
                               child: Text(
                                 "CUR. STOCK",
-                                style: TextStyle(color: Colors.grey),
+                                style: TextStyle(color: c.textSecondary),
                               ),
                             ),
                           ),
@@ -819,39 +1042,46 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
           ),
         ),
 
+        // 🟩 PREMIUM FOOTER
         if (allItems.isNotEmpty)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
             decoration: BoxDecoration(
-              color: cardDark,
-              border: Border(top: BorderSide(color: theme.dividerColor)),
+              color: c.cardBg,
+              border: Border(top: BorderSide(color: c.border)),
             ),
             alignment: Alignment.centerRight,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                backgroundColor: accentViolet,
-                foregroundColor: Colors.white,
+                backgroundColor: c.success,
+                foregroundColor:
+                    Colors.black, // Dark text on green for premium look
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
+                  horizontal: 40,
+                  vertical: 18,
                 ),
+                elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
               onPressed: () async {
+                if (_isProcessing) return; // 🚀 FIX: Double-click lock!
+
                 if (_selectedIndices.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Select items to Go Live!"),
-                      backgroundColor: Colors.orange,
+                    SnackBar(
+                      content: const Text("Select items to Go Live!"),
+                      backgroundColor: c.danger,
                     ),
                   );
                   return;
                 }
 
                 List<Map<String, dynamic>> itemsToProcess = [];
-                for (int i in _selectedIndices) itemsToProcess.add(allItems[i]);
+                for (int i in _selectedIndices) {
+                  itemsToProcess.add(allItems[i]);
+                }
 
                 for (var item in itemsToProcess) {
                   if ((item['name']?.toString().trim().isEmpty ?? true) ||
@@ -860,49 +1090,137 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
                       (item['unitCost']?.toString().trim().isEmpty ?? true) ||
                       (item['weight']?.toString().trim().isEmpty ?? true)) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
+                      SnackBar(
+                        content: const Text(
                           "Missing Mandatory Fields! (Name, Qty, Price, Cost, Wt/Vol)",
                         ),
-                        backgroundColor: Colors.redAccent,
+                        backgroundColor: c.danger,
                       ),
                     );
                     return;
                   }
                 }
 
+                // 🚀 NEW: CONFIRMATION DIALOG BEFORE GO LIVE
+                final bool? confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: c.cardBg,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    title: Row(
+                      children: [
+                        Icon(Icons.rocket_launch, color: c.success),
+                        const SizedBox(width: 10),
+                        Text(
+                          "Confirm Go Live",
+                          style: TextStyle(
+                            color: c.textPrimary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    content: Text(
+                      "Are you sure you want to push ${itemsToProcess.length} items to the live inventory? This action will immediately make them available for billing.",
+                      style: TextStyle(color: c.textSecondary, height: 1.5),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(
+                          "CANCEL",
+                          style: TextStyle(
+                            color: c.textSecondary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: c.success,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text(
+                          "YES, GO LIVE",
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm != true) return; // User cancelled
+
+                setState(() => _isProcessing = true); // 🚀 Lock UI
+
                 try {
                   await ref
                       .read(idtDepositProvider.notifier)
                       .markMultipleAsProcessed(itemsToProcess);
+
+                  if (!context.mounted) return;
+
                   setState(() {
-                    _localItems.removeWhere((l) => itemsToProcess.contains(l));
+                    final processedLocalIds = itemsToProcess
+                        .where((i) => i['isLocal'] == true)
+                        .map((i) => i['_localId'])
+                        .toSet();
+
+                    _localItems.removeWhere(
+                      (l) => processedLocalIds.contains(l['_localId']),
+                    );
                     _selectedIndices.clear();
                   });
-                  _saveDraft(); // Clear draft after success
+
+                  _saveDraft();
                   _playSuccessSound();
-                  if (context.mounted)
+
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Verified & Stock Live! ✅"),
-                        backgroundColor: Colors.green,
+                      SnackBar(
+                        content: const Text("Verified & Stock Live! ✅"),
+                        backgroundColor: c.success,
                       ),
                     );
+                  }
                 } catch (e) {
                   _playErrorSound();
-                  if (context.mounted)
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(e.toString()),
-                        backgroundColor: Colors.redAccent,
+                        backgroundColor: c.danger,
                       ),
                     );
+                  }
+                } finally {
+                  if (mounted)
+                    setState(() => _isProcessing = false); // 🚀 Unlock UI
                 }
               },
-              icon: const Icon(Icons.rocket_launch, size: 18),
-              label: const Text(
-                "VERIFY & GO LIVE",
-                style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
+              icon: _isProcessing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(Icons.rocket_launch, size: 20),
+              label: Text(
+                _isProcessing ? "PROCESSING..." : "VERIFY & GO LIVE",
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 14,
+                  letterSpacing: 1,
+                ),
               ),
             ),
           ),
@@ -913,7 +1231,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
   Widget _buildSmallField(
     TextEditingController ctrl,
     String hint,
-    Color bg, {
+    bool isDark, {
     List<TextInputFormatter>? formatters,
   }) {
     return SizedBox(
@@ -922,10 +1240,18 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
       child: TextField(
         controller: ctrl,
         inputFormatters: formatters,
+        style: TextStyle(
+          color: context.colors.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
         decoration: InputDecoration(
           hintText: hint,
+          hintStyle: TextStyle(color: context.colors.textSecondary),
           filled: true,
-          fillColor: bg,
+          fillColor: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6),
             borderSide: BorderSide.none,
@@ -936,6 +1262,7 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     );
   }
 
+  // 🚀 FIXED: ValueKey was causing input focus loss on every keystroke
   Widget _compactInput(
     Map<String, dynamic> item,
     String key, {
@@ -944,34 +1271,45 @@ class _FlatDepositTableState extends ConsumerState<FlatDepositTable> {
     List<TextInputFormatter>? formatters,
     String hint = '',
   }) {
-    final theme = Theme.of(context);
-    final inputBg = theme.brightness == Brightness.dark
-        ? const Color(0xFF1A221A)
-        : const Color(0xFFF4F5F7);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
+
     return SizedBox(
       width: width,
-      height: 36,
+      height: 40,
       child: TextFormField(
         key: ValueKey(
-          '${item['_docId'] ?? item['_localId']}_${item['_originalIndex'] ?? 0}_${key}_${item[key]}',
+          '${item['_docId'] ?? item['_localId']}_${item['_originalIndex'] ?? 0}_$key',
         ),
         initialValue: item[key]?.toString() ?? '',
         keyboardType: isNum ? TextInputType.number : TextInputType.text,
         inputFormatters: formatters,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        // 🚀 ABSOLUTE FIX: Explicitly forcing White text in Dark Mode so it never shows black
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w900,
+          color: isDark ? Colors.white : Colors.black87,
+        ),
         decoration: InputDecoration(
           hintText: hint,
+          hintStyle: TextStyle(color: c.textSecondary.withValues(alpha: 0.5)),
           filled: true,
-          fillColor: inputBg,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+          fillColor: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade100,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: c.ctaBackground, width: 1.5),
           ),
         ),
         onChanged: (v) {
           item[key] = v;
-          _saveDraft(); // 🚀 FEATURE 3: Auto-Save Draft on every keystroke
+          _saveDraft();
         },
       ),
     );

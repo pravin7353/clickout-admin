@@ -753,31 +753,48 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
     Widget? prefix,
     Widget? suffix,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final c = context.colors;
     return InputDecoration(
       labelText: label,
       hintText: hint,
       prefixIcon: prefix,
       suffixIcon: suffix,
-      labelStyle: TextStyle(color: c.textSecondary, fontSize: 13),
-      hintStyle: TextStyle(color: c.textSecondary.withValues(alpha: 0.5)),
+      labelStyle: TextStyle(
+        color: isDark ? Colors.white70 : Colors.black87,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+      ),
+      hintStyle: TextStyle(
+        color: isDark ? Colors.white24 : Colors.black26,
+        fontSize: 13,
+      ),
       filled: true,
-      fillColor: c.scaffoldBg,
+      fillColor: c.cardBg,
+      contentPadding: const EdgeInsets.all(16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: c.border),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: c.border),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: c.ctaBackground, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: c.danger, width: 1),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: c.danger, width: 1.5),
       ),
     );
   }
@@ -1538,25 +1555,39 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
         });
       },
       child: Dialog(
-        backgroundColor: c.cardBg,
-        surfaceTintColor: Colors.transparent,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: c.border),
-        ),
         child: Container(
           width: isMobile ? double.infinity : 850,
           height: MediaQuery.of(context).size.height * 0.9,
           decoration: BoxDecoration(
-            color: c.cardBg,
-            borderRadius: BorderRadius.circular(16),
+            color: c.scaffoldBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade200,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? c.ctaBackground.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.1),
+                blurRadius: 40,
+                spreadRadius: -10,
+              ),
+            ],
           ),
           child: Column(
             children: [
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
+                  color: c.cardBg,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
                   border: Border(bottom: BorderSide(color: c.border)),
                 ),
                 child: Row(
@@ -1599,10 +1630,13 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 20,
+                  vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  border: Border(top: BorderSide(color: c.border)),
+                  color: c.cardBg,
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(24),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1659,13 +1693,15 @@ class _CreateStoreDialogState extends State<CreateStoreDialog> {
                         : ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: c.ctaBackground,
-                              foregroundColor: c.ctaText,
+                              foregroundColor:
+                                  Colors.black, // Premium Dark text
+                              elevation: 0,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 30,
+                                horizontal: 32,
                                 vertical: 16,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
                             onPressed: _isLoading ? null : _submit,

@@ -383,7 +383,7 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   spacing: 15,
                   runSpacing: 10,
                   children: [
-                    // 🚀 NAYA: TEMPLATE BUTTON
+                    // 🚀 VIEW TEMPLATE BUTTON
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         foregroundColor: textPrimary,
@@ -391,7 +391,9 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                           horizontal: 16,
                           vertical: 16,
                         ),
-                        side: BorderSide(color: textSecondary.withValues(alpha: 0.3)),
+                        side: BorderSide(
+                          color: textSecondary.withValues(alpha: 0.3),
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
@@ -399,94 +401,129 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       onPressed: () {
                         showDialog(
                           context: context,
-                          builder: (ctx) => AlertDialog(
-                            backgroundColor: inputBg,
-                            title: Text(
-                              "CSV Format Template",
-                              style: TextStyle(
-                                color: textPrimary,
-                                fontWeight: FontWeight.bold,
+                          builder: (dialogCtx) => Dialog(
+                            // 🛠️ FIX: Used Dialog instead of AlertDialog for premium look
+                            backgroundColor: Colors.transparent,
+                            insetPadding: const EdgeInsets.all(20),
+                            child: Container(
+                              width: 450,
+                              padding: const EdgeInsets.all(24),
+                              decoration: BoxDecoration(
+                                color: cardDark,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.05)
+                                      : Colors.grey.shade300,
+                                ),
                               ),
-                            ),
-                            content: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Column Order:',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  'barcode, name, price, unit_cost, gst, physical_stock, expiry_date, weight',
-                                  style: TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 11,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Example row:',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  '8901542001234, Mango Juice, 100, 70, 18, 50, 12/2027, 250',
-                                  style: TextStyle(
-                                    fontFamily: 'monospace',
-                                    fontSize: 11,
-                                    color: Color(0xFF00C853),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: Colors.red.withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    '⚠️ Weight: 250 ✅  250ml ❌\n⚠️ Price: 100 ✅  ₹100 ❌\n⚠️ GST: 18 ✅  18% ❌',
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "CSV Format Template",
                                     style: TextStyle(
-                                      color: Colors.redAccent,
-                                      fontSize: 12,
-                                      height: 1.6,
+                                      color: textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            actions: [
-                              TextButton.icon(
-                                icon: const Icon(Icons.copy, size: 14),
-                                label: const Text('Copy Template'),
-                                onPressed: () {
-                                  Clipboard.setData(
-                                    const ClipboardData(
-                                      text:
-                                          'barcode,name,price,unit_cost,gst,physical_stock,expiry_date,weight\n8901542001234,Mango Juice,100,70,18,50,12/2027,250',
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Column Order:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: textSecondary,
                                     ),
-                                  );
-                                  Navigator.pop(ctx);
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        '✅ Template copied to clipboard',
+                                  ),
+                                  const SizedBox(height: 6),
+                                  const Text(
+                                    'barcode, name, price, unit_cost, gst, physical_stock, expiry_date, weight',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Example row:',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    '8901542001234, Mango Juice, 100, 70, 18, 50, 12/2027, 250',
+                                    style: TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 11,
+                                      color: Color(0xFF00C853),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(dialogCtx),
+                                        child: Text(
+                                          "Close",
+                                          style: TextStyle(
+                                            color: textSecondary,
+                                          ),
+                                        ),
                                       ),
-                                      backgroundColor: Color(0xFF00C853),
-                                    ),
-                                  );
-                                },
+                                      const SizedBox(width: 12),
+                                      ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: accentGreen,
+                                          foregroundColor: Colors.black,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                        icon: const Icon(Icons.copy, size: 14),
+                                        label: const Text(
+                                          'Copy Template',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        onPressed: () {
+                                          Clipboard.setData(
+                                            const ClipboardData(
+                                              text:
+                                                  'barcode,name,price,unit_cost,gst,physical_stock,expiry_date,weight\n8901542001234,Mango Juice,100,70,18,50,12/2027,250',
+                                            ),
+                                          );
+                                          Navigator.pop(
+                                            dialogCtx,
+                                          ); // 🛠️ FIX: Only pops the dialog, not the screen
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                '✅ Template copied to clipboard',
+                                              ),
+                                              backgroundColor: Color(
+                                                0xFF00C853,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                child: const Text("Got it"),
-                              ),
-                            ],
+                            ),
                           ),
                         );
                       },
@@ -496,6 +533,8 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
+
+                    // 🚀 IMPORT CSV BUTTON
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: inputBg,
@@ -514,140 +553,137 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                       onPressed: _isUploadingCsv
                           ? null
                           : () async {
-                              // Show warning dialog before upload
                               await showDialog(
                                 context: context,
-                                builder: (_) => AlertDialog(
-                                  backgroundColor: isDark
-                                      ? const Color(0xFF111811)
-                                      : Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  title: Row(
-                                    children: const [
-                                      Icon(
-                                        Icons.warning_amber_rounded,
-                                        color: Colors.amber,
+                                builder: (dialogCtx) => Dialog(
+                                  // 🛠️ FIX: Used dialogCtx to prevent screen crash
+                                  backgroundColor: Colors.transparent,
+                                  insetPadding: const EdgeInsets.all(20),
+                                  child: Container(
+                                    width: 500,
+                                    padding: const EdgeInsets.all(24),
+                                    decoration: BoxDecoration(
+                                      color: cardDark,
+                                      borderRadius: BorderRadius.circular(24),
+                                      border: Border.all(
+                                        color: isDark
+                                            ? Colors.white.withValues(
+                                                alpha: 0.05,
+                                              )
+                                            : Colors.grey.shade300,
                                       ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'CSV Format Rules',
-                                        style: TextStyle(fontSize: 16),
-                                      ),
-                                    ],
-                                  ),
-                                  content: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Text(
-                                        'Numeric fields must be NUMBERS ONLY:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      _csvRuleRow('Weight', '250ml ❌', '250 ✅'),
-                                      _csvRuleRow('Price', '₹100 ❌', '100 ✅'),
-                                      _csvRuleRow('GST', '18% ❌', '18 ✅'),
-                                      _csvRuleRow('Unit Cost', '₹70 ❌', '70 ✅'),
-                                      const SizedBox(height: 16),
-                                      Container(
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.withValues(alpha: 0.08),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.red.withValues(alpha: 0.3),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          '⚠️ Units or symbols in numeric fields will CRASH the system and corrupt your inventory.',
-                                          style: TextStyle(
-                                            color: Colors.redAccent,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      const Text(
-                                        'CSV Column Order:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      const Text(
-                                        'barcode, name, price, unit_cost, gst, physical_stock, expiry_date(MM/YYYY), weight',
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      const Text(
-                                        'Example row:',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        '8901542001234, Mango Juice, 100, 70, 18, 50, 12/2027, 250',
-                                        style: TextStyle(
-                                          fontFamily: 'monospace',
-                                          fontSize: 11,
-                                          color: Color(0xFF00C853),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  actions: [
-                                    TextButton.icon(
-                                      icon: const Icon(Icons.copy, size: 14),
-                                      label: const Text('Copy Template'),
-                                      onPressed: () {
-                                        Clipboard.setData(
-                                          const ClipboardData(
-                                            text:
-                                                'barcode,name,price,unit_cost,gst,physical_stock,expiry_date,weight\n8901542001234,Mango Juice,100,70,18,50,12/2027,250',
-                                          ),
-                                        );
-                                        Navigator.pop(context);
-                                        ScaffoldMessenger.of(
-                                          context,
-                                        ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              '✅ Template copied to clipboard',
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.warning_amber_rounded,
+                                              color: Colors.amber,
                                             ),
-                                            backgroundColor: Color(0xFF00C853),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: accentGreen,
-                                        foregroundColor: Colors.black,
-                                      ),
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        _processCsvImport();
-                                      },
-                                      child: const Text(
-                                        'Understood, Upload CSV',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              'CSV Format Rules',
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Numeric fields must be NUMBERS ONLY:',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: textSecondary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        _csvRuleRow(
+                                          'Weight',
+                                          '250ml ❌',
+                                          '250 ✅',
+                                        ),
+                                        _csvRuleRow('Price', '₹100 ❌', '100 ✅'),
+                                        _csvRuleRow('GST', '18% ❌', '18 ✅'),
+                                        _csvRuleRow(
+                                          'Unit Cost',
+                                          '₹70 ❌',
+                                          '70 ✅',
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.red.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: Colors.red.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                            ),
+                                          ),
+                                          child: const Text(
+                                            '⚠️ Units or symbols in numeric fields will CRASH the system and corrupt your inventory.',
+                                            style: TextStyle(
+                                              color: Colors.redAccent,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 24),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.end,
+                                          children: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(dialogCtx),
+                                              child: Text(
+                                                "Cancel",
+                                                style: TextStyle(
+                                                  color: textSecondary,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            ElevatedButton(
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: accentGreen,
+                                                foregroundColor: Colors.black,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                              ),
+                                              onPressed: () {
+                                                Navigator.pop(
+                                                  dialogCtx,
+                                                ); // 🛠️ FIX: Safely close dialog before upload starts
+                                                _processCsvImport();
+                                              },
+                                              child: const Text(
+                                                'Understood, Upload CSV',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
                                 ),
                               );
                             },
@@ -670,12 +706,13 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
+
+                    // 🚀 ADD PRODUCT BUTTON
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentGreen,
-                        foregroundColor: isDark
-                            ? const Color(0xFF080B08)
-                            : Colors.white,
+                        foregroundColor: Colors
+                            .black, // 🛠️ FIX: Premium black text on green
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 16,
@@ -710,7 +747,9 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   decoration: BoxDecoration(
                     color: inputBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: textSecondary.withValues(alpha: 0.15)),
+                    border: Border.all(
+                      color: textSecondary.withValues(alpha: 0.15),
+                    ),
                   ),
                   child: TextField(
                     controller: _searchController,
@@ -750,7 +789,9 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                   decoration: BoxDecoration(
                     color: inputBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: textSecondary.withValues(alpha: 0.15)),
+                    border: Border.all(
+                      color: textSecondary.withValues(alpha: 0.15),
+                    ),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
@@ -878,7 +919,11 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                             columns: const [
                               DataColumn(label: Text("BARCODE")),
                               DataColumn(label: Text("PRODUCT NAME")),
+                              DataColumn(label: Text("UNIT COST")), // 🛠️ ADDED
                               DataColumn(label: Text("MRP / PRICE")),
+                              DataColumn(label: Text("GST")), // 🛠️ ADDED
+                              DataColumn(label: Text("WEIGHT")), // 🛠️ ADDED
+                              DataColumn(label: Text("EXPIRY")), // 🛠️ ADDED
                               DataColumn(label: Text("PHYSICAL STOCK")),
                               DataColumn(label: Text("STATUS")),
                               DataColumn(label: Text("ACTIONS")),
@@ -899,6 +944,19 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                               var safeData = Map<String, dynamic>.from(data);
                               safeData['expiryDate'] = data['expiryDate']
                                   ?.toString();
+
+                              // 🚀 FORMAT EXPIRY DATE PROPERLY
+                              String displayExpiry = '-';
+                              if (data['expiryDate'] != null) {
+                                if (data['expiryDate'] is Timestamp) {
+                                  final d = (data['expiryDate'] as Timestamp)
+                                      .toDate();
+                                  displayExpiry =
+                                      "${d.day.toString().padLeft(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.month - 1]} ${d.year}";
+                                } else {
+                                  displayExpiry = data['expiryDate'].toString();
+                                }
+                              }
 
                               return DataRow(
                                 color: WidgetStateProperty.resolveWith<Color?>((
@@ -935,9 +993,42 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                   ),
                                   DataCell(
                                     Text(
+                                      "₹${data['unitCost'] ?? 0}",
+                                      style: TextStyle(
+                                        color: textSecondary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
                                       "₹${data['price'] ?? 0}",
                                       style: TextStyle(
                                         color: accentGreen,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      data['gst']?.toString() ?? '0%',
+                                      style: TextStyle(
+                                        color: textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      data['weight']?.toString() ?? '-',
+                                      style: TextStyle(color: textPrimary),
+                                    ),
+                                  ),
+                                  DataCell(
+                                    Text(
+                                      displayExpiry, // 🛠️ FIX: Prints clean date instead of raw Timestamp
+                                      style: TextStyle(
+                                        color: textPrimary,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -951,12 +1042,16 @@ class _ProductControlScreenState extends ConsumerState<ProductControlScreen> {
                                       decoration: BoxDecoration(
                                         color: isLowStock
                                             ? accentRed.withValues(alpha: 0.1)
-                                            : accentGreen.withValues(alpha: 0.1),
+                                            : accentGreen.withValues(
+                                                alpha: 0.1,
+                                              ),
                                         borderRadius: BorderRadius.circular(6),
                                         border: Border.all(
                                           color: isLowStock
                                               ? accentRed.withValues(alpha: 0.3)
-                                              : accentGreen.withValues(alpha: 0.3),
+                                              : accentGreen.withValues(
+                                                  alpha: 0.3,
+                                                ),
                                         ),
                                       ),
                                       child: Row(

@@ -25,6 +25,7 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
   late TextEditingController _barcodeCtrl;
   late TextEditingController _nameCtrl;
   late TextEditingController _priceCtrl;
+  late TextEditingController _unitCostCtrl; // 🛠️ FIX: Added Unit Cost
   late TextEditingController _weightCtrl;
   late TextEditingController _stockCtrl;
   late String _gst;
@@ -54,6 +55,11 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
     );
     _priceCtrl = TextEditingController(
       text: widget.productData['price']?.toString() ?? '0',
+    );
+    _unitCostCtrl = TextEditingController(
+      text:
+          widget.productData['unitCost']?.toString() ??
+          '0', // 🛠️ FIX: Initialize Unit Cost
     );
     _weightCtrl = TextEditingController(
       text:
@@ -97,6 +103,8 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
     final updatedData = {
       'name': _nameCtrl.text.trim(),
       'price': _priceCtrl.text.trim(),
+      'unitCost': _unitCostCtrl.text
+          .trim(), // 🛠️ FIX: Save Unit Cost to Firebase
       'weight': _weightCtrl.text.trim(),
       'physicalStock': _stockCtrl.text.trim(),
       'gst': _gst,
@@ -138,18 +146,31 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
     bool isExpired =
         _selectedExpiry != null && _selectedExpiry!.isBefore(DateTime.now());
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
-      ),
-      backgroundColor: bgDark,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       insetPadding: const EdgeInsets.all(16),
       child: Container(
         width: isMobile ? double.infinity : 750,
         decoration: BoxDecoration(
           color: bgDark,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24), // 🛠️ Premium 24px radius
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? accentGreen.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.1),
+              blurRadius: 40,
+              spreadRadius: -10,
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -158,18 +179,26 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: bgDark,
+                color: cardDark, // 🛠️ Premium contrast header
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                border: Border(
-                  bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                  top: Radius.circular(24),
                 ),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.edit_square, color: accentGreen, size: 28),
-                  const SizedBox(width: 15),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: accentGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.edit_square,
+                      color: accentGreen,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +232,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       decoration: BoxDecoration(
                         color: accentRed.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: accentRed.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: accentRed.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: const Text(
                         "Low Stock",
@@ -276,7 +307,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(color: textSecondary.withValues(alpha: 0.1)),
+                        child: Divider(
+                          color: textSecondary.withValues(alpha: 0.1),
+                        ),
                       ),
 
                       _buildSectionLabel("PRICING & TAX"),
@@ -287,13 +320,23 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                           _buildInputField(
                             label: "Selling Price (₹)",
                             controller: _priceCtrl,
-                            icon: Icons.currency_rupee,
+                            icon: Icons.sell_outlined,
                             isNumber: true,
                             isRequired: true,
-                            width: 200,
+                            width: 180,
+                          ),
+                          _buildInputField(
+                            label:
+                                "Unit Cost (₹) (KHARIDI BHAV)", // 🛠️ FIX: Updated label for clarity
+                            controller:
+                                _unitCostCtrl, // 🛠️ FIX: Added Unit Cost Input
+                            icon: Icons.account_balance_wallet_outlined,
+                            isNumber: true,
+                            isRequired: true,
+                            width: 180,
                           ),
                           SizedBox(
-                            width: 200,
+                            width: 180,
                             child: DropdownButtonFormField<String>(
                               initialValue: _gstSlabs.contains(_gst)
                                   ? _gst
@@ -328,7 +371,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                       ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 20),
-                        child: Divider(color: textSecondary.withValues(alpha: 0.1)),
+                        child: Divider(
+                          color: textSecondary.withValues(alpha: 0.1),
+                        ),
                       ),
 
                       _buildSectionLabel("INVENTORY & LIFECYCLE"),
@@ -415,12 +460,9 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: bgDark,
+                color: cardDark,
                 borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(16),
-                ),
-                border: Border(
-                  top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                  bottom: Radius.circular(24),
                 ),
               ),
               child: Row(
@@ -439,36 +481,44 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accentGreen,
-                      foregroundColor: bgDark,
+                      foregroundColor:
+                          Colors.black, // 🛠️ Premium dark text on green
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 32,
                         vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: isProcessing ? null : _submitEdit,
-                    icon: isProcessing
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
+                    child: isProcessing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
                             child: CircularProgressIndicator(
-                              color: bgDark,
+                              color: Colors.black,
                               strokeWidth: 2,
                             ),
                           )
-                        : const Icon(Icons.update, size: 18),
-                    label: const Text(
-                      "UPDATE CHANGES",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1,
-                      ),
-                    ),
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.update, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                "Save Configuration",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ],
               ),
@@ -527,27 +577,41 @@ class _EditProductDialogState extends ConsumerState<EditProductDialog> {
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-        color: textSecondary.withValues(alpha: 0.8),
-        fontWeight: FontWeight.bold,
+        color: isDark ? Colors.white70 : Colors.black87,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
       ),
-      prefixIcon: Icon(icon, color: textSecondary, size: 20),
+      prefixIcon: Icon(icon, color: Colors.grey, size: 18),
       filled: true,
-      fillColor: inputBg,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      fillColor: cardDark,
+      contentPadding: const EdgeInsets.all(16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
+      ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: accentGreen, width: 1.5),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: accentGreen),
       ),
-      errorBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
   }

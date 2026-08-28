@@ -102,36 +102,53 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
+    final bool isGstZero = _selectedGst == '0% GST';
+
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentBlue.withValues(alpha: 0.2), width: 1),
-      ),
-      backgroundColor: bgDark,
-      elevation: 24,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(20),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 800),
+        constraints: const BoxConstraints(maxWidth: 750),
         child: Container(
           decoration: BoxDecoration(
-            color: bgDark,
-            borderRadius: BorderRadius.circular(16),
+            color: c.scaffoldBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.grey.shade200,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? accentBlue.withValues(alpha: 0.05)
+                    : Colors.black.withValues(alpha: 0.1),
+                blurRadius: 40,
+                spreadRadius: -10,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 🟦 HEADER SECTION
+              // 🟦 PREMIUM HEADER SECTION
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
                   vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: c.cardBg,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
+                    top: Radius.circular(24),
                   ),
                   border: Border(
-                    bottom: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: BorderSide(
+                      color: isDark ? Colors.white12 : Colors.grey.shade200,
+                    ),
                   ),
                 ),
                 child: Row(
@@ -156,7 +173,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                           Text(
                             "Add New Service",
                             style: TextStyle(
-                              color: textPrimary,
+                              color: c.textPrimary,
                               fontSize: 22,
                               fontWeight: FontWeight.w800,
                               letterSpacing: -0.5,
@@ -166,7 +183,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                           Text(
                             "Register a non-physical service (e.g., Hair Spa, Polishing).",
                             style: TextStyle(
-                              color: textSecondary,
+                              color: c.textSecondary,
                               fontSize: 13,
                               fontWeight: FontWeight.w500,
                             ),
@@ -175,169 +192,166 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: textSecondary),
+                      icon: Icon(Icons.close, color: c.textSecondary),
                       onPressed: () => Navigator.pop(context),
+                      splashRadius: 24,
                     ),
                   ],
                 ),
               ),
 
-              // ⬜ FORM BODY SECTION
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(30),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildSectionTitle("SERVICE IDENTITY"),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                label: "Service Code (ID)",
-                                controller: _codeCtrl,
-                                icon: Icons.tag,
-                                hintText: "e.g., VHSSPA002",
-                                inputFormatters: [
-                                  // 🚀 FIX: Only allow letters & numbers (No spaces, no hyphens, no +)
-                                  FilteringTextInputFormatter.allow(
-                                    RegExp(r'[a-zA-Z0-9]'),
+              // ⬜ COMPACT NO-SCROLL FORM BODY
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 24,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ROW 1: Identity
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              label: "Service Code (ID)",
+                              controller: _codeCtrl,
+                              icon: Icons.tag,
+                              hintText: "e.g., VHSSPA002",
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'[a-zA-Z0-9]'),
+                                ),
+                                TextInputFormatter.withFunction(
+                                  (oldValue, newValue) => TextEditingValue(
+                                    text: newValue.text.toUpperCase(),
+                                    selection: newValue.selection,
                                   ),
-                                  // 🚀 FIX: Auto-convert to UPPERCASE while typing
-                                  TextInputFormatter.withFunction(
-                                    (oldValue, newValue) => TextEditingValue(
-                                      text: newValue.text.toUpperCase(),
-                                      selection: newValue.selection,
-                                    ),
-                                  ),
-                                ],
-                                validator: (v) =>
-                                    v!.isEmpty ? 'Code required' : null,
-                              ),
+                                ),
+                              ],
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
                             ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: _buildTextField(
-                                label: "Service Name",
-                                controller: _nameCtrl,
-                                icon: Icons.design_services,
-                                hintText: "Example: L'Oreal Hair Spa",
-                                validator: (v) =>
-                                    v!.isEmpty ? 'Name required' : null,
-                              ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 2,
+                            child: _buildTextField(
+                              label: "Service Name",
+                              controller: _nameCtrl,
+                              icon: Icons.design_services,
+                              hintText: "Example: L'Oreal Hair Spa",
+                              validator: (v) => v!.isEmpty ? 'Required' : null,
                             ),
-                          ],
-                        ),
-                        _buildDivider(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
 
-                        _buildSectionTitle("PRICING & COMPLIANCE"),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                label: "Service Charge (₹)",
-                                controller: _priceCtrl,
-                                icon: Icons.sell_outlined,
-                                hintText: "0.00",
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                    ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                    RegExp(r'^\d+\.?\d{0,2}'),
+                      // ROW 2: Pricing & Compliance
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              label: "Service Charge (₹)",
+                              controller: _priceCtrl,
+                              icon: Icons.sell_outlined,
+                              hintText: "0.00",
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
                                   ),
-                                ],
-                                validator: (v) => v == null || v.isEmpty
-                                    ? 'Charge required'
-                                    : null,
-                              ),
+                              inputFormatters: [
+                                FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d+\.?\d{0,2}'),
+                                ),
+                              ],
+                              validator: (v) =>
+                                  (v == null || v.isEmpty) ? 'Required' : null,
                             ),
-                            const SizedBox(width: 20),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "Applicable GST",
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: textPrimary,
-                                    ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "GST (if applicable)",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: c.textPrimary,
                                   ),
-                                  const SizedBox(height: 8),
-                                  DropdownButtonFormField<String>(
-                                    initialValue: _selectedGst,
-                                    decoration: _inputStyle(
-                                      icon: Icons.receipt_long,
-                                    ),
-                                    dropdownColor: cardDark,
-                                    icon: const Icon(
-                                      Icons.keyboard_arrow_down,
-                                      color: accentBlue,
-                                    ),
-                                    items: _gstSlabs
-                                        .map(
-                                          (String slab) => DropdownMenuItem(
-                                            value: slab,
-                                            child: Text(
-                                              slab,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: textPrimary,
-                                              ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: (val) =>
-                                        setState(() => _selectedGst = val!),
+                                ),
+                                const SizedBox(height: 8),
+                                DropdownButtonFormField<String>(
+                                  initialValue: _selectedGst,
+                                  decoration: _inputStyle(
+                                    icon: Icons.receipt_long,
                                   ),
-                                ],
-                              ),
+                                  dropdownColor: c.cardBg,
+                                  icon: const Icon(
+                                    Icons.keyboard_arrow_down,
+                                    color: accentBlue,
+                                  ),
+                                  items: _gstSlabs.map((String slab) {
+                                    return DropdownMenuItem(
+                                      value: slab,
+                                      child: Text(
+                                        slab,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          color: c.textPrimary,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _selectedGst = val!;
+                                      if (_selectedGst == '0% GST') {
+                                        _sacCtrl.clear();
+                                      }
+                                    });
+                                  },
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                label: "SAC Code (For Services)",
-                                controller: _sacCtrl,
-                                icon: Icons.account_balance,
-                                hintText: "e.g., 9983",
-                                keyboardType: TextInputType.number,
-                              ),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            child: _buildTextField(
+                              label: "SAC Code (For Service)",
+                              controller: _sacCtrl,
+                              icon: Icons.account_balance,
+                              hintText: isGstZero
+                                  ? "N/A for 0% GST"
+                                  : "e.g., 9983",
+                              keyboardType: TextInputType.number,
+                              readOnly: isGstZero,
                             ),
-                            const SizedBox(width: 20),
-                            const Expanded(
-                              child: SizedBox(),
-                            ), // Placeholder to keep UI aligned
-                          ],
-                        ),
-                      ],
-                    ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
 
-              // 🟩 FOOTER SECTION
+              // 🟩 PREMIUM FOOTER
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 30,
-                  vertical: 20,
+                  vertical: 24,
                 ),
                 decoration: BoxDecoration(
-                  color: bgDark,
+                  color: c.cardBg,
                   borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(16),
-                  ),
-                  border: Border(
-                    top: BorderSide(color: textSecondary.withValues(alpha: 0.1)),
+                    bottom: Radius.circular(24),
                   ),
                 ),
                 child: Row(
@@ -347,28 +361,24 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                       onPressed: _isLoading
                           ? null
                           : () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 20,
+                        ),
+                      ),
                       child: Text(
                         "Cancel",
                         style: TextStyle(
-                          color: textSecondary,
+                          color: c.textSecondary,
                           fontWeight: FontWeight.bold,
                           fontSize: 14,
                         ),
                       ),
                     ),
                     const SizedBox(width: 16),
-                    ElevatedButton.icon(
+                    ElevatedButton(
                       onPressed: _isLoading ? null : _saveService,
-                      icon: _isLoading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Icon(Icons.check, size: 18),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: accentBlue,
                         foregroundColor: Colors.white,
@@ -376,17 +386,34 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
                           horizontal: 32,
                           vertical: 16,
                         ),
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      label: const Text(
-                        "Save Service",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 14,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.check, size: 18),
+                                SizedBox(width: 8),
+                                Text(
+                                  "Save Configuration",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
                 ),
@@ -398,36 +425,17 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
     );
   }
 
-  Widget _buildSectionTitle(String title) => Padding(
-    padding: const EdgeInsets.only(bottom: 16),
-    child: Text(
-      title,
-      style: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w900,
-        color: textSecondary,
-        letterSpacing: 1.5,
-      ),
-    ),
-  );
-  Widget _buildDivider() => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 24),
-    child: Divider(
-      height: 1,
-      thickness: 1,
-      color: textSecondary.withValues(alpha: 0.1),
-    ),
-  );
-
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     required IconData icon,
     String? hintText,
+    bool readOnly = false,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
+    final c = context.colors;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -436,7 +444,7 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: textPrimary,
+            color: readOnly ? c.textSecondary : c.textPrimary,
           ),
         ),
         const SizedBox(height: 8),
@@ -444,33 +452,76 @@ class _AddServiceDialogState extends ConsumerState<AddServiceDialog> {
           controller: controller,
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
-          style: TextStyle(fontWeight: FontWeight.w600, color: textPrimary),
-          decoration: _inputStyle(icon: icon, hintText: hintText),
+          readOnly: readOnly,
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: readOnly ? c.textSecondary : c.textPrimary,
+            fontSize: 14,
+          ),
+          decoration: _inputStyle(
+            icon: icon,
+            hintText: hintText,
+            isLocked: readOnly,
+          ),
           validator: validator,
         ),
       ],
     );
   }
 
-  InputDecoration _inputStyle({required IconData icon, String? hintText}) {
+  InputDecoration _inputStyle({
+    required IconData icon,
+    String? hintText,
+    bool isLocked = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final c = context.colors;
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
-      prefixIcon: Icon(icon, color: textSecondary, size: 20),
+      hintStyle: TextStyle(
+        color: isDark ? Colors.white24 : Colors.black26,
+        fontSize: 14,
+      ),
+      prefixIcon: Icon(icon, color: Colors.grey, size: 20),
       filled: true,
-      fillColor: inputBg,
+      fillColor: isLocked
+          ? (isDark ? Colors.white10 : Colors.grey.shade100)
+          : (isDark
+                ? c.cardBg
+                : Colors.white), // 🚀 FIX: Solid white in light theme
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: accentBlue, width: 1.5),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
-      errorBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
+      focusedBorder: isLocked
+          ? OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.05)
+                    : Colors.grey.shade300,
+              ),
+            )
+          : OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: accentBlue),
+            ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
   }

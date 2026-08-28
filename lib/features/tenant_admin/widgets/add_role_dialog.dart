@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart'; // 🚀 Neon Theme
 import '../providers/org_provider.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_loader.dart'; // 🚀 Added
+import '../../../core/widgets/error_state.dart'; // 🚀 Added
 
 class AddRoleDialog extends ConsumerStatefulWidget {
   const AddRoleDialog({super.key});
@@ -89,7 +91,10 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
       hintStyle: TextStyle(
         color: context.colors.textSecondary.withValues(alpha: 0.5),
       ),
-      prefixIcon: Icon(icon, color: context.colors.success.withValues(alpha: 0.7)),
+      prefixIcon: Icon(
+        icon,
+        color: context.colors.success.withValues(alpha: 0.7),
+      ),
       labelStyle: TextStyle(color: context.colors.textSecondary, fontSize: 13),
       filled: true,
       fillColor: context.colors.scaffoldBg, // 🚀 Connected to Theme
@@ -347,12 +352,13 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
                                       ),
                                     );
                                   },
-                                  loading: () => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                  error: (_, __) => const Text(
-                                    "Failed to load roles",
-                                    style: TextStyle(color: Colors.red),
+                                  loading: () => const SkeletonBox(
+                                    height: 56,
+                                  ), // 🚀 MATCHES INPUT HEIGHT
+                                  error: (_, __) => ErrorState(
+                                    message: "Failed to load hierarchy roles.",
+                                    onRetry: () =>
+                                        ref.invalidate(orgStructureProvider),
                                   ),
                                 ),
                               ],
@@ -439,12 +445,14 @@ class _AddRoleDialogState extends ConsumerState<AddRoleDialog> {
                                         ),
                                       );
                                     },
-                                    loading: () => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                    error: (_, __) => const Text(
-                                      "Failed to load roles",
-                                      style: TextStyle(color: Colors.red),
+                                    loading: () => const SkeletonBox(
+                                      height: 56,
+                                    ), // 🚀 MATCHES INPUT HEIGHT
+                                    error: (_, __) => ErrorState(
+                                      message:
+                                          "Failed to load hierarchy roles.",
+                                      onRetry: () =>
+                                          ref.invalidate(orgStructureProvider),
                                     ),
                                   ),
                                 ),

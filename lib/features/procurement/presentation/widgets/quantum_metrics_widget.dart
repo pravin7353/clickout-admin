@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../coach/widgets/info_button.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
 
 class QuantumMetricsWidget extends StatelessWidget {
   final String storeId;
@@ -10,17 +11,9 @@ class QuantumMetricsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 🎨 DYNAMIC PREMIUM THEME (Sunset Orange)
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final Color cardDark = isDark
-        ? const Color(0xFF111811)
-        : const Color(0xFFFFFFFF);
-    final Color accentOrange = const Color(0xFFFF6D00); // 🚀 Sunset Amber
-    final Color textPrimary = theme.textTheme.bodyLarge?.color ?? Colors.black;
-    final Color textSecondary =
-        theme.textTheme.labelLarge?.color ?? Colors.grey;
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color accentOrange = const Color(0xFFFF6D00);
 
     final NumberFormat currencyFormat = NumberFormat.currency(
       locale: 'en_IN',
@@ -29,7 +22,6 @@ class QuantumMetricsWidget extends StatelessWidget {
     );
 
     return StreamBuilder<DocumentSnapshot>(
-      // 🚀 Firestore Cache Engine ON
       stream: FirebaseFirestore.instance
           .collection('store_metrics')
           .doc(storeId)
@@ -37,16 +29,15 @@ class QuantumMetricsWidget extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
-          return _buildLoadingState(cardDark, accentOrange, textSecondary);
+          return _buildLoadingState(c.cardBg, accentOrange, c.textSecondary);
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
-          return _buildNoDataState(cardDark, textSecondary);
+          return _buildNoDataState(c.cardBg, c.textSecondary);
         }
 
         final data = snapshot.data!.data() as Map<String, dynamic>;
 
-        // 🧠 Safe Number Parsing
         final double inventoryVal = (data['totalInventoryValue'] ?? 0)
             .toDouble();
         final double costVal = (data['totalCostValue'] ?? 0).toDouble();
@@ -60,7 +51,7 @@ class QuantumMetricsWidget extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🎩 HEADER SECTION
+            // HEADER SECTION
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Row(
@@ -77,7 +68,7 @@ class QuantumMetricsWidget extends StatelessWidget {
                       Text(
                         "Promotion Analytics",
                         style: TextStyle(
-                          color: textPrimary,
+                          color: c.textPrimary,
                           fontWeight: FontWeight.w900,
                           fontSize: 16,
                           letterSpacing: 0.5,
@@ -96,7 +87,7 @@ class QuantumMetricsWidget extends StatelessWidget {
               ),
             ),
 
-            // 📊 METRICS SECTION (INDIVIDUAL CARDS)
+            // METRICS SECTION
             LayoutBuilder(
               builder: (context, constraints) {
                 bool isMobile = constraints.maxWidth < 600;
@@ -110,9 +101,9 @@ class QuantumMetricsWidget extends StatelessWidget {
                         Icons.inventory_2_outlined,
                         Colors.blue,
                         "Base retail value before offers",
-                        cardDark,
-                        textSecondary,
-                        textPrimary,
+                        c.cardBg,
+                        c.textSecondary,
+                        c.textPrimary,
                         isDark,
                       ),
                       const SizedBox(height: 16),
@@ -120,11 +111,11 @@ class QuantumMetricsWidget extends StatelessWidget {
                         "Promotion Impact",
                         currencyFormat.format(discountBurn),
                         Icons.local_offer_outlined,
-                        discountBurn > 0 ? Colors.redAccent : Colors.green,
+                        discountBurn > 0 ? c.danger : c.success,
                         "Total discount given to customers",
-                        cardDark,
-                        textSecondary,
-                        textPrimary,
+                        c.cardBg,
+                        c.textSecondary,
+                        c.textPrimary,
                         isDark,
                       ),
                       const SizedBox(height: 16),
@@ -132,11 +123,11 @@ class QuantumMetricsWidget extends StatelessWidget {
                         "Proj. Margin",
                         "${margin.toStringAsFixed(1)}%",
                         Icons.show_chart_rounded,
-                        margin > 15 ? Colors.green : Colors.orange,
+                        margin > 15 ? c.success : Colors.orange,
                         "Estimated profit margin",
-                        cardDark,
-                        textSecondary,
-                        textPrimary,
+                        c.cardBg,
+                        c.textSecondary,
+                        c.textPrimary,
                         isDark,
                       ),
                     ],
@@ -152,9 +143,9 @@ class QuantumMetricsWidget extends StatelessWidget {
                         Icons.inventory_2_outlined,
                         Colors.blue,
                         "Base retail value before offers",
-                        cardDark,
-                        textSecondary,
-                        textPrimary,
+                        c.cardBg,
+                        c.textSecondary,
+                        c.textPrimary,
                         isDark,
                       ),
                     ),
@@ -164,11 +155,11 @@ class QuantumMetricsWidget extends StatelessWidget {
                         "Promotion Impact",
                         currencyFormat.format(discountBurn),
                         Icons.local_offer_outlined,
-                        discountBurn > 0 ? Colors.redAccent : Colors.green,
+                        discountBurn > 0 ? c.danger : c.success,
                         "Total discount given to customers",
-                        cardDark,
-                        textSecondary,
-                        textPrimary,
+                        c.cardBg,
+                        c.textSecondary,
+                        c.textPrimary,
                         isDark,
                       ),
                     ),
@@ -178,11 +169,11 @@ class QuantumMetricsWidget extends StatelessWidget {
                         "Proj. Margin",
                         "${margin.toStringAsFixed(1)}%",
                         Icons.show_chart_rounded,
-                        margin > 15 ? Colors.green : Colors.orange,
+                        margin > 15 ? c.success : Colors.orange,
                         "Estimated profit margin",
-                        cardDark,
-                        textSecondary,
-                        textPrimary,
+                        c.cardBg,
+                        c.textSecondary,
+                        c.textPrimary,
                         isDark,
                       ),
                     ),
@@ -213,7 +204,7 @@ class QuantumMetricsWidget extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardDark,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24), // 🚀 Premium Radius
         border: Border.all(
           color: textSecondary.withValues(alpha: 0.15),
           width: 1,
@@ -303,7 +294,7 @@ class QuantumMetricsWidget extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: textSecondary.withValues(alpha: 0.1)),
       ),
       child: Center(child: CircularProgressIndicator(color: accent)),
@@ -317,8 +308,11 @@ class QuantumMetricsWidget extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 24),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: textSecondary.withValues(alpha: 0.2), width: 1),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: textSecondary.withValues(alpha: 0.2),
+          width: 1,
+        ),
       ),
       child: Center(
         child: Text(

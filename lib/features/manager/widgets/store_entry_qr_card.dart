@@ -212,8 +212,10 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
 
                       Text(
                         dynamicStoreName,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: context
+                              .colors
+                              .textPrimary, // 🛠️ FIX: Auto adapts to Light/Dark Mode
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 1,
@@ -225,7 +227,9 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
                       Text(
                         "STORE ID: $branchCode",
                         style: TextStyle(
-                          color: Colors.grey.shade400,
+                          color: context
+                              .colors
+                              .textSecondary, // 🛠️ FIX: Auto adapts to Light/Dark Mode
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 1.5,
@@ -260,7 +264,9 @@ class _StoreEntryQRCardState extends ConsumerState<StoreEntryQRCard> {
                       Text(
                         "Scan to enter via ClickOut App",
                         style: TextStyle(
-                          color: Colors.grey.shade500,
+                          color: context
+                              .colors
+                              .textSecondary, // 🛠️ FIX: Auto adapts to Light/Dark Mode
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),

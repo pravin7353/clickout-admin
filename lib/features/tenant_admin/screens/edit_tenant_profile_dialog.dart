@@ -544,39 +544,49 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
     bool isReadOnly = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fillCol = isDark
-        ? (isReadOnly ? Colors.white10 : const Color(0xFF080B08))
-        : (isReadOnly ? Colors.grey.shade100 : const Color(0xFFF8FAFC));
-    final borderCol = isDark ? Colors.white12 : Colors.grey.shade300;
+    final cardDark = context.colors.cardBg;
+    final accentGreen = context.colors.success;
 
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-        color: isDark ? Colors.white54 : Colors.black54,
+        color: isDark ? Colors.white70 : Colors.black87,
         fontSize: 13,
+        fontWeight: FontWeight.w600,
       ),
       filled: true,
-      fillColor: fillCol,
+      fillColor: isReadOnly
+          ? (isDark ? Colors.white10 : Colors.grey.shade100)
+          : (isDark
+                ? cardDark
+                : Colors
+                      .white), // 🚀 FIX: Solid white in light theme to prevent transparency
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.all(16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: borderCol),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: borderCol),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(
-          color: Theme.of(context).primaryColor,
-          width: 1.5,
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
         ),
       ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: accentGreen, width: 1.5),
+      ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
   }
@@ -646,28 +656,39 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
     final mutedCol = context.colors.textSecondary;
 
     return Dialog(
-      backgroundColor: bgCol,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: brandColor.withValues(alpha: 0.2)),
-      ),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Container(
         width: 850,
         height: MediaQuery.of(context).size.height * 0.9,
-        padding: const EdgeInsets.all(
-          0,
-        ), // Removed outer padding for edge-to-edge header
+        decoration: BoxDecoration(
+          color: bgCol,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? brandColor.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.1),
+              blurRadius: 40,
+              spreadRadius: -10,
+            ),
+          ],
+        ),
         child: Column(
           children: [
             // ── HEADER WITH READINESS SCORE ──
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF080B08)
-                    : const Color(0xFFF1F5F9),
+                color: context.colors.cardBg,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
+                  top: Radius.circular(24),
                 ),
                 border: Border(
                   bottom: BorderSide(
@@ -1414,12 +1435,11 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
 
             // ── FOOTER ACTIONS ──
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 30),
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 30),
               decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: isDark ? Colors.white12 : Colors.grey.shade200,
-                  ),
+                color: context.colors.cardBg,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(24),
                 ),
               ),
               child: Row(
@@ -1439,13 +1459,14 @@ class _EditTenantProfileDialogState extends State<EditTenantProfileDialog> {
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: brandColor,
-                      foregroundColor: isDark ? Colors.black : Colors.white,
+                      foregroundColor:
+                          Colors.black, // 🛠️ Premium dark text on green
                       padding: const EdgeInsets.symmetric(
                         horizontal: 40,
                         vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 0,
                     ),

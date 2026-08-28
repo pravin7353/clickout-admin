@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import 'add_distributor_dialog.dart'; // 🚀 Added Missing Import
 import 'edit_distributor_dialog.dart';
 import '../../coach/widgets/info_button.dart';
-import '../../../core/theme/app_theme.dart';
+import '/core/theme/app_theme.dart'; // 🚀 Added Theme Support
 
 class DistributorListScreen extends ConsumerStatefulWidget {
   const DistributorListScreen({super.key});
@@ -24,35 +25,31 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
     super.dispose();
   }
 
-  // 🎨 DYNAMIC LIGHT/DARK THEME
-  Color get bgDark => context.colors.scaffoldBg;
-  Color get cardDark => context.colors.cardBg;
-  Color get accentGreen => Theme.of(context).brightness == Brightness.dark
-      ? const Color(0xFF00C853)
-      : const Color(0xFF2E7D32);
-  Color get accentOrange => const Color(0xFFFF6D00);
-  Color get textPrimary => context.colors.textPrimary;
-  Color get textSecondary => context.colors.textSecondary;
-
   Future<void> _toggleStatus(String docId, bool currentStatus) async {
     await FirebaseFirestore.instance.collection('suppliers').doc(docId).update({
       'isActive': !currentStatus,
     });
   }
 
-  Future<void> _deleteSupplier(String docId, String name) async {
+  Future<void> _deleteSupplier(String docId, String name, dynamic c) async {
     bool confirm =
         await showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: cardDark,
+            backgroundColor: c.cardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
             title: Text(
               "Delete Supplier?",
-              style: TextStyle(color: textPrimary, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: c.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             content: Text(
               "Are you sure you want to delete '$name'?",
-              style: TextStyle(color: textSecondary),
+              style: TextStyle(color: c.textSecondary),
             ),
             actions: [
               TextButton(
@@ -64,7 +61,10 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent,
+                  backgroundColor: c.danger,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onPressed: () => Navigator.pop(ctx, true),
                 child: const Text(
@@ -91,14 +91,11 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
     final tenantId = adminData?['tenantId'];
     final role = (adminData?['role'] ?? '').toString().toUpperCase();
 
-    // 🚀 SAAS INJECTION: Tenant Data Isolation
-    Query query = FirebaseFirestore.instance
-        .collection('suppliers')
-        // 🚀 COST FIX: SUPER_ADMIN ke case me ye poore platform ke saare
-        // tenants ke suppliers bina limit ke real-time stream karta tha.
-        // TODO: Proper pagination (startAfterDocument) add karo jab supplier
-        // count consistently 300 se zyada rehne lage.
-        .limit(300); // 🚀 FIX: Removed orderBy here
+    final c = context.colors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Query query = FirebaseFirestore.instance.collection('suppliers').limit(300);
+
     if (role != 'SUPER_ADMIN' &&
         role != 'SUPER ADMIN' &&
         role != 'ADMIN' &&
@@ -109,7 +106,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
     final isMobile = MediaQuery.of(context).size.width < 800;
 
     return Scaffold(
-      backgroundColor: bgDark,
+      backgroundColor: c.scaffoldBg,
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.all(isMobile ? 16.0 : 24.0),
@@ -119,44 +116,35 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
               // 🎩 HEADER SECTION
               Row(
                 children: [
-                  // 🔙 BACK BUTTON
                   InkWell(
                     onTap: () => Navigator.pop(context),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: cardDark,
+                        color: c.cardBg,
                         border: Border.all(
-                          color: textSecondary.withValues(alpha: 0.2),
+                          color: c.textSecondary.withValues(alpha: 0.2),
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
-                        // 🚀 REMOVED CONST
                         Icons.arrow_back,
-                        color: textPrimary,
+                        color: c.textPrimary,
                         size: 24,
                       ),
                     ),
                   ),
                   const SizedBox(width: 16),
-
-                  // 🌟 MAIN ICON
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: accentGreen.withValues(alpha: 0.1),
+                      color: c.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      Icons.hub,
-                      color: accentGreen,
-                      size: 28,
-                    ), // 🚀 REMOVED CONST
+                    child: Icon(Icons.hub, color: c.success, size: 28),
                   ),
                   const SizedBox(width: 16),
-
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -168,7 +156,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w900,
-                                color: textPrimary,
+                                color: c.textPrimary,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -183,7 +171,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                         Text(
                           "Track supply chains, contact info, and supplier metrics.",
                           style: TextStyle(
-                            color: textSecondary,
+                            color: c.textSecondary,
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
                           ),
@@ -191,8 +179,71 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                       ],
                     ),
                   ),
+
+                  // 🚀 NEW: Button on Desktop
+                  if (!isMobile) ...[
+                    const SizedBox(width: 16),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: c.success,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (ctx) => const AddDistributorDialog(),
+                      ),
+                      icon: const Icon(Icons.domain_add_outlined, size: 20),
+                      label: const Text(
+                        "Add Distributor",
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
+
+              // 🚀 NEW: Button on Mobile (Full Width for better UX)
+              if (isMobile) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: c.success,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => showDialog(
+                      context: context,
+                      builder: (ctx) => const AddDistributorDialog(),
+                    ),
+                    icon: const Icon(Icons.domain_add_outlined, size: 20),
+                    label: const Text(
+                      "Add Distributor",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 24),
 
               // 🔍 SEARCH & FILTERS
@@ -200,32 +251,33 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                 onChanged: (val) =>
                     setState(() => _searchQuery = val.toLowerCase()),
                 style: TextStyle(
-                  // 🚀 REMOVED CONST
-                  color: textPrimary,
+                  color: c.textPrimary,
                   fontWeight: FontWeight.bold,
                 ),
                 decoration: InputDecoration(
                   hintText: "Search by Supplier Name, Code, or Category...",
-                  hintStyle: TextStyle(color: textSecondary.withValues(alpha: 0.5)),
-                  prefixIcon: Icon(
+                  hintStyle: TextStyle(
+                    color: c.textSecondary.withValues(alpha: 0.5),
+                  ),
+                  prefixIcon: const Icon(
                     Icons.search,
-                    color: accentOrange,
-                  ), // 🚀 REMOVED CONST
+                    color: Color(0xFFFF6D00),
+                  ),
                   filled: true,
-                  fillColor: cardDark,
+                  fillColor: c.cardBg,
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                      color: textSecondary.withValues(alpha: 0.2),
+                      color: c.textSecondary.withValues(alpha: 0.2),
                     ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: accentOrange,
+                    borderSide: const BorderSide(
+                      color: Color(0xFFFF6D00),
                       width: 2,
-                    ), // 🚀 REMOVED CONST
+                    ),
                   ),
                 ),
               ),
@@ -238,8 +290,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(
-                        // 🚀 REMOVED CONST
-                        child: CircularProgressIndicator(color: accentGreen),
+                        child: CircularProgressIndicator(color: c.success),
                       );
                     }
 
@@ -247,26 +298,22 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                       return Center(
                         child: Text(
                           "🚨 Error loading data: ${snapshot.error}",
-                          style: const TextStyle(color: Colors.redAccent),
+                          style: TextStyle(color: c.danger),
                         ),
                       );
                     }
 
                     var docs = snapshot.data?.docs.toList() ?? [];
 
-                    // 🚀 FIX: Sort Locally in Dart to bypass Firestore Index Error
                     docs.sort((a, b) {
                       final dataA = a.data() as Map<String, dynamic>;
                       final dataB = b.data() as Map<String, dynamic>;
                       final timeA = dataA['createdAt'] as Timestamp?;
                       final timeB = dataB['createdAt'] as Timestamp?;
                       if (timeA == null || timeB == null) return 0;
-                      return timeB.compareTo(
-                        timeA,
-                      ); // Descending (Newest first)
+                      return timeB.compareTo(timeA);
                     });
 
-                    // Client-Side Search Filter
                     if (_searchQuery.isNotEmpty) {
                       docs = docs.where((doc) {
                         final data = doc.data() as Map<String, dynamic>;
@@ -290,7 +337,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                         child: Text(
                           "No distributors found.",
                           style: TextStyle(
-                            color: textSecondary,
+                            color: c.textSecondary,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                           ),
@@ -309,11 +356,24 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
 
                         return Container(
                           decoration: BoxDecoration(
-                            color: cardDark,
-                            borderRadius: BorderRadius.circular(16),
+                            color: c.cardBg,
+                            borderRadius: BorderRadius.circular(
+                              24,
+                            ), // 🚀 Premium 24px Glass UI
                             border: Border.all(
-                              color: textSecondary.withValues(alpha: 0.1),
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.05)
+                                  : Colors.grey.shade200,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha: isDark ? 0.2 : 0.05,
+                                ),
+                                blurRadius: 20,
+                                spreadRadius: -5,
+                              ),
+                            ],
                           ),
                           child: Scrollbar(
                             controller: _horizontalScrollController,
@@ -327,7 +387,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                 width: tableWidth,
                                 child: DataTable(
                                   headingRowColor: WidgetStateProperty.all(
-                                    bgDark,
+                                    c.scaffoldBg,
                                   ),
                                   dataRowMaxHeight: 70,
                                   dividerThickness: 0.5,
@@ -337,7 +397,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                       label: Text(
                                         "Supplier Details",
                                         style: TextStyle(
-                                          color: textSecondary,
+                                          color: c.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -346,7 +406,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                       label: Text(
                                         "Supplier Code",
                                         style: TextStyle(
-                                          color: textSecondary,
+                                          color: c.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -355,7 +415,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                       label: Text(
                                         "Contact & Comm.",
                                         style: TextStyle(
-                                          color: textSecondary,
+                                          color: c.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -364,7 +424,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                       label: Text(
                                         "Supply Category",
                                         style: TextStyle(
-                                          color: textSecondary,
+                                          color: c.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -373,7 +433,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                       label: Text(
                                         "Status",
                                         style: TextStyle(
-                                          color: textSecondary,
+                                          color: c.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -382,7 +442,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                       label: Text(
                                         "Actions",
                                         style: TextStyle(
-                                          color: textSecondary,
+                                          color: c.textSecondary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -392,22 +452,22 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                     final data =
                                         doc.data() as Map<String, dynamic>;
                                     final bool isActive =
-                                        data['isActive'] ??
-                                        true; // Default True
+                                        data['isActive'] ?? true;
                                     return DataRow(
                                       cells: [
                                         DataCell(
                                           Row(
                                             children: [
                                               CircleAvatar(
-                                                backgroundColor: accentOrange
-                                                    .withValues(alpha: 0.1),
+                                                backgroundColor: const Color(
+                                                  0xFFFF6D00,
+                                                ).withValues(alpha: 0.1),
                                                 child: Text(
                                                   (data['name'] ?? 'U')
                                                       .toString()[0]
                                                       .toUpperCase(),
-                                                  style: TextStyle(
-                                                    color: accentOrange,
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFFF6D00),
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
@@ -416,7 +476,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                               Text(
                                                 data['name'] ?? 'Unknown',
                                                 style: TextStyle(
-                                                  color: textPrimary,
+                                                  color: c.textPrimary,
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 15,
                                                 ),
@@ -431,9 +491,9 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                               vertical: 4,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: bgDark,
+                                              color: c.scaffoldBg,
                                               border: Border.all(
-                                                color: textSecondary
+                                                color: c.textSecondary
                                                     .withValues(alpha: 0.3),
                                               ),
                                               borderRadius:
@@ -441,8 +501,8 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                             ),
                                             child: Text(
                                               data['supplierID'] ?? 'N/A',
-                                              style: TextStyle(
-                                                color: accentOrange,
+                                              style: const TextStyle(
+                                                color: Color(0xFFFF6D00),
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 12,
                                               ),
@@ -467,7 +527,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                   Text(
                                                     data['email'] ?? 'No Email',
                                                     style: TextStyle(
-                                                      color: textPrimary,
+                                                      color: c.textPrimary,
                                                       fontSize: 13,
                                                     ),
                                                   ),
@@ -485,7 +545,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                   Text(
                                                     data['phone'] ?? 'No Phone',
                                                     style: TextStyle(
-                                                      color: textSecondary,
+                                                      color: c.textSecondary,
                                                       fontSize: 12,
                                                     ),
                                                   ),
@@ -498,7 +558,7 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                           Text(
                                             data['categories'] ?? 'General',
                                             style: TextStyle(
-                                              color: textPrimary,
+                                              color: c.textPrimary,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
@@ -516,18 +576,19 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                               decoration: BoxDecoration(
                                                 color:
                                                     (isActive
-                                                            ? accentGreen
-                                                            : Colors.redAccent)
+                                                            ? c.success
+                                                            : c.danger)
                                                         .withValues(alpha: 0.1),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
                                                 border: Border.all(
                                                   color:
                                                       (isActive
-                                                              ? accentGreen
-                                                              : Colors
-                                                                    .redAccent)
-                                                          .withValues(alpha: 0.3),
+                                                              ? c.success
+                                                              : c.danger)
+                                                          .withValues(
+                                                            alpha: 0.3,
+                                                          ),
                                                 ),
                                               ),
                                               child: Row(
@@ -539,8 +600,8 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                         : Icons.cancel,
                                                     size: 14,
                                                     color: isActive
-                                                        ? accentGreen
-                                                        : Colors.redAccent,
+                                                        ? c.success
+                                                        : c.danger,
                                                   ),
                                                   const SizedBox(width: 6),
                                                   Text(
@@ -549,8 +610,8 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                         : "INACTIVE",
                                                     style: TextStyle(
                                                       color: isActive
-                                                          ? accentGreen
-                                                          : Colors.redAccent,
+                                                          ? c.success
+                                                          : c.danger,
                                                       fontSize: 10,
                                                       fontWeight:
                                                           FontWeight.w900,
@@ -566,9 +627,9 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               IconButton(
-                                                icon: Icon(
+                                                icon: const Icon(
                                                   Icons.edit_note,
-                                                  color: accentOrange,
+                                                  color: Color(0xFFFF6D00),
                                                 ),
                                                 onPressed: () => showDialog(
                                                   context: context,
@@ -580,14 +641,15 @@ class _DistributorListScreenState extends ConsumerState<DistributorListScreen> {
                                                 ),
                                               ),
                                               IconButton(
-                                                icon: const Icon(
+                                                icon: Icon(
                                                   Icons.delete_outline,
-                                                  color: Colors.redAccent,
+                                                  color: c.danger,
                                                 ),
                                                 onPressed: () =>
                                                     _deleteSupplier(
                                                       doc.id,
                                                       data['name'] ?? 'Unknown',
+                                                      c,
                                                     ),
                                               ),
                                             ],

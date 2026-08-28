@@ -5,6 +5,8 @@ import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 // 🚀 SAAS INJECTIONS
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
+import 'package:clickout_admin/core/widgets/skeleton_loader.dart'; // 🚀 Added
+import 'package:clickout_admin/core/widgets/error_state.dart'; // 🚀 Added
 
 class RiskEngineScreen extends ConsumerWidget {
   const RiskEngineScreen({super.key});
@@ -93,9 +95,39 @@ class RiskEngineScreen extends ConsumerWidget {
             child: StreamBuilder<QuerySnapshot>(
               stream: riskQuery.snapshots(), // 🚀 SAAS ISOLATED STREAM
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const ErrorState(
+                    message: 'Failed to stream live risk logs.',
+                  ); // 🚀 FIX: Proper Error Handle
+                }
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.redAccent),
+                  // 🚀 FIX: Premium Skeleton Layout matching the UI
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SkeletonBox(
+                              height: 100,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                          const SizedBox(width: 20),
+                          Expanded(
+                            child: SkeletonBox(
+                              height: 100,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 45),
+                      Expanded(
+                        child: SkeletonBox(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ],
                   );
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {

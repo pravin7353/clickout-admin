@@ -1348,3 +1348,82 @@ exports.onStoreDeleted = onDocumentDeleted('stores/{storeId}', async (event) => 
         console.error(`🚨 CRITICAL: DPDP Wipe failed for ${storeId}:`, error);
     }
 });
+
+// ============================================================================
+// 21. PHASE 5B: DAILY AGGREGATION ENGINE (RUNS 12:05 AM IST)
+// ============================================================================
+exports.aggregateDailyStoreStats = onSchedule(
+    { schedule: "5 0 * * *", timeZone: "Asia/Kolkata", memory: "512MiB" }, 
+    async (event) => {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        const startOfDay = new Date(yesterday.setHours(0, 0, 0, 0));
+        const endOfDay = new Date(yesterday.setHours(23, 59, 59, 999));
+        const dateString = startOfDay.toISOString().split('T')[0];
+
+        const ordersSnap = await db.collection('orders')
+            .where('timestamp', '>=', startOfDay)
+            .where('timestamp', '<=', endOfDay)
+            .where('status', 'in', ['COMPLETED', 'APPROVED', 'SUCCESS', 'PAID'])
+            .get();
+
+        if (ordersSnap.empty) {
+            console.log(`No orders found for ${dateString}.`);
+            return null;
+        }
+
+        const storeStats = {};
+        ordersSnap.forEach(doc => {
+            const data = doc.data();
+            const tenantId = data.tenantId;
+            if (!tenantId) return;
+
+            const branchCode = data.branchCode || 'HQ';
+            const key = `${tenantId}_${branchCode}`;
+
+            if (!storeStats[key]) {
+                storeStats[key] = {
+                    tenantId: tenantId,
+                    branchCode: branchCode,
+                    date: dateString,
+                    totalOrders: 0,
+                    totalRevenue: 0,
+                    itemsSold: 0
+                };
+            }
+
+            storeStats[key].totalOrders += 1;
+            storeStats[key].totalRevenue += (data.totalAmount || data.amount || 0);
+            
+            const items = data.cartItems || data.items || [];
+            storeStats[key].itemsSold += items.length;
+        });
+
+        const batch = db.batch();
+        let operationCount = 0;
+
+        for (const stat of Object.values(storeStats)) {
+            const docId = `${stat.tenantId}_${stat.branchCode}_${stat.date}`;
+            const docRef = db.collection('daily_store_stats').doc(docId);
+            
+            batch.set(docRef, {
+                ...stat,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            operationCount++;
+            if (operationCount >= 490) {
+                await batch.commit();
+                operationCount = 0;
+            }
+        }
+
+        if (operationCount > 0) {
+            await batch.commit();
+        }
+        
+        console.log(`Aggregated stats for ${Object.keys(storeStats).length} stores on ${dateString}`);
+        return null;
+    }
+);

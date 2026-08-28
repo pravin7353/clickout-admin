@@ -9,6 +9,8 @@ import 'edit_tenant_profile_dialog.dart';
 import 'edit_store_profile_dialog.dart';
 import '../../../core/store/providers/store_provider.dart';
 import 'package:clickout_admin/core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_loader.dart'; // 🚀 Added
+import '../../../core/widgets/error_state.dart'; // 🚀 Added
 
 final growthConfigProvider =
     FutureProvider.family<Map<String, dynamic>?, String>((ref, tenantId) async {
@@ -812,17 +814,26 @@ class TenantDashboardScreen extends ConsumerWidget {
                   Divider(height: 1, color: borderColor),
 
                   storesState.when(
-                    loading: () => Padding(
-                      padding: const EdgeInsets.all(40.0),
-                      child: Center(
-                        child: CircularProgressIndicator(color: accentGreen),
+                    loading: () => ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: 3,
+                      itemBuilder: (_, __) => const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 8,
+                        ),
+                        child: SkeletonBox(
+                          height: 70,
+                          borderRadius: BorderRadius.all(Radius.circular(8)),
+                        ), // 🚀 MATCHES DATATABLE ROW HEIGHT
                       ),
                     ),
                     error: (err, _) => Padding(
                       padding: const EdgeInsets.all(24.0),
-                      child: Text(
-                        "Error loading stores: $err",
-                        style: const TextStyle(color: Colors.redAccent),
+                      child: ErrorState(
+                        message: "Failed to load store locations.",
+                        onRetry: () => ref.invalidate(tenantStoresProvider),
                       ),
                     ),
                     data: (stores) {
@@ -870,7 +881,11 @@ class TenantDashboardScreen extends ConsumerWidget {
                           ),
                           child: DataTable(
                             headingRowColor: WidgetStateProperty.all(
-                              const Color(0xFF1A221A),
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white.withValues(
+                                      alpha: 0.05,
+                                    ) // 🚀 FIX: Pure dark theme neutral header
+                                  : Colors.grey.shade100,
                             ),
                             dataRowMaxHeight: 80,
                             dataRowMinHeight: 70,
@@ -1022,7 +1037,9 @@ class TenantDashboardScreen extends ConsumerWidget {
     required WidgetRef ref,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardDark = isDark ? const Color(0xFF111811) : Colors.white;
+    final cardDark = Theme.of(
+      context,
+    ).cardColor; // 🚀 FIX: Removed hardcoded green tint
     final textPrimary = isDark
         ? const Color(0xFFF0F0F0)
         : const Color(0xFF111111);
@@ -1295,7 +1312,9 @@ class TenantDashboardScreen extends ConsumerWidget {
     required Color color,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardDark = isDark ? const Color(0xFF111811) : Colors.white;
+    final cardDark = Theme.of(
+      context,
+    ).cardColor; // 🚀 FIX: Removed hardcoded green tint
     final textPrimary = isDark
         ? const Color(0xFFF0F0F0)
         : const Color(0xFF111111);
@@ -1385,8 +1404,12 @@ class _AssignManagerDialogState extends State<AssignManagerDialog> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dialogBg = isDark ? const Color(0xFF111811) : Colors.white;
-    final inputBg = isDark ? const Color(0xFF080B08) : const Color(0xFFF3F4F6);
+    final dialogBg = Theme.of(
+      context,
+    ).cardColor; // 🚀 FIX: Removed hardcoded green tint
+    final inputBg = isDark
+        ? Colors.black26
+        : const Color(0xFFF3F4F6); // 🚀 FIX: Neutral dark input background
     final textCol = isDark ? const Color(0xFFF0F0F0) : const Color(0xFF111111);
     final textMuted = isDark
         ? const Color(0xFF888888)

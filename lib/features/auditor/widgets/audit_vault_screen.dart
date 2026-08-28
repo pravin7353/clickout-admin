@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // 🚀 SAAS INJECTION IMPORT
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import 'package:clickout_admin/features/coach/widgets/info_button.dart';
 import '../../../core/theme/app_theme.dart';
 
-class AuditVaultScreen extends ConsumerWidget {
+class AuditVaultScreen extends ConsumerStatefulWidget {
   const AuditVaultScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 🚀 SAAS INJECTION: Get admin context
+  ConsumerState<AuditVaultScreen> createState() => _AuditVaultScreenState();
+}
+
+class _AuditVaultScreenState extends ConsumerState<AuditVaultScreen> {
+  int _currentPage = 0;
+  final int _pageSize = 50; // 🚀 Paginate 50 logs per page
+  String _selectedSeverity = 'ALL'; // 🚀 Added Filter State
+  String _selectedTimeRange = 'ALL_TIME'; // 🚀 Added Date Filter State
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.colors;
     final adminData = ref.watch(adminRoleProvider).value;
     final String? tenantId = adminData?['tenantId'];
     final String role = (adminData?['role'] ?? '').toString().toLowerCase();
@@ -20,39 +30,32 @@ class AuditVaultScreen extends ConsumerWidget {
       'admin_audit_logs',
     );
 
-    // 🚀 SAAS ISOLATION: Filter logs by company.
-    // 🛡️ FIX: Removed branchCode filter because it doesn't exist in Firestore 'audit_logs' documents.
     if (role != 'super_admin' && tenantId != null && tenantId.isNotEmpty) {
       auditQuery = auditQuery.where('tenantId', isEqualTo: tenantId);
     }
 
-    // 🚀 BILL EXPLOSION FIX: Limit logs to avoid OOM & massive read costs
-    auditQuery = auditQuery.orderBy('timestamp', descending: true).limit(150);
+    // 🚀 Limit to last 500 logs to prevent memory crash, we paginate locally
+    auditQuery = auditQuery.limit(500);
 
     return Scaffold(
-      backgroundColor: context.colors.scaffoldBg,
+      backgroundColor: c.scaffoldBg,
       appBar: AppBar(
-        backgroundColor: context.colors.scaffoldBg,
+        backgroundColor: c.scaffoldBg,
         elevation: 0,
-        // 🚪 THE 100% WORKING ESCAPE DOOR
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new,
-            color: context.colors.textPrimary,
-          ),
+          icon: Icon(Icons.arrow_back_ios_new, color: c.textPrimary),
           onPressed: () {
             if (Navigator.canPop(context)) {
               Navigator.pop(context);
             } else {
-              // Fallback for Web if stack gets lost
               Navigator.of(context).pushReplacementNamed('/auditor');
             }
           },
         ),
-        title: const Text(
+        title: Text(
           "BACK TO COMMAND CENTER",
           style: TextStyle(
-            color: Colors.white54,
+            color: c.textSecondary,
             fontSize: 12,
             fontWeight: FontWeight.bold,
             letterSpacing: 1,
@@ -70,7 +73,7 @@ class AuditVaultScreen extends ConsumerWidget {
                   Text(
                     "Audit Vault",
                     style: TextStyle(
-                      color: context.colors.textPrimary,
+                      color: c.textPrimary,
                       fontSize: 32,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 1.5,
@@ -79,216 +82,475 @@ class AuditVaultScreen extends ConsumerWidget {
                   const SizedBox(width: 10),
                   InfoButton(
                     title: "Audit Vault",
-                    en: "Every critical system action is permanently recorded here — deletions, approvals, overrides. Use this to investigate fraud or disputes.",
-                    hi: "System ka koi bhi bada action yahan permanently save hota hai — delete, approve, override sab. Fraud ya dispute mein yahan se proof milega.",
-                    iconColor: context.colors.textSecondary,
+                    en: "Command-line view of all system actions.",
+                    hi: "System logs ka command-prompt view.",
+                    iconColor: c.textSecondary,
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              Text(
-                "Immutable System Activity Logs",
-                style: TextStyle(
-                  color: context.colors.textSecondary,
-                  fontSize: 14,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "Immutable System Activity Terminal",
+                    style: TextStyle(color: c.textSecondary, fontSize: 14),
+                  ),
+                  // 🚀 DOUBLE FILTERS (DATE + SEVERITY)
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      Container(
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: c.cardBg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: c.textSecondary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedTimeRange,
+                            dropdownColor: c.cardBg,
+                            icon: Icon(
+                              Icons.calendar_month,
+                              color: c.textPrimary,
+                              size: 14,
+                            ),
+                            style: TextStyle(
+                              color: c.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'ALL_TIME',
+                                child: Text('All Time'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'TODAY',
+                                child: Text('Today'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'LAST_7_DAYS',
+                                child: Text('Last 7 Days'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'THIS_MONTH',
+                                child: Text('This Month'),
+                              ),
+                            ],
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedTimeRange = val!;
+                                _currentPage = 0;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      Container(
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: c.cardBg,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: c.textSecondary.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedSeverity,
+                            dropdownColor: c.cardBg,
+                            icon: Icon(
+                              Icons.filter_list,
+                              color: c.textPrimary,
+                              size: 16,
+                            ),
+                            style: TextStyle(
+                              color: c.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            items: ['ALL', 'CRITICAL', 'WARNING', 'INFO']
+                                .map(
+                                  (e) => DropdownMenuItem(
+                                    value: e,
+                                    child: Text(
+                                      e == 'ALL' ? 'All Severities' : e,
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedSeverity = val!;
+                                _currentPage = 0;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
+
+              // 💻 TERMINAL BOX
               Expanded(
                 child: Container(
+                  width: double.infinity,
                   decoration: BoxDecoration(
-                    color: context.colors.cardBg,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: context.colors.border),
+                    color: const Color(0xFF0A0A0A), // 🚀 Pitch Black Terminal
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white24, width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 20,
+                      ),
+                    ],
                   ),
                   child: StreamBuilder<QuerySnapshot>(
-                    stream: auditQuery.snapshots(), // 🚀 SAAS INJECTION FIX
+                    stream: auditQuery.snapshots(),
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
                         return const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
+                          child: CircularProgressIndicator(
+                            color: Colors.greenAccent,
+                          ),
                         );
                       }
 
                       if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                         return const Center(
                           child: Text(
-                            "No audit logs found.",
-                            style: TextStyle(color: Colors.white54),
+                            "> No audit logs found...",
+                            style: TextStyle(
+                              color: Colors.greenAccent,
+                              fontFamily: 'monospace',
+                            ),
                           ),
                         );
                       }
 
-                      return ListView.separated(
-                        padding: const EdgeInsets.all(20),
-                        itemCount: snapshot.data!.docs.length,
-                        separatorBuilder: (_, __) => const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.0),
-                          child: Divider(color: Colors.white10, height: 1),
-                        ),
-                        itemBuilder: (context, index) {
-                          final data =
-                              snapshot.data!.docs[index].data()
-                                  as Map<String, dynamic>;
-                          final Timestamp? ts = data['timestamp'] as Timestamp?;
-                          final String timeString = ts != null
-                              ? DateFormat(
-                                  'dd MMM yyyy, HH:mm:ss',
-                                ).format(ts.toDate())
-                              : 'Unknown Time';
+                      // 🚀 APPLY DUAL FILTERS (DATE & SEVERITY)
+                      final now = DateTime.now();
+                      final startOfToday = DateTime(
+                        now.year,
+                        now.month,
+                        now.day,
+                      );
+                      final startOfMonth = DateTime(now.year, now.month, 1);
+                      final last7Days = startOfToday.subtract(
+                        const Duration(days: 7),
+                      );
 
-                          final String actionType =
-                              data['action'] ?? data['actionType'] ?? 'UNKNOWN';
-                          final String actorEmail =
-                              data['actor'] ?? data['actorEmail'] ?? 'SYSTEM';
-                          final String targetCol =
-                              data['companyName'] ??
-                              data['targetCollection'] ??
-                              '';
-                          final String targetId =
-                              data['tenantId'] ?? data['targetId'] ?? '';
-                          final String details =
-                              data['details'] ?? data['branchCode'] ?? '';
-                          final String severity =
+                      var docs = snapshot.data!.docs.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+
+                        // 1. Time Filter
+                        if (_selectedTimeRange != 'ALL_TIME') {
+                          final ts = data['timestamp'] as Timestamp?;
+                          if (ts == null) return false;
+                          final logDate = ts.toDate();
+
+                          if (_selectedTimeRange == 'TODAY' &&
+                              logDate.isBefore(startOfToday))
+                            return false;
+                          if (_selectedTimeRange == 'LAST_7_DAYS' &&
+                              logDate.isBefore(last7Days))
+                            return false;
+                          if (_selectedTimeRange == 'THIS_MONTH' &&
+                              logDate.isBefore(startOfMonth))
+                            return false;
+                        }
+
+                        // 2. Severity Filter
+                        if (_selectedSeverity != 'ALL') {
+                          final action =
+                              data['action'] ?? data['actionType'] ?? '';
+                          String severity =
                               data['severity'] ??
-                              (actionType.startsWith('FRAUD')
+                              (action.startsWith('FRAUD')
                                   ? 'CRITICAL'
-                                  : actionType.contains('SUSPEND')
+                                  : action.contains('SUSPEND')
                                   ? 'WARNING'
                                   : 'INFO');
+                          if (action.contains('LOCKED') ||
+                              action.contains('SUSPEND'))
+                            severity = 'WARNING';
+                          if (action.contains('REVOKE') ||
+                              action.contains('DELETE') ||
+                              action.contains('REMOVE'))
+                            severity = 'CRITICAL';
+                          if (severity != _selectedSeverity) return false;
+                        }
 
-                          Color severityColor = Colors.blueAccent;
-                          if (severity == 'WARNING') {
-                            severityColor = Colors.orange;
-                          }
-                          if (severity == 'CRITICAL') {
-                            severityColor = Colors.redAccent;
-                          }
+                        return true;
+                      }).toList();
 
-                          return Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                margin: const EdgeInsets.only(top: 6),
-                                decoration: BoxDecoration(
-                                  color: severityColor,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: severityColor.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                      blurRadius: 10,
-                                    ),
-                                  ],
-                                ),
+                      // 🚀 DART MEMORY SORTING (Desc: Newest First)
+                      docs.sort((a, b) {
+                        final aData = a.data() as Map<String, dynamic>;
+                        final bData = b.data() as Map<String, dynamic>;
+                        final tA = aData['timestamp'] as Timestamp?;
+                        final tB = bData['timestamp'] as Timestamp?;
+                        if (tA == null || tB == null) return 0;
+                        return tB.compareTo(tA);
+                      });
+
+                      // 🚀 PAGINATION LOGIC
+                      final totalPages = (docs.length / _pageSize).ceil();
+                      if (_currentPage >= totalPages && totalPages > 0) {
+                        _currentPage = totalPages - 1;
+                      }
+
+                      final startIndex = _currentPage * _pageSize;
+                      final endIndex = (startIndex + _pageSize > docs.length)
+                          ? docs.length
+                          : startIndex + _pageSize;
+                      final pageDocs = docs.sublist(startIndex, endIndex);
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 🖥️ TERMINAL HEADER
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1A1A1A),
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(12),
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          timeString,
-                                          style: const TextStyle(
-                                            color: Colors.white38,
-                                            fontSize: 11,
-                                            fontFamily: 'monospace',
-                                          ),
+                              border: Border(
+                                bottom: BorderSide(color: Colors.white24),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.terminal,
+                                  color: Colors.greenAccent,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "root@clickout-os:~# tail -f /var/log/audit.log",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade400,
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // 📜 TERMINAL LOGS
+                          Expanded(
+                            child: Scrollbar(
+                              thumbVisibility: true,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: pageDocs.length,
+                                itemBuilder: (context, index) {
+                                  final data =
+                                      pageDocs[index].data()
+                                          as Map<String, dynamic>;
+                                  final Timestamp? ts =
+                                      data['timestamp'] as Timestamp?;
+                                  final String timeStr = ts != null
+                                      ? DateFormat(
+                                          'yy-MM-dd HH:mm:ss',
+                                        ).format(ts.toDate())
+                                      : '00-00-00 00:00:00';
+
+                                  final String action =
+                                      data['action'] ??
+                                      data['actionType'] ??
+                                      'UNKNOWN';
+                                  final String actor =
+                                      data['actor'] ??
+                                      data['actorEmail'] ??
+                                      'SYSTEM';
+                                  final String target =
+                                      data['companyName'] ??
+                                      data['targetCollection'] ??
+                                      data['targetId'] ??
+                                      data['tenantId'] ??
+                                      '';
+                                  final String details =
+                                      data['details'] ??
+                                      data['branchCode'] ??
+                                      '';
+
+                                  // 🚀 FIX: Removed 'final' so we can override it based on action triggers
+                                  String severity =
+                                      data['severity'] ??
+                                      (action.startsWith('FRAUD')
+                                          ? 'CRITICAL'
+                                          : action.contains('SUSPEND')
+                                          ? 'WARNING'
+                                          : 'INFO');
+
+                                  // 🚀 STRICT COLOR CODING LOGIC
+                                  Color sevColor =
+                                      Colors.lightBlueAccent; // INFO
+                                  if (severity == 'WARNING' ||
+                                      action.contains('LOCKED') ||
+                                      action.contains('SUSPEND')) {
+                                    sevColor = Colors.orangeAccent;
+                                    severity = 'WARNING';
+                                  }
+                                  if (severity == 'CRITICAL' ||
+                                      action.contains('REVOKE') ||
+                                      action.contains('DELETE') ||
+                                      action.contains('REMOVE')) {
+                                    sevColor = Colors.redAccent;
+                                    severity = 'CRITICAL';
+                                  }
+
+                                  // 🚀 SINGLE LINE CMD PROMPT FORMAT WITH HEAVY COLORS
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: SelectableText.rich(
+                                      TextSpan(
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                          fontSize: 13,
+                                          height: 1.4,
                                         ),
-                                        Text(
-                                          severity,
-                                          style: TextStyle(
-                                            color: severityColor,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(
-                                          alpha: 0.02,
-                                        ),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: Colors.white10,
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
                                         children: [
-                                          Row(
-                                            children: [
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 2,
-                                                    ),
-                                                decoration: BoxDecoration(
-                                                  color: severityColor
-                                                      .withValues(alpha: 0.2),
-                                                  borderRadius:
-                                                      BorderRadius.circular(4),
-                                                ),
-                                                child: Text(
-                                                  actionType,
-                                                  style: TextStyle(
-                                                    color: severityColor,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 10,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Text(
-                                                "$targetCol / $targetId",
-                                                style: const TextStyle(
-                                                  color: Colors.white54,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            details,
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 13,
-                                              height: 1.4,
+                                          TextSpan(
+                                            text: "[$timeStr] ",
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
                                             ),
                                           ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            "Actor: $actorEmail",
+                                          TextSpan(
+                                            text: "[$severity] ",
+                                            style: TextStyle(
+                                              color: sevColor,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: "$action ",
+                                            style: TextStyle(
+                                              color: sevColor,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          TextSpan(
+                                            text: "by <$actor> ",
                                             style: const TextStyle(
-                                              color: Colors.white38,
-                                              fontSize: 11,
-                                              fontStyle: FontStyle.italic,
+                                              color: Colors.purpleAccent,
+                                            ),
+                                          ),
+                                          if (target.isNotEmpty)
+                                            TextSpan(
+                                              text: "on [$target] ",
+                                              style: const TextStyle(
+                                                color: Colors.yellowAccent,
+                                              ),
+                                            ),
+                                          TextSpan(
+                                            text: "» $details",
+                                            style: TextStyle(
+                                              color: severity == 'CRITICAL'
+                                                  ? Colors.red.shade200
+                                                  : Colors.grey.shade300,
                                             ),
                                           ),
                                         ],
                                       ),
                                     ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+
+                          // ⏭️ PAGINATION FOOTER
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF1A1A1A),
+                              borderRadius: BorderRadius.vertical(
+                                bottom: Radius.circular(12),
+                              ),
+                              border: Border(
+                                top: BorderSide(color: Colors.white24),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  "Showing ${startIndex + 1}-${endIndex} of ${docs.length} logs",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontFamily: 'monospace',
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.arrow_back_ios,
+                                        size: 14,
+                                        color: Colors.greenAccent,
+                                      ),
+                                      onPressed: _currentPage > 0
+                                          ? () => setState(() => _currentPage--)
+                                          : null,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      disabledColor: Colors.grey.shade800,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Text(
+                                      "PAGE ${_currentPage + 1} / $totalPages",
+                                      style: const TextStyle(
+                                        color: Colors.greenAccent,
+                                        fontFamily: 'monospace',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.arrow_forward_ios,
+                                        size: 14,
+                                        color: Colors.greenAccent,
+                                      ),
+                                      onPressed: _currentPage < totalPages - 1
+                                          ? () => setState(() => _currentPage++)
+                                          : null,
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      disabledColor: Colors.grey.shade800,
+                                    ),
                                   ],
                                 ),
-                              ),
-                            ],
-                          );
-                        },
+                              ],
+                            ),
+                          ),
+                        ],
                       );
                     },
                   ),

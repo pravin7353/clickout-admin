@@ -12,6 +12,8 @@ import '../auth/auth_provider.dart';
 import '../../core/utils/standard_utils.dart'; // 🚀 5 Standard Rules
 import '../coach/widgets/info_button.dart';
 import '../../core/theme/app_theme.dart'; // 🚀 Added Theme Extension
+import '../../core/widgets/skeleton_loader.dart';
+import '../../core/widgets/error_state.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -30,17 +32,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       backgroundColor: bgColor,
       body: revenueState.when(
-        loading: () => const Center(
-          child: SkeletonLoader(
+        loading: () => const Padding(
+          padding: EdgeInsets.all(24.0),
+          child: SkeletonBox(
             width: double.infinity,
             height: 400,
-          ), // 🚀 Skeleton Rule
-        ),
-        error: (err, stack) => Center(
-          child: Text(
-            "🚨 Intel Radar Failed: $err",
-            style: const TextStyle(color: Colors.red),
+            borderRadius: BorderRadius.all(Radius.circular(16)),
           ),
+        ),
+        error: (err, stack) => ErrorState(
+          message: "Failed to load revenue metrics.",
+          onRetry: () => ref.invalidate(revenueEngineProvider),
         ),
         data: (metrics) {
           return SingleChildScrollView(

@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 FIX: IMPORT ADDED
 import '../services/employee_service.dart';
 import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/skeleton_loader.dart';
+import '../../../core/widgets/error_state.dart';
 
 class OnboardStaffDialog extends ConsumerStatefulWidget {
   const OnboardStaffDialog({super.key});
@@ -98,38 +100,48 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     String? hint,
     IconData? prefixIcon,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
       labelText: label,
       hintText: hint,
       labelStyle: TextStyle(
-        color: textSecondary,
+        color: isDark ? Colors.white70 : Colors.black87,
         fontSize: 13,
-      ), // 🚀 Removed const
+        fontWeight: FontWeight.w600,
+      ),
       hintStyle: TextStyle(
-        color: textSecondary.withValues(alpha: 0.5),
+        color: isDark ? Colors.white24 : Colors.black26,
         fontSize: 13,
       ),
       filled: true,
-      fillColor: inputBg,
+      fillColor: cardDark, // 🛠️ FIX: Premium thick background style
       prefixIcon: prefixIcon != null
-          ? Icon(prefixIcon, color: textSecondary, size: 18)
+          ? Icon(prefixIcon, color: Colors.grey, size: 18)
           : null,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      contentPadding: const EdgeInsets.all(16),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.05)
+              : Colors.grey.shade300,
+        ),
       ),
-      focusedBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: accentGreen, width: 1.5),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: accentGreen),
       ),
-      errorBorder: const OutlineInputBorder(
-        borderRadius: BorderRadius.all(Radius.circular(8)),
-        borderSide: BorderSide(color: Colors.redAccent, width: 1.5),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.redAccent),
       ),
     );
   }
@@ -156,60 +168,87 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
     // 🚀 STATIC ROLES LIST
     final List<String> availableRoles = ['MANAGER', 'CASHIER', 'GUARD'];
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: accentGreen.withValues(alpha: 0.2), width: 1),
-      ),
-      backgroundColor: bgDark,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       insetPadding: EdgeInsets.all(isMobile ? 15 : 20),
       alignment: Alignment.center,
       child: Container(
         width: isMobile ? double.infinity : 550,
         decoration: BoxDecoration(
           color: bgDark,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(24), // 🛠️ FIX: Premium curves
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.grey.shade200,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? accentGreen.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.1),
+              blurRadius: 40,
+              spreadRadius: -10,
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // --- HEADER ---
-            Padding(
+            // 🌟 PREMIUM HEADER
+            Container(
               padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: cardDark,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.person_add_alt_1,
-                    color: accentGreen,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    // 🚀 Removed const
-                    "Onboard Personnel",
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      color: textPrimary,
-                      letterSpacing: 0.5,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: accentGreen.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.person_add_alt_1,
+                      color: accentGreen,
+                      size: 24,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Onboard Personnel",
+                          style: TextStyle(
+                            color: textPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        Text(
+                          "Grant access and assign branch roles",
+                          style: TextStyle(color: textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
                   IconButton(
-                    icon: Icon(
-                      Icons.close,
-                      color: textSecondary,
-                    ), // 🚀 Removed const
+                    icon: Icon(Icons.close, color: textSecondary),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
               ),
-            ),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: textSecondary.withValues(alpha: 0.1),
             ),
 
             // --- FORM CONTENT ---
@@ -307,11 +346,32 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                             );
 
                           // 🏢 Agar Tenant Admin hai, toh unke saare stores ka Dropdown dikhao
-                          if (!snapshot.hasData) {
-                            return const Center(
-                              child: CircularProgressIndicator(
-                                color: accentGreen,
+                          if (snapshot.hasError) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 20),
+                              child: ErrorState(
+                                message: "Failed to load branches.",
+                                onRetry: () => setState(() {
+                                  _storesFuture = FirebaseFirestore.instance
+                                      .collection('stores')
+                                      .where(
+                                        'tenantId',
+                                        isEqualTo: adminData?['tenantId'],
+                                      )
+                                      .where('isDeleted', isEqualTo: false)
+                                      .limit(200)
+                                      .get();
+                                }),
                               ),
+                            );
+                          }
+
+                          if (!snapshot.hasData) {
+                            return const Padding(
+                              padding: EdgeInsets.only(bottom: 20),
+                              child: SkeletonBox(
+                                height: 56,
+                              ), // 🚀 MATCHES INPUT HEIGHT
                             );
                           }
 
@@ -521,22 +581,21 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                 ),
               ),
             ),
-            Divider(
-              height: 1,
-              thickness: 1,
-              color: textSecondary.withValues(alpha: 0.1),
-            ),
-
-            // --- FOOTER BUTTONS ---
-            Padding(
+            // 🚀 PREMIUM FOOTER ACTIONS
+            Container(
               padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: cardDark,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(24),
+                ),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: _isLoading ? null : () => Navigator.pop(context),
                     child: Text(
-                      // 🚀 Removed const
                       "Cancel",
                       style: TextStyle(
                         color: textSecondary,
@@ -545,36 +604,46 @@ class _OnboardStaffDialogState extends ConsumerState<OnboardStaffDialog> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: accentGreen,
-                      foregroundColor: bgDark,
+                      foregroundColor:
+                          Colors.black, // 🛠️ Premium dark text on green
+                      elevation: 0,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
+                        horizontal: 32,
                         vertical: 16,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: _isLoading
                         ? null
                         : () => _submitForm(autoFetchedBranch),
-                    icon: _isLoading
-                        ? SizedBox(
-                            // 🚀 Removed const
-                            width: 18,
-                            height: 18,
+                    child: _isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
                             child: CircularProgressIndicator(
-                              color: bgDark,
+                              color: Colors.black,
                               strokeWidth: 2,
                             ),
                           )
-                        : const Icon(Icons.rocket_launch, size: 18),
-                    label: Text(
-                      _isLoading ? "Processing..." : "Create Access",
-                      style: const TextStyle(fontWeight: FontWeight.w900),
-                    ),
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.rocket_launch, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                "Create Access",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ],
               ),

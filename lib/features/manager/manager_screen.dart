@@ -11,6 +11,8 @@ import 'package:clickout_admin/features/auth/auth_provider.dart';
 import '../coach/widgets/mission_banner.dart';
 import '../coach/widgets/info_button.dart';
 import '../../core/theme/app_theme.dart';
+import 'package:clickout_admin/core/widgets/skeleton_loader.dart'; // 🚀 Added
+import 'package:clickout_admin/core/widgets/error_state.dart'; // 🚀 Added
 
 class ManagerScreen extends ConsumerStatefulWidget {
   const ManagerScreen({super.key});
@@ -26,6 +28,36 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
   void dispose() {
     _horizontalScrollController.dispose();
     super.dispose();
+  }
+
+  // 🚀 SAAS AUDIT INJECTION: Log critical actions directly to the Vault
+  Future<void> _logAuditAction(
+    String action,
+    String severity,
+    String targetId,
+    String details,
+  ) async {
+    try {
+      final adminData = ref.read(adminRoleProvider).value;
+      final String? tenantId = adminData?['tenantId'];
+      final String actorName = adminData?['name'] ?? 'Super Admin';
+      final String actorEmail = adminData?['email'] ?? 'Unknown Email';
+
+      if (tenantId == null) return;
+
+      await FirebaseFirestore.instance.collection('admin_audit_logs').add({
+        'tenantId': tenantId,
+        'actionType': action,
+        'severity': severity,
+        'actorEmail': "$actorName ($actorEmail)",
+        'targetCollection': 'Staff Roster',
+        'targetId': targetId,
+        'details': details,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      debugPrint("Failed to log audit: $e");
+    }
   }
 
   // 🎨 DYNAMIC THEME INPUT STYLE
@@ -679,12 +711,17 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                     OutlinedButton.icon(
                       icon: Icon(
                         Icons.file_upload_outlined,
-                        color: theme.primaryColor,
+                        color: isDark
+                            ? Colors.white
+                            : theme.primaryColor, // 🛠️ FIX: White in Dark Mode
                       ),
                       label: Text(
                         "Import CSV",
                         style: TextStyle(
-                          color: theme.primaryColor,
+                          color: isDark
+                              ? Colors.white
+                              : theme
+                                    .primaryColor, // 🛠️ FIX: White in Dark Mode
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -693,7 +730,9 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                           horizontal: 20,
                           vertical: 16,
                         ),
-                        side: BorderSide(color: theme.primaryColor),
+                        side: BorderSide(
+                          color: isDark ? Colors.white54 : theme.primaryColor,
+                        ), // 🛠️ FIX: Border color
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -843,7 +882,16 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                       ),
                     )
                   : (managerState.isLoading && managerState.records.isEmpty)
-                  ? const Center(child: CircularProgressIndicator())
+                  ? ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: 6,
+                      itemBuilder: (_, __) => const Padding(
+                        padding: EdgeInsets.only(bottom: 12),
+                        child: SkeletonBox(
+                          height: 65,
+                        ), // 🚀 FIX: Matches DataTable Row Height
+                      ),
+                    )
                   : managerState.records.isEmpty
                   ? const Center(
                       child: Text(
@@ -1135,6 +1183,14 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                                                 ),
                                                           ),
                                                           onSelected: (value) async {
+                                                            final empId =
+                                                                data['empId'] ??
+                                                                data['docId'] ??
+                                                                'Unknown';
+                                                            final empName =
+                                                                data['name'] ??
+                                                                'Unknown Staff';
+
                                                             if (value ==
                                                                 'edit') {
                                                               _showEditStaffDialog(
@@ -1149,6 +1205,26 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                                               );
                                                               managerNotifier
                                                                   .fetchInitial();
+
+                                                              // 🚀 PUSH TO AUDIT VAULT
+                                                              final action =
+                                                                  isActive
+                                                                  ? 'REVOKED_ACCESS'
+                                                                  : 'RESTORED_ACCESS';
+                                                              final severity =
+                                                                  isActive
+                                                                  ? 'CRITICAL'
+                                                                  : 'INFO';
+                                                              final details =
+                                                                  isActive
+                                                                  ? "Revoked access for $empName ($empId)"
+                                                                  : "Restored access for $empName ($empId)";
+                                                              await _logAuditAction(
+                                                                action,
+                                                                severity,
+                                                                empId,
+                                                                details,
+                                                              );
                                                             } else if (value ==
                                                                 'delete') {
                                                               await EmployeeService.softDeleteEmployee(
@@ -1157,6 +1233,14 @@ class _ManagerScreenState extends ConsumerState<ManagerScreen> {
                                                               );
                                                               managerNotifier
                                                                   .fetchInitial();
+
+                                                              // 🚀 PUSH TO AUDIT VAULT
+                                                              await _logAuditAction(
+                                                                'REMOVED_STAFF',
+                                                                'CRITICAL',
+                                                                empId,
+                                                                "Permanently removed $empName ($empId) from the roster.",
+                                                              );
                                                             }
                                                           },
                                                           itemBuilder: (context) => [
@@ -1425,11 +1509,16 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark; // 🛠️ FIX: Added dark mode check
     final isMobile =
         MediaQuery.of(context).size.width < 600; // 🚀 RESPONSIVE CHECK
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: isDark ? Colors.white12 : Colors.transparent),
+      ),
       backgroundColor: theme.cardColor,
       insetPadding: EdgeInsets.all(
         isMobile ? 15 : 24,
@@ -1443,50 +1532,69 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
           children: [
             Row(
               children: [
-                Icon(Icons.rocket_launch, color: theme.primaryColor, size: 28),
+                Icon(
+                  Icons.rocket_launch,
+                  color: isDark ? Colors.white : theme.primaryColor,
+                  size: 28,
+                ),
                 const SizedBox(width: 12),
                 Text(
                   "Bulk Onboarding Engine",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: theme.primaryColor,
+                    color: isDark
+                        ? Colors.white
+                        : theme.primaryColor, // 🛠️ FIX: Visible Title
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
-            const Text(
+            Text(
               "Format: empId, name, email, phone, role, branchCode",
-              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.grey.shade400 : Colors.grey,
+              ),
             ),
             const SizedBox(height: 20),
             if (!_isProcessing && _totalRows == 0) ...[
               TextField(
                 controller: _csvController,
                 maxLines: 10,
-                style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                ), // 🛠️ FIX: Text color
                 decoration: InputDecoration(
                   hintText:
                       "e.g.\nEMP001, Manager, manager@clickout.com, 9876543210, MANAGER, JAI_MUM_002\nEMP002, Cashier, , 9876543211, CASHIER, JAI_MUM_002\nEMP003, Guard Bhaiya, , 9876543212, GUARD, JAI_MUM_002",
                   hintStyle: TextStyle(
-                    color: Colors.grey.withValues(alpha: 0.5),
+                    color: isDark ? Colors.white38 : Colors.black38,
                   ),
                   filled: true,
-                  fillColor: theme.brightness == Brightness.dark
-                      ? const Color(0xFF1A221A)
-                      : const Color(0xFFF4F5F7), // 💎 Sequence soft input
+                  fillColor: isDark
+                      ? const Color(0xFF1E1E1E) // 💎 Premium Dark Input
+                      : const Color(0xFFF4F5F7),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: theme.dividerColor),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white12 : theme.dividerColor,
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: theme.dividerColor),
+                    borderSide: BorderSide(
+                      color: isDark ? Colors.white12 : theme.dividerColor,
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: theme.primaryColor),
+                    borderSide: BorderSide(
+                      color: isDark
+                          ? const Color(0xFF00C853)
+                          : theme.primaryColor,
+                    ), // Green focus
                   ),
                 ),
               ),
@@ -1496,18 +1604,32 @@ class _BulkImportDialogState extends ConsumerState<BulkImportDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text("Cancel"),
+                    child: Text(
+                      "Cancel",
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.black87,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primaryColor,
+                      backgroundColor: isDark
+                          ? const Color(0xFF00C853)
+                          : theme.primaryColor, // 🛠️ FIX: Green button
+                      foregroundColor: isDark ? Colors.black : Colors.white,
                     ),
                     onPressed: _processCsv,
-                    icon: const Icon(Icons.play_arrow, color: Colors.white),
-                    label: const Text(
+                    icon: Icon(
+                      Icons.play_arrow,
+                      color: isDark ? Colors.black : Colors.white,
+                    ),
+                    label: Text(
                       "Start Batch Process",
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(
+                        color: isDark ? Colors.black : Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
