@@ -1427,3 +1427,114 @@ exports.aggregateDailyStoreStats = onSchedule(
         return null;
     }
 );
+        // ============================================================================
+        // 22. DAILY STORE STATS GENERATOR
+        // Runs every night, aggregates today's orders per store into one summary doc.
+        // ============================================================================
+        exports.generateDailyStoreStats = onSchedule(
+        { schedule: "55 23 * * *", timeZone: "Asia/Kolkata" },
+        async () => {
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+        const ordersSnap = await db.collection("orders")
+            .where("timestamp", ">=", admin.firestore.Timestamp.fromDate(startOfDay))
+            .get();
+
+        const groups = {};
+        for (const doc of ordersSnap.docs) {
+            const data = doc.data();
+            const key = `${data.tenantId}_${data.branchCode}`;
+                if (!groups[key]) {
+                    groups[key] = {
+                        tenantId: data.tenantId,
+                        branchCode: data.branchCode,
+                        totalRevenue: 0, cashRevenue: 0, upiRevenue: 0,
+                        cashLeakage: 0, upiLeakage: 0,
+                        totalOrders: 0, rejectedCount: 0, pendingCount: 0,
+                        refundCount: 0, refundAmount: 0,
+        };
+      }
+        const g = groups[key];
+        const pStatus = (data.paymentStatus || "").toUpperCase();
+        const eStatus = (data.exitStatus || "").toUpperCase();
+        const amount = parseFloat(data.totalAmount || 0) || 0;
+        const isCash = (data.paymentMode || "").toUpperCase() === "CASH";
+
+      if (pStatus === "PAID" || pStatus === "SUCCESS") {
+        g.totalOrders++;
+        g.totalRevenue += amount;
+        if (isCash) g.cashRevenue += amount; else g.upiRevenue += amount;
+
+        if (eStatus === "REJECTED") {
+          g.rejectedCount++;
+          if (isCash) g.cashLeakage += amount; else g.upiLeakage += amount;
+        } else if (eStatus === "PENDING" || eStatus === "READY_FOR_EXIT") {
+          g.pendingCount++;
+          if (isCash) g.cashLeakage += amount; else g.upiLeakage += amount;
+        }
+      }
+      if (pStatus === "REFUNDED") {
+        g.refundCount++;
+        g.refundAmount += amount;
+      }
+    }
+
+    const batch = db.batch();
+    for (const key of Object.keys(groups)) {
+      const g = groups[key];
+      const docId = `${g.tenantId}_${g.branchCode}_${dateStr}`;
+      batch.set(db.collection("daily_store_stats").doc(docId), {
+        ...g,
+        date: dateStr,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    }
+    await batch.commit();
+    console.log(`Generated daily_store_stats for ${Object.keys(groups).length} stores.`);
+  }
+);
+
+// ============================================================================
+// 23. AI REORDER SUGGESTION GENERATOR
+// Runs every morning, scans low-stock products, creates one suggestion per item.
+// ============================================================================
+exports.generateAiPoSuggestions = onSchedule(
+  { schedule: "0 6 * * *", timeZone: "Asia/Kolkata" },
+  async () => {
+    const lowStockSnap = await db.collection("products")
+      .where("physicalStock", "<=", 20)
+      .get();
+
+    const existingSnap = await db.collection("ai_po_suggestions").get();
+    const alreadySuggested = new Set(existingSnap.docs.map((d) => d.data().productId));
+
+    const batch = db.batch();
+    let created = 0;
+
+    for (const doc of lowStockSnap.docs) {
+      const data = doc.data();
+      if (data.isBlocked === true || data.isDeleted === true) continue;
+      if (alreadySuggested.has(doc.id)) continue;
+
+      const supplierId = data.supplierId || "DEFAULT_SUPPLIER";
+      const suggestedQty = Math.max(50, (data.openingStock || 50) - (data.physicalStock || 0));
+
+      const ref = db.collection("ai_po_suggestions").doc();
+      batch.set(ref, {
+        suggestionId: ref.id,
+        productId: doc.id,
+        supplierId,
+        branchCode: data.branchCode || "HQ",
+        suggestedQty,
+        tenantId: data.tenantId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      created++;
+    }
+
+    await batch.commit();
+    console.log(`Generated ${created} new AI PO suggestions.`);
+  }
+);
